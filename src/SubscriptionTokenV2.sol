@@ -8,7 +8,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin-upgradeable/contracts/acces
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import {ERC721Upgradeable} from "@openzeppelin-upgradeable/contracts/token/ERC721/ERC721Upgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/ReentrancyGuardUpgradeable.sol";
-import {Shared} from "./Shared.sol";
+import {InitParams} from "./types/InitParams.sol";
 
 /**
  * @title Subscription Token Protocol Version 1
@@ -208,7 +208,7 @@ contract SubscriptionTokenV2 is
      * @dev Initialize acts as the constructor, as this contract is intended to work with proxy contracts.
      * @param params the init params (See Common.InitParams)
      */
-    function initialize(Shared.InitParams memory params) public initializer {
+    function initialize(InitParams memory params) public initializer {
         require(bytes(params.name).length > 0, "Name cannot be empty");
         require(bytes(params.symbol).length > 0, "Symbol cannot be empty");
         require(bytes(params.contractUri).length > 0, "Contract URI cannot be empty");

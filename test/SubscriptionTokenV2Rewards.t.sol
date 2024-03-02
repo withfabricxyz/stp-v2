@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {Shared} from "src/Shared.sol";
+import {InitParams} from "src/types/InitParams.sol";
 import {BaseTest, ERC20Token, MockFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 
 contract SubscriptionTokenV2RewardsTest is BaseTest {
@@ -17,9 +17,8 @@ contract SubscriptionTokenV2RewardsTest is BaseTest {
     }
 
     function testSingleHalving() public {
-        SubscriptionTokenV2 m = createStp(
-            Shared.InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 10, 500, 1, 0, address(0), address(0))
-        );
+        SubscriptionTokenV2 m =
+            createStp(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 10, 500, 1, 0, address(0), address(0)));
         assertEq(m.rewardMultiplier(), 2);
         vm.warp(block.timestamp + 11);
         assertEq(m.rewardMultiplier(), 1);
@@ -143,9 +142,7 @@ contract SubscriptionTokenV2RewardsTest is BaseTest {
             bytes32(uint256(0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00)),
             bytes32(0)
         );
-        stp.initialize(
-            Shared.InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 10, 0, 1, 0, address(0), address(0))
-        );
+        stp.initialize(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 10, 0, 1, 0, address(0), address(0)));
 
         mint(alice, 2592000 * 2);
         mint(bob, 1e8);

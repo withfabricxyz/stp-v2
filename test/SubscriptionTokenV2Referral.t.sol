@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {Shared} from "src/Shared.sol";
+import {InitParams} from "src/types/InitParams.sol";
 import {BaseTest, ERC20Token, MockFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 
 contract SubscriptionTokenV2ReferralTest is BaseTest {

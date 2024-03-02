@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {Shared} from "src/Shared.sol";
+import {InitParams} from "src/types/InitParams.sol";
 import {BaseTest, ERC20Token, MockFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 import {SubscriptionTokenV2Factory} from "src/SubscriptionTokenV2Factory.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";

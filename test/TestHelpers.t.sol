@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {Test} from "@forge/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {Shared} from "src/Shared.sol";
+import {InitParams} from "src/types/InitParams.sol";
 
 // Test token which charges 50% fee on transfer
 contract MockFeeToken is ERC20 {
@@ -128,7 +128,7 @@ abstract contract BaseTest is Test {
 
     SubscriptionTokenV2 internal stp;
 
-    function createStp(Shared.InitParams memory params) internal returns (SubscriptionTokenV2) {
+    function createStp(InitParams memory params) internal returns (SubscriptionTokenV2) {
         stp = new SubscriptionTokenV2();
         vm.store(
             address(stp),
@@ -181,7 +181,7 @@ abstract contract BaseTest is Test {
         _token.transfer(creator, 1e20);
 
         return createStp(
-            Shared.InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 2, 0, 0, 0, address(0), address(_token))
+            InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 2, 0, 0, 0, address(0), address(_token))
         );
     }
 
@@ -194,13 +194,13 @@ abstract contract BaseTest is Test {
         // vm.store(address(m), bytes32(uint256(0)), bytes32(0));
         if (feeBps > 0) {
             sub = createStp(
-                Shared.InitParams(
+                InitParams(
                     "Meow Sub", "MEOW", "curi", "turi", creator, 2, minPurchase, rewardBps, 6, feeBps, fees, address(0)
                 )
             );
         } else {
             sub = createStp(
-                Shared.InitParams(
+                InitParams(
                     "Meow Sub", "MEOW", "curi", "turi", creator, 2, minPurchase, rewardBps, 6, 0, address(0), address(0)
                 )
             );

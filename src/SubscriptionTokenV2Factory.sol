@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {SubscriptionTokenV2} from "./SubscriptionTokenV2.sol";
-import {Shared} from "./Shared.sol";
+import {InitParams} from "./types/InitParams.sol";
 
 /**
  *
@@ -97,7 +97,7 @@ contract SubscriptionTokenV2Factory is Ownable2Step {
 
         address deployment = Clones.clone(_implementation);
         SubscriptionTokenV2(payable(deployment)).initialize(
-            Shared.InitParams(
+            InitParams(
                 name,
                 symbol,
                 contractURI,

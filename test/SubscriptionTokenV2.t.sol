@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {Shared} from "src/Shared.sol";
+import {InitParams} from "src/types/InitParams.sol";
 import {BaseTest, ERC20Token, MockFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
@@ -10,9 +10,7 @@ import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.s
 
 contract SubscriptionTokenV2Test is BaseTest {
     function setUp() public {
-        stp = createStp(
-            Shared.InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 0, 0, 0, address(0), address(0))
-        );
+        stp = createStp(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 0, 0, 0, address(0), address(0)));
 
         deal(alice, 1e19);
         deal(bob, 1e19);
@@ -36,60 +34,46 @@ contract SubscriptionTokenV2Test is BaseTest {
 
         vm.expectRevert("Owner address cannot be 0x0");
         stp.initialize(
-            Shared.InitParams("Meow Sub", "MEOW", "curi", "turi", address(0), 2, 4, 0, 0, 0, address(0), address(0))
+            InitParams("Meow Sub", "MEOW", "curi", "turi", address(0), 2, 4, 0, 0, 0, address(0), address(0))
         );
 
         vm.expectRevert("Tokens per second must be > 0");
-        stp.initialize(
-            Shared.InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 0, 4, 0, 0, 0, address(0), address(0))
-        );
+        stp.initialize(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 0, 4, 0, 0, 0, address(0), address(0)));
 
         vm.expectRevert("Fee bps too high");
-        stp.initialize(
-            Shared.InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 0, 0, 1500, fees, address(0))
-        );
+        stp.initialize(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 0, 0, 1500, fees, address(0)));
 
         vm.expectRevert("Fees required when fee recipient is present");
-        stp.initialize(Shared.InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 0, 0, 0, fees, address(0)));
+        stp.initialize(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 0, 0, 0, fees, address(0)));
 
         vm.expectRevert("Min purchase seconds must be > 0");
-        stp.initialize(
-            Shared.InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 0, 0, 0, 0, address(0), address(0))
-        );
+        stp.initialize(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 0, 0, 0, 0, address(0), address(0)));
 
         vm.expectRevert("Reward bps too high");
         stp.initialize(
-            Shared.InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 11_000, 0, 0, address(0), address(0))
+            InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 11_000, 0, 0, address(0), address(0))
         );
 
         vm.expectRevert("Reward halvings too high");
         stp.initialize(
-            Shared.InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 500, 33, 0, address(0), address(0))
+            InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 500, 33, 0, address(0), address(0))
         );
 
         vm.expectRevert("Reward halvings too low");
-        stp.initialize(
-            Shared.InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 500, 0, 0, address(0), address(0))
-        );
+        stp.initialize(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 500, 0, 0, address(0), address(0)));
 
         // Invalid name
         vm.expectRevert("Name cannot be empty");
-        stp.initialize(Shared.InitParams("", "MEOW", "curi", "turi", creator, 2, 4, 0, 0, 0, address(0), address(0)));
+        stp.initialize(InitParams("", "MEOW", "curi", "turi", creator, 2, 4, 0, 0, 0, address(0), address(0)));
 
         vm.expectRevert("Symbol cannot be empty");
-        stp.initialize(
-            Shared.InitParams("Meow Sub", "", "curi", "turi", creator, 2, 4, 0, 0, 0, address(0), address(0))
-        );
+        stp.initialize(InitParams("Meow Sub", "", "curi", "turi", creator, 2, 4, 0, 0, 0, address(0), address(0)));
 
         vm.expectRevert("Contract URI cannot be empty");
-        stp.initialize(
-            Shared.InitParams("Meow Sub", "MEOW", "", "turi", creator, 2, 4, 0, 0, 0, address(0), address(0))
-        );
+        stp.initialize(InitParams("Meow Sub", "MEOW", "", "turi", creator, 2, 4, 0, 0, 0, address(0), address(0)));
 
         vm.expectRevert("Token URI cannot be empty");
-        stp.initialize(
-            Shared.InitParams("Meow Sub", "MEOW", "curi", "", creator, 2, 4, 0, 0, 0, address(0), address(0))
-        );
+        stp.initialize(InitParams("Meow Sub", "MEOW", "curi", "", creator, 2, 4, 0, 0, 0, address(0), address(0)));
     }
 
     function testMint() public prank(alice) {
@@ -339,7 +323,7 @@ contract SubscriptionTokenV2Test is BaseTest {
         );
         _token.transfer(alice, 1e20);
         SubscriptionTokenV2 m = createStp(
-            Shared.InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 2, 0, 0, 0, address(0), address(_token))
+            InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 2, 0, 0, 0, address(0), address(_token))
         );
         vm.startPrank(alice);
         _token.approve(address(m), 1e18);
