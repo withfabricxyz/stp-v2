@@ -9,6 +9,9 @@ import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/Pau
 import {ERC721Upgradeable} from "@openzeppelin-upgradeable/contracts/token/ERC721/ERC721Upgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/ReentrancyGuardUpgradeable.sol";
 import {InitParams} from "./types/InitParams.sol";
+import {Allocation} from "./types/Allocation.sol";
+import {Subscription} from "./types/Subscription.sol";
+import {AllocationLib} from "./libraries/AllocationLib.sol";
 
 /**
  * @title Subscription Token Protocol Version 1
@@ -29,6 +32,7 @@ contract SubscriptionTokenV2 is
 {
     using SafeERC20 for IERC20;
     using Strings for uint256;
+    using AllocationLib for Allocation;
 
     /// @dev The maximum number of reward halvings (limiting this prevents overflow)
     uint256 private constant _MAX_REWARD_HALVINGS = 32;
@@ -102,24 +106,6 @@ contract SubscriptionTokenV2 is
     /// @dev Emitted when the transfer recipient is updated
     event TransferRecipientChange(address indexed recipient);
 
-    /// @dev The subscription struct which holds the state of a subscription for an account
-    struct Subscription {
-        /// @dev The tokenId for the subscription
-        uint256 tokenId;
-        /// @dev The number of seconds purchased
-        uint256 secondsPurchased;
-        /// @dev The number of seconds granted by the creator
-        uint256 secondsGranted;
-        /// @dev A time offset used to adjust expiration for grants
-        uint256 grantOffset;
-        /// @dev A time offset used to adjust expiration for purchases
-        uint256 purchaseOffset;
-        /// @dev The number of reward points earned
-        uint256 rewardPoints;
-        /// @dev The number of rewards withdrawn
-        uint256 rewardsWithdrawn;
-    }
-
     /// @dev The metadata URI for the contract
     string private _contractURI;
 
@@ -135,14 +121,10 @@ contract SubscriptionTokenV2 is
     /// @dev The minimum number of tokens accepted for a time purchase
     uint256 private _minimumPurchase;
 
+    Allocation private _allocation;
+
     /// @dev The token contract address, or 0x0 for native tokens
     IERC20 private _token;
-
-    /// @dev The total number of tokens transferred in (accounting)
-    uint256 private _tokensIn;
-
-    /// @dev The total number of tokens transferred out (accounting)
-    uint256 private _tokensOut;
 
     /// @dev The token counter for mint id generation and enforcing supply caps
     uint256 private _tokenCounter;
@@ -230,6 +212,7 @@ contract SubscriptionTokenV2 is
         _transferOwnership(params.owner);
         __Pausable_init();
         __ReentrancyGuard_init();
+        _allocation = Allocation(0, 0, params.erc20TokenAddr);
         _contractURI = params.contractUri;
         _tokenURI = params.tokenUri;
         _tokensPerSecond = params.tokensPerSecond;
@@ -277,7 +260,7 @@ contract SubscriptionTokenV2 is
         sub.rewardsWithdrawn += rewardAmount;
         _subscriptions[msg.sender] = sub;
         _rewardPoolBalance -= rewardAmount;
-        _transferOut(msg.sender, rewardAmount);
+        _allocation.transferOut(msg.sender, rewardAmount);
         emit RewardWithdraw(msg.sender, rewardAmount);
     }
 
@@ -352,7 +335,8 @@ contract SubscriptionTokenV2 is
     function refund(uint256 numTokensIn, address[] memory accounts) external payable onlyOwner {
         require(accounts.length > 0, "No accounts to refund");
         if (numTokensIn > 0) {
-            uint256 finalAmount = _transferIn(msg.sender, numTokensIn);
+            // uint256 finalAmount = _transferIn(msg.sender, numTokensIn);
+            uint256 finalAmount = _allocation.transferIn(msg.sender, numTokensIn);
             emit RefundTopUp(finalAmount);
         } else if (msg.value > 0) {
             revert("Unexpected value transfer");
@@ -431,7 +415,7 @@ contract SubscriptionTokenV2 is
      * @param numTokens the amount of ERC20 tokens or native tokens to transfer
      */
     function mintFor(address account, uint256 numTokens) public payable whenNotPaused validAmount(numTokens) {
-        uint256 finalAmount = _transferIn(msg.sender, numTokens);
+        uint256 finalAmount = _allocation.transferIn(msg.sender, numTokens);
         _purchaseTime(account, finalAmount);
     }
 
@@ -450,13 +434,13 @@ contract SubscriptionTokenV2 is
     {
         require(referrer != address(0), "Referrer cannot be 0x0");
 
-        uint256 finalAmount = _transferIn(msg.sender, numTokens);
+        uint256 finalAmount = _allocation.transferIn(msg.sender, numTokens);
         uint256 tokenId = _purchaseTime(account, finalAmount);
 
         // Calculate rewards and transfer rewards out
         uint256 payout = _referralAmount(finalAmount, referralCode);
         if (payout > 0) {
-            _transferOut(referrer, payout);
+            _allocation.transferOut(referrer, payout);
             emit ReferralPayout(tokenId, referrer, referralCode, payout);
         }
     }
@@ -628,41 +612,10 @@ contract SubscriptionTokenV2 is
         return amount - rewards;
     }
 
-    /// @dev Transfer tokens into the contract, either native or ERC20
-    function _transferIn(address from, uint256 amount) internal nonReentrant returns (uint256) {
-        if (!_erc20) {
-            require(msg.value == amount, "Purchase amount must match value sent");
-            _tokensIn += amount;
-            return amount;
-        }
-
-        // Note: We support tokens which take fees, but do not support rebasing tokens
-        require(msg.value == 0, "Native tokens not accepted for ERC20 subscriptions");
-        uint256 preBalance = _token.balanceOf(from);
-        uint256 allowance = _token.allowance(from, address(this));
-        require(preBalance >= amount && allowance >= amount, "Insufficient Balance or Allowance");
-        _token.safeTransferFrom(from, address(this), amount);
-        uint256 postBalance = _token.balanceOf(from);
-        uint256 finalAmount = preBalance - postBalance;
-        _tokensIn += finalAmount;
-        return finalAmount;
-    }
-
     /// @dev Transfer tokens to the creator, after allocating protocol fees and rewards
     function _transferToCreator(address to, uint256 amount) internal {
         emit Withdraw(to, amount);
-        _transferOut(to, amount);
-    }
-
-    /// @dev Transfer tokens out of the contract, either native or ERC20
-    function _transferOut(address to, uint256 amount) internal nonReentrant {
-        _tokensOut += amount;
-        if (_erc20) {
-            _token.safeTransfer(to, amount);
-        } else {
-            (bool sent,) = payable(to).call{value: amount}("");
-            require(sent, "Failed to transfer Ether");
-        }
+        _allocation.transferOut(to, amount);
     }
 
     /// @dev Transfer fees to the fee collector
@@ -672,7 +625,7 @@ contract SubscriptionTokenV2 is
         }
         uint256 balance = _feeBalance;
         _feeBalance = 0;
-        _transferOut(_feeCollector, balance);
+        _allocation.transferOut(_feeCollector, balance);
         emit FeeTransfer(msg.sender, _feeCollector, balance);
     }
 
@@ -735,7 +688,7 @@ contract SubscriptionTokenV2 is
         if (balance > 0) {
             sub.secondsPurchased -= balance;
             _subscriptions[account] = sub;
-            _transferOut(account, tokens);
+            _allocation.transferOut(account, tokens);
         } else {
             _subscriptions[account] = sub;
         }
@@ -829,7 +782,7 @@ contract SubscriptionTokenV2 is
      * @return balance the number of tokens available for withdraw
      */
     function creatorBalance() public view returns (uint256 balance) {
-        return _tokensIn - _tokensOut - _feeBalance - _rewardPoolBalance;
+        return _allocation.balance() - _feeBalance - _rewardPoolBalance;
     }
 
     /**
@@ -837,7 +790,7 @@ contract SubscriptionTokenV2 is
      * @return total the total number of tokens deposited
      */
     function totalCreatorEarnings() public view returns (uint256 total) {
-        return _tokensIn;
+        return _allocation.total();
     }
 
     /**
@@ -1024,11 +977,7 @@ contract SubscriptionTokenV2 is
      * @dev The prevents lost funds if ERC20 tokens are transferred to the contract directly
      */
     function reconcileERC20Balance() external onlyOwner {
-        require(_erc20, "Only for ERC20 tokens");
-        uint256 balance = _token.balanceOf(address(this));
-        uint256 expectedBalance = _tokensIn - _tokensOut;
-        require(balance > expectedBalance, "Tokens already reconciled");
-        _tokensIn += balance - expectedBalance;
+        _allocation.reconcileBalance();
     }
 
     /**
@@ -1058,11 +1007,6 @@ contract SubscriptionTokenV2 is
      * @notice Reconcile native tokens which bypassed receive/mint. Only callable for native denominated contracts.
      */
     function reconcileNativeBalance() external onlyOwner {
-        require(!_erc20, "Not supported, use recoverNativeTokens");
-        uint256 balance = address(this).balance;
-        require(balance > 0, "No balance to recover");
-        uint256 expectedBalance = _tokensIn - _tokensOut;
-        require(balance > expectedBalance, "Balance reconciled");
-        _tokensIn += balance - expectedBalance;
+        _allocation.reconcileBalance();
     }
 }

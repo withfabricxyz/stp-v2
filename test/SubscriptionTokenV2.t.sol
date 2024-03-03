@@ -7,6 +7,7 @@ import {BaseTest, ERC20Token, MockFeeToken, SelfDestruct} from "./TestHelpers.t.
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
+import {AllocationLib} from "src/libraries/AllocationLib.sol";
 
 contract SubscriptionTokenV2Test is BaseTest {
     function setUp() public {
@@ -91,7 +92,7 @@ contract SubscriptionTokenV2Test is BaseTest {
     }
 
     function testMintInvalid() public prank(alice) {
-        vm.expectRevert("Purchase amount must match value sent");
+        vm.expectRevert(abi.encodeWithSelector(AllocationLib.PurchaseAmountMustMatchValueSent.selector, 1e18, 1e17));
         stp.mint{value: 1e17}(1e18);
     }
 
@@ -271,7 +272,7 @@ contract SubscriptionTokenV2Test is BaseTest {
         vm.expectRevert("Account cannot be 0x0");
         stp.withdrawTo(address(0));
 
-        vm.expectRevert("Failed to transfer Ether");
+        vm.expectRevert(abi.encodeWithSelector(AllocationLib.FailedToTransferEther.selector, invalid, 1e18));
         stp.withdrawTo(invalid);
         stp.withdrawTo(alice);
         vm.stopPrank();
@@ -309,9 +310,11 @@ contract SubscriptionTokenV2Test is BaseTest {
     }
 
     function testMintInvalidERC20() public erc20 prank(alice) {
-        vm.expectRevert("Native tokens not accepted for ERC20 subscriptions");
+        vm.expectRevert(abi.encodeWithSelector(AllocationLib.NativeTokensNotAcceptedForERC20Subscriptions.selector));
         stp.mint{value: 1e17}(1e18);
-        vm.expectRevert("Insufficient Balance or Allowance");
+        vm.expectRevert(
+            abi.encodeWithSelector(AllocationLib.InsufficientBalanceOrAllowance.selector, token().balanceOf(alice), 0)
+        );
         stp.mint(1e18);
     }
 
@@ -447,13 +450,13 @@ contract SubscriptionTokenV2Test is BaseTest {
     }
 
     /// Reconciation
-    function testReconcileEth() public prank(creator) {
-        vm.expectRevert("Only for ERC20 tokens");
-        stp.reconcileERC20Balance();
-    }
+    // function testReconcileEth() public prank(creator) {
+    //     vm.expectRevert("Only for ERC20 tokens");
+    //     stp.reconcileERC20Balance();
+    // }
 
     function testReconcile() public erc20 prank(creator) {
-        vm.expectRevert("Tokens already reconciled");
+        // No-op
         stp.reconcileERC20Balance();
 
         token().transfer(address(stp), 1e17);
@@ -481,7 +484,7 @@ contract SubscriptionTokenV2Test is BaseTest {
     function testReconcileNative() public prank(creator) {
         SelfDestruct attack = new SelfDestruct();
 
-        vm.expectRevert("No balance to recover");
+        // no op
         stp.reconcileNativeBalance();
 
         deal(address(attack), 1e18);
@@ -491,9 +494,6 @@ contract SubscriptionTokenV2Test is BaseTest {
         assertEq(stp.creatorBalance(), 0);
         stp.reconcileNativeBalance();
         assertEq(stp.creatorBalance(), 1e18);
-
-        vm.expectRevert("Balance reconciled");
-        stp.reconcileNativeBalance();
 
         vm.expectRevert("Not supported, use reconcileNativeBalance");
         stp.recoverNativeTokens(bob);
@@ -516,9 +516,6 @@ contract SubscriptionTokenV2Test is BaseTest {
         stp.recoverNativeTokens(bob);
         assertEq(stp.creatorBalance(), 0);
         assertEq(bob.balance, 1e19 + 1e18);
-
-        vm.expectRevert("Not supported, use recoverNativeTokens");
-        stp.reconcileNativeBalance();
     }
 
     /// Supply Cap
