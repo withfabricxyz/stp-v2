@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/InitParams.sol";
-import {BaseTest, ERC20Token, MockFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
+import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 
 contract SubscriptionTokenV2RewardsTest is BaseTest {
     function setUp() public {
@@ -318,5 +318,19 @@ contract SubscriptionTokenV2RewardsTest is BaseTest {
 
         mint(alice, 3e8);
         assertEq(stp.rewardBalanceOf(alice), 4500000);
+    }
+
+    function testRewardDistribution() public {
+        mint(alice, 1e8);
+        mint(charlie, 1e8);
+
+        uint256 b1 = stp.rewardBalanceOf(alice);
+
+        vm.startPrank(creator);
+        stp.distributeRewards{value: 1e18}(1e18);
+        vm.stopPrank();
+
+        uint256 b2 = stp.rewardBalanceOf(alice);
+        assertEq(b1 + 0.5 ether, b2);
     }
 }

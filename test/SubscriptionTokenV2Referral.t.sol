@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/InitParams.sol";
-import {BaseTest, ERC20Token, MockFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
+import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 
 contract SubscriptionTokenV2ReferralTest is BaseTest {
     function setUp() public {

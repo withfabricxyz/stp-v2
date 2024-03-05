@@ -17,4 +17,6 @@ struct Subscription {
     uint256 rewardPoints;
     /// @dev The number of rewards withdrawn
     uint256 rewardsWithdrawn;
+    /// @dev The tier id of the subscription
+    uint16 tierId;
 }

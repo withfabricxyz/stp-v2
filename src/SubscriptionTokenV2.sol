@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -8,10 +8,15 @@ import {Ownable2StepUpgradeable} from "@openzeppelin-upgradeable/contracts/acces
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import {ERC721Upgradeable} from "@openzeppelin-upgradeable/contracts/token/ERC721/ERC721Upgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/ReentrancyGuardUpgradeable.sol";
+
+import {Tier} from "./types/Tier.sol";
 import {InitParams} from "./types/InitParams.sol";
 import {Allocation} from "./types/Allocation.sol";
 import {Subscription} from "./types/Subscription.sol";
 import {AllocationLib} from "./libraries/AllocationLib.sol";
+import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
+import {TierLib} from "./libraries/TierLib.sol";
+import {ISubscriptionTokenV2} from "./interfaces/ISubscriptionTokenV2.sol";
 
 /**
  * @title Subscription Token Protocol Version 1
@@ -23,16 +28,18 @@ import {AllocationLib} from "./libraries/AllocationLib.sol";
  *      additional functionalities for granting time, refunding accounts, fees, rewards, etc. This contract is designed to be used with
  *      Clones, but is not designed to be upgradeable. Added functionality will come with new versions.
  */
-
 contract SubscriptionTokenV2 is
     ERC721Upgradeable,
     Ownable2StepUpgradeable,
     ReentrancyGuardUpgradeable,
-    PausableUpgradeable
+    PausableUpgradeable,
+    ISubscriptionTokenV2
 {
     using SafeERC20 for IERC20;
     using Strings for uint256;
     using AllocationLib for Allocation;
+    using TierLib for Tier;
+    using SubscriptionLib for Subscription;
 
     /// @dev The maximum number of reward halvings (limiting this prevents overflow)
     uint256 private constant _MAX_REWARD_HALVINGS = 32;
@@ -43,83 +50,11 @@ contract SubscriptionTokenV2 is
     /// @dev Maximum basis points (100%)
     uint16 private constant _MAX_BIPS = 10000;
 
-    /// @dev Guard to ensure the purchase amount is valid
-    modifier validAmount(uint256 amount) {
-        require(amount >= _minimumPurchase, "Amount must be >= minimum purchase");
-        _;
-    }
-
-    /// @dev Emitted when the owner withdraws available funds
-    event Withdraw(address indexed account, uint256 tokensTransferred);
-
-    /// @dev Emitted when a subscriber withdraws their rewards
-    event RewardWithdraw(address indexed account, uint256 tokensTransferred);
-
-    /// @dev Emitted when a subscriber slashed the rewards of another subscriber
-    event RewardPointsSlashed(address indexed account, address indexed slasher, uint256 rewardPointsSlashed);
-
-    /// @dev Emitted when tokens are allocated to the reward pool
-    event RewardsAllocated(uint256 tokens);
-
-    /// @dev Emitted when time is purchased (new nft or renewed)
-    event Purchase(
-        address indexed account,
-        uint256 indexed tokenId,
-        uint256 tokensTransferred,
-        uint256 timePurchased,
-        uint256 rewardPoints,
-        uint256 expiresAt
-    );
-
-    /// @dev Emitted when a subscriber is granted time by the creator
-    event Grant(address indexed account, uint256 indexed tokenId, uint256 secondsGranted, uint256 expiresAt);
-
-    /// @dev Emitted when the creator refunds a subscribers remaining time
-    event Refund(address indexed account, uint256 indexed tokenId, uint256 tokensTransferred, uint256 timeReclaimed);
-
-    /// @dev Emitted when the creator tops up the contract balance on refund
-    event RefundTopUp(uint256 tokensIn);
-
-    /// @dev Emitted when the fees are transferred to the collector
-    event FeeTransfer(address indexed from, address indexed to, uint256 tokensTransferred);
-
-    /// @dev Emitted when the fee collector is updated
-    event FeeCollectorChange(address indexed from, address indexed to);
-
-    /// @dev Emitted when tokens are allocated to the fee pool
-    event FeeAllocated(uint256 tokens);
-
-    /// @dev Emitted when a referral fee is paid out
-    event ReferralPayout(
-        uint256 indexed tokenId, address indexed referrer, uint256 indexed referralId, uint256 rewardAmount
-    );
-
-    /// @dev Emitted when a new referral code is created
-    event ReferralCreated(uint256 id, uint16 rewardBps);
-
-    /// @dev Emitted when a referral code is deleted
-    event ReferralDestroyed(uint256 id);
-
-    /// @dev Emitted when the supply cap is updated
-    event SupplyCapChange(uint256 supplyCap);
-
-    /// @dev Emitted when the transfer recipient is updated
-    event TransferRecipientChange(address indexed recipient);
-
     /// @dev The metadata URI for the contract
     string private _contractURI;
 
     /// @dev The metadata URI for the tokens. Note: if it ends with /, then we append the tokenId
     string private _tokenURI;
-
-    /// @dev The cost of one second in denominated token (wei or other base unit)
-    uint256 private _tokensPerSecond;
-
-    /// @dev Minimum number of seconds to purchase. Also, this is the number of seconds until the reward multiplier is halved.
-    uint256 private _minPurchaseSeconds;
-
-    /// @dev The minimum number of tokens accepted for a time purchase
-    uint256 private _minimumPurchase;
 
     Allocation private _allocation;
 
@@ -162,9 +97,6 @@ contract SubscriptionTokenV2 is
     /// @dev The number of reward halvings. This is used to calculate the reward multiplier for early supporters, if the creator chooses to reward them.
     uint256 private _numRewardHalvings;
 
-    /// @dev The maximum number of tokens which can be minted (adjustable over time, but will not allow setting below current count)
-    uint256 private _supplyCap;
-
     /// @dev The address of the account which can receive transfers via sponsored calls
     address private _transferRecipient;
 
@@ -173,6 +105,10 @@ contract SubscriptionTokenV2 is
 
     /// @dev The collection of referral codes for referral rewards
     mapping(uint256 => uint16) private _referralCodes;
+
+    uint16 private _tierCount;
+    /// @dev The available tiers (default tier has id = 1)
+    mapping(uint16 => Tier) private _tiers;
 
     ////////////////////////////////////
 
@@ -208,6 +144,23 @@ contract SubscriptionTokenV2 is
             require(params.numRewardHalvings > 0, "Reward halvings too low");
         }
 
+        // For now let's set things to normal
+        _tiers[1] = Tier({
+            id: 1,
+            periodDurationSeconds: uint32(params.minimumPurchaseSeconds),
+            paused: false,
+            payWhatYouWant: false,
+            maxSupply: 0,
+            numSubs: 0,
+            numFrozenSubs: 0,
+            rewardMultiplier: 1,
+            allowList: 0,
+            initialMintPrice: 0,
+            pricePerPeriod: params.minimumPurchaseSeconds * params.tokensPerSecond,
+            maxMintablePeriods: 24
+        });
+        _tierCount = 1;
+
         __ERC721_init(params.name, params.symbol);
         _transferOwnership(params.owner);
         __Pausable_init();
@@ -215,9 +168,6 @@ contract SubscriptionTokenV2 is
         _allocation = Allocation(0, 0, params.erc20TokenAddr);
         _contractURI = params.contractUri;
         _tokenURI = params.tokenUri;
-        _tokensPerSecond = params.tokensPerSecond;
-        _minimumPurchase = params.minimumPurchaseSeconds * params.tokensPerSecond;
-        _minPurchaseSeconds = params.minimumPurchaseSeconds;
         _rewardBps = params.rewardBps;
         _numRewardHalvings = params.numRewardHalvings;
         _feeBps = params.feeBps;
@@ -386,14 +336,17 @@ contract SubscriptionTokenV2 is
         _unpause();
     }
 
+    function setTierSupplyCap(uint256 supplyCap, uint16 tierId) public onlyOwner {
+        _getTier(tierId).updateSupplyCap(supplyCap);
+        emit SupplyCapChange(supplyCap);
+    }
+
     /**
      * @notice Update the maximum number of tokens (subscriptions)
      * @param supplyCap the new supply cap (must be greater than token count or 0 for unlimited)
      */
     function setSupplyCap(uint256 supplyCap) external onlyOwner {
-        require(supplyCap == 0 || supplyCap >= _tokenCounter, "Supply cap must be >= current count or 0");
-        _supplyCap = supplyCap;
-        emit SupplyCapChange(supplyCap);
+        setTierSupplyCap(supplyCap, 1);
     }
 
     /**
@@ -414,9 +367,8 @@ contract SubscriptionTokenV2 is
      * @param account the account to mint or renew time for
      * @param numTokens the amount of ERC20 tokens or native tokens to transfer
      */
-    function mintFor(address account, uint256 numTokens) public payable whenNotPaused validAmount(numTokens) {
-        uint256 finalAmount = _allocation.transferIn(msg.sender, numTokens);
-        _purchaseTime(account, finalAmount);
+    function mintFor(address account, uint256 numTokens) public payable whenNotPaused {
+        _mintOrRenew(account, numTokens, 0, 0, address(0));
     }
 
     /**
@@ -430,19 +382,70 @@ contract SubscriptionTokenV2 is
         public
         payable
         whenNotPaused
-        validAmount(numTokens)
     {
         require(referrer != address(0), "Referrer cannot be 0x0");
+        _mintOrRenew(account, numTokens, 0, referralCode, referrer);
+    }
 
-        uint256 finalAmount = _allocation.transferIn(msg.sender, numTokens);
-        uint256 tokenId = _purchaseTime(account, finalAmount);
+    function _mintOrRenew(address account, uint256 numTokens, uint16 tierId, uint256 referralCode, address referrer)
+        internal
+    {
+        require(account != address(0), "Account cannot be 0x0");
+        uint256 amount = _allocation.transferIn(msg.sender, numTokens);
 
-        // Calculate rewards and transfer rewards out
-        uint256 payout = _referralAmount(finalAmount, referralCode);
-        if (payout > 0) {
-            _allocation.transferOut(referrer, payout);
-            emit ReferralPayout(tokenId, referrer, referralCode, payout);
+        // We need to make sure the price is right
+
+        Tier storage tier;
+        Subscription storage sub = _subscriptions[account];
+        if (sub.tokenId == 0) {
+            sub.tierId = tierId == 0 ? 1 : tierId;
+
+            tier = _getTier(sub.tierId);
+
+            if (!tier.hasSupply()) {
+                revert TierHasNoSupply(tier.id);
+            }
+
+            tier.numSubs += 1;
+
+            _tokenCounter += 1;
+            sub.tokenId = _tokenCounter;
+
+            _safeMint(account, sub.tokenId);
+            // sub.purchase(tier, tokensTransferred);
+            // _subscriptions[account] = sub;??
+        } else {
+            tier = _tiers[sub.tierId];
+            // Tier paused?
+            // sub.purchase(tier, tokensTransferred);
         }
+
+        if (block.timestamp > sub.purchaseOffset + sub.secondsPurchased) {
+            sub.purchaseOffset = block.timestamp - sub.secondsPurchased;
+        }
+
+        uint256 rp = amount * rewardMultiplier() * tier.rewardMultiplier;
+        uint256 tv = timeValue(amount); // Need to get this from the tier
+        sub.secondsPurchased += tv;
+        sub.rewardPoints += rp;
+        // _subscriptions[account] = sub; ???
+        // set the total tokens paid in the subscription
+        _totalRewardPoints += rp;
+
+        // TODO sub.purchase(tier, tokensTransferred);
+        uint256 remaining = amount;
+        if (referrer != address(0)) {
+            uint256 payout = _referralAmount(remaining, referralCode);
+            if (payout > 0) {
+                _allocation.transferOut(referrer, payout);
+                emit ReferralPayout(sub.tokenId, referrer, referralCode, payout);
+                remaining -= payout;
+            }
+        }
+
+        _allocateFeesAndRewards(remaining);
+
+        emit Purchase(account, sub.tokenId, amount, tv, rp, _subscriptionExpiresAt(sub));
     }
 
     /**
@@ -460,6 +463,16 @@ contract SubscriptionTokenV2 is
     function transferAllBalances() external {
         require(_transferRecipient != address(0), "Transfer recipient not set");
         _transferAllBalances(_transferRecipient);
+    }
+
+    // @inheritdoc ISubscriptionTokenV2
+    function distributeRewards(uint256 numTokens) external payable override {
+        require(_rewardBps > 0, "Rewards disabled");
+        require(numTokens > 0, "Num rewards must be > 0");
+        uint256 finalAmount = _allocation.transferIn(msg.sender, numTokens);
+        _rewardPoolBalance += finalAmount;
+        _rewardPoolTotal += finalAmount;
+        emit RewardsAllocated(finalAmount);
     }
 
     /////////////////////////
@@ -538,41 +551,20 @@ contract SubscriptionTokenV2 is
     // Core Internal Logic
     ////////////////////////
 
-    /// @dev Add time to a given account (transfer happens before this is called)
-    function _purchaseTime(address account, uint256 amount) internal returns (uint256) {
-        require(account != address(0), "Account cannot be 0x0");
-
-        Subscription memory sub = _fetchSubscription(account);
-
-        // Adjust offset to account for existing time
-        if (block.timestamp > sub.purchaseOffset + sub.secondsPurchased) {
-            sub.purchaseOffset = block.timestamp - sub.secondsPurchased;
+    function _getTier(uint16 tierId) internal view returns (Tier storage) {
+        Tier storage tier = _tiers[tierId];
+        if (tier.id == 0) {
+            revert TierNotFound(tierId);
         }
-
-        uint256 rp = amount * rewardMultiplier();
-        uint256 tv = timeValue(amount);
-        sub.secondsPurchased += tv;
-        sub.rewardPoints += rp;
-        _subscriptions[account] = sub;
-        _totalRewardPoints += rp;
-
-        // If fees or rewards are enabled, allocate a portion of the purchase to those pools
-        _allocateFeesAndRewards(amount);
-
-        // Mint the NFT if it does not exist before purchase event for indexers
-        _maybeMint(account, sub.tokenId);
-
-        emit Purchase(account, sub.tokenId, amount, tv, rp, _subscriptionExpiresAt(sub));
-        return sub.tokenId;
+        return tier;
     }
 
     /// @dev Get or build a new subscription
     function _fetchSubscription(address account) internal returns (Subscription memory) {
         Subscription memory sub = _subscriptions[account];
         if (sub.tokenId == 0) {
-            require(_supplyCap == 0 || _tokenCounter < _supplyCap, "Supply cap reached");
             _tokenCounter += 1;
-            sub = Subscription(_tokenCounter, 0, 0, block.timestamp, block.timestamp, 0, 0);
+            sub = Subscription(_tokenCounter, 0, 0, block.timestamp, block.timestamp, 0, 0, 1);
         }
         return sub;
     }
@@ -684,7 +676,7 @@ contract SubscriptionTokenV2 is
 
         sub.secondsGranted = 0;
         uint256 balance = refundableBalanceOf(account);
-        uint256 tokens = balance * _tokensPerSecond;
+        uint256 tokens = balance * tps();
         if (balance > 0) {
             sub.secondsPurchased -= balance;
             _subscriptions[account] = sub;
@@ -741,7 +733,7 @@ contract SubscriptionTokenV2 is
         for (uint256 i = 0; i < accounts.length; i++) {
             amount += refundableBalanceOf(accounts[i]);
         }
-        return amount * _tokensPerSecond;
+        return amount * tps();
     }
 
     /**
@@ -761,7 +753,7 @@ contract SubscriptionTokenV2 is
         if (_numRewardHalvings == 0) {
             return 0;
         }
-        uint256 halvings = (block.timestamp - _deployBlockTime) / _minPurchaseSeconds;
+        uint256 halvings = (block.timestamp - _deployBlockTime) / _getTier(1).periodDurationSeconds;
         if (halvings > _numRewardHalvings) {
             return 0;
         }
@@ -774,7 +766,7 @@ contract SubscriptionTokenV2 is
      * @return numSeconds the number of seconds purchased
      */
     function timeValue(uint256 numTokens) public view returns (uint256 numSeconds) {
-        return numTokens / _tokensPerSecond;
+        return numTokens / tps();
     }
 
     /**
@@ -881,8 +873,8 @@ contract SubscriptionTokenV2 is
      * @notice The number of tokens required for a single second of time
      * @return numTokens per second
      */
-    function tps() external view returns (uint256 numTokens) {
-        return _tokensPerSecond;
+    function tps() public view returns (uint256 numTokens) {
+        return _getTier(1).tokensPerSecond();
     }
 
     /**
@@ -890,7 +882,7 @@ contract SubscriptionTokenV2 is
      * @return numSeconds minimum
      */
     function minPurchaseSeconds() external view returns (uint256 numSeconds) {
-        return _minPurchaseSeconds;
+        return _getTier(1).periodDurationSeconds;
     }
 
     /**
@@ -899,7 +891,8 @@ contract SubscriptionTokenV2 is
      * @return cap the max number of subscriptions
      */
     function supplyDetail() external view returns (uint256 count, uint256 cap) {
-        return (_tokenCounter, _supplyCap);
+        Tier storage tier = _getTier(1);
+        return (tier.numSubs - tier.numFrozenSubs, tier.maxSupply);
     }
 
     /**

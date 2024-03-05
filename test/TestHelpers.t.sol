@@ -7,7 +7,7 @@ import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/InitParams.sol";
 
 // Test token which charges 50% fee on transfer
-contract MockFeeToken is ERC20 {
+contract TestFeeToken is ERC20 {
     constructor(string memory name, string memory symbol, uint256 initialSupply) ERC20(name, symbol) {
         _mint(msg.sender, initialSupply);
     }
@@ -23,7 +23,7 @@ contract MockFeeToken is ERC20 {
     }
 }
 
-contract ERC20Token is ERC20 {
+contract TestERC20Token is ERC20 {
     uint8 private immutable _decimals;
 
     constructor(string memory name, string memory symbol, uint8 numDecimals) ERC20(name, symbol) {
@@ -165,16 +165,12 @@ abstract contract BaseTest is Test {
         stp.withdraw();
     }
 
-    function token() internal view returns (ERC20Token) {
-        return ERC20Token(stp.erc20Address());
+    function token() internal view returns (TestERC20Token) {
+        return TestERC20Token(stp.erc20Address());
     }
 
     function createERC20Sub() public virtual returns (SubscriptionTokenV2) {
-        ERC20Token _token = new ERC20Token(
-        "FIAT",
-        "FIAT",
-        18
-      );
+        TestERC20Token _token = new TestERC20Token("FIAT", "FIAT", 18);
         _token.transfer(alice, 1e20);
         _token.transfer(bob, 1e20);
         _token.transfer(charlie, 1e20);

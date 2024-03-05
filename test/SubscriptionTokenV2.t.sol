@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
+import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/InitParams.sol";
-import {BaseTest, ERC20Token, MockFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
+import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
@@ -319,11 +320,7 @@ contract SubscriptionTokenV2Test is BaseTest {
     }
 
     function testERC20FeeTakingToken() public {
-        MockFeeToken _token = new MockFeeToken(
-          "FIAT",
-          "FIAT",
-          1e21
-        );
+        TestFeeToken _token = new TestFeeToken("FIAT", "FIAT", 1e21);
         _token.transfer(alice, 1e20);
         SubscriptionTokenV2 m = createStp(
             InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 2, 0, 0, 0, address(0), address(_token))
@@ -449,12 +446,6 @@ contract SubscriptionTokenV2Test is BaseTest {
         assertEq(charlie.balance, balance + 2e18);
     }
 
-    /// Reconciation
-    // function testReconcileEth() public prank(creator) {
-    //     vm.expectRevert("Only for ERC20 tokens");
-    //     stp.reconcileERC20Balance();
-    // }
-
     function testReconcile() public erc20 prank(creator) {
         // No-op
         stp.reconcileERC20Balance();
@@ -471,11 +462,7 @@ contract SubscriptionTokenV2Test is BaseTest {
     }
 
     function testRecoverERC20() public prank(creator) {
-        ERC20Token token = new ERC20Token(
-        "FIAT",
-        "FIAT",
-        18
-      );
+        TestERC20Token token = new TestERC20Token("FIAT", "FIAT", 18);
         token.transfer(address(stp), 1e17);
         stp.recoverERC20(address(token), alice, 1e17);
         assertEq(token.balanceOf(alice), 1e17);
@@ -531,7 +518,7 @@ contract SubscriptionTokenV2Test is BaseTest {
         mint(alice, 1e18);
 
         vm.startPrank(bob);
-        vm.expectRevert("Supply cap reached");
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.TierHasNoSupply.selector, 1));
         stp.mint{value: 1e18}(1e18);
         vm.stopPrank();
 
