@@ -58,9 +58,6 @@ contract SubscriptionTokenV2 is
 
     Allocation private _allocation;
 
-    /// @dev The token contract address, or 0x0 for native tokens
-    IERC20 private _token;
-
     /// @dev The token counter for mint id generation and enforcing supply caps
     uint256 private _tokenCounter;
 
@@ -72,9 +69,6 @@ contract SubscriptionTokenV2 is
 
     /// @dev The protocol fee collector address (for withdraws or sponsored transfers)
     address private _feeCollector;
-
-    /// @dev Flag which determines if the contract is erc20 denominated
-    bool private _erc20;
 
     /// @dev The block timestamp of the contract deployment (used for reward halvings)
     uint256 private _deployBlockTime;
@@ -172,8 +166,6 @@ contract SubscriptionTokenV2 is
         _numRewardHalvings = params.numRewardHalvings;
         _feeBps = params.feeBps;
         _feeCollector = params.feeRecipient;
-        _token = IERC20(params.erc20TokenAddr);
-        _erc20 = params.erc20TokenAddr != address(0);
         _deployBlockTime = block.timestamp;
     }
 
@@ -840,7 +832,7 @@ contract SubscriptionTokenV2 is
      * @return erc20 address or 0x0 for native
      */
     function erc20Address() public view returns (address erc20) {
-        return address(_token);
+        return _allocation.tokenAddress;
     }
 
     /**
@@ -989,7 +981,7 @@ contract SubscriptionTokenV2 is
      * @param recipient the address to send the tokens to
      */
     function recoverNativeTokens(address recipient) external onlyOwner {
-        require(_erc20, "Not supported, use reconcileNativeBalance");
+        require(_allocation.isERC20(), "Not supported, use reconcileNativeBalance");
         uint256 balance = address(this).balance;
         require(balance > 0, "No balance to recover");
         (bool sent,) = payable(recipient).call{value: balance}("");
