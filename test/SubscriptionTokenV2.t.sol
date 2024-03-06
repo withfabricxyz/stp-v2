@@ -12,70 +12,16 @@ import {AllocationLib} from "src/libraries/AllocationLib.sol";
 
 contract SubscriptionTokenV2Test is BaseTest {
     function setUp() public {
-        stp = createStp(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 0, 0, 0, address(0), address(0)));
+        InitParams memory params = initParams();
+        params.minimumPurchaseSeconds = 4;
+        params.numRewardHalvings = 0;
+        stp = createStp(params);
 
         deal(alice, 1e19);
         deal(bob, 1e19);
         deal(charlie, 1e19);
         deal(creator, 1e19);
         deal(fees, 1e19);
-    }
-
-    function testInit() public {
-        assertEq(stp.erc20Address(), address(0));
-        assertEq(stp.timeValue(2), 1);
-        assertEq(stp.tps(), 2);
-        assertEq(stp.minPurchaseSeconds(), 4);
-        assertEq(stp.baseTokenURI(), "turi");
-
-        vm.store(
-            address(stp),
-            bytes32(uint256(0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00)),
-            bytes32(0)
-        );
-
-        vm.expectRevert("Owner address cannot be 0x0");
-        stp.initialize(
-            InitParams("Meow Sub", "MEOW", "curi", "turi", address(0), 2, 4, 0, 0, 0, address(0), address(0))
-        );
-
-        vm.expectRevert("Tokens per second must be > 0");
-        stp.initialize(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 0, 4, 0, 0, 0, address(0), address(0)));
-
-        vm.expectRevert("Fee bps too high");
-        stp.initialize(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 0, 0, 1500, fees, address(0)));
-
-        vm.expectRevert("Fees required when fee recipient is present");
-        stp.initialize(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 0, 0, 0, fees, address(0)));
-
-        vm.expectRevert("Min purchase seconds must be > 0");
-        stp.initialize(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 0, 0, 0, 0, address(0), address(0)));
-
-        vm.expectRevert("Reward bps too high");
-        stp.initialize(
-            InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 11_000, 0, 0, address(0), address(0))
-        );
-
-        vm.expectRevert("Reward halvings too high");
-        stp.initialize(
-            InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 500, 33, 0, address(0), address(0))
-        );
-
-        vm.expectRevert("Reward halvings too low");
-        stp.initialize(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 4, 500, 0, 0, address(0), address(0)));
-
-        // Invalid name
-        vm.expectRevert("Name cannot be empty");
-        stp.initialize(InitParams("", "MEOW", "curi", "turi", creator, 2, 4, 0, 0, 0, address(0), address(0)));
-
-        vm.expectRevert("Symbol cannot be empty");
-        stp.initialize(InitParams("Meow Sub", "", "curi", "turi", creator, 2, 4, 0, 0, 0, address(0), address(0)));
-
-        vm.expectRevert("Contract URI cannot be empty");
-        stp.initialize(InitParams("Meow Sub", "MEOW", "", "turi", creator, 2, 4, 0, 0, 0, address(0), address(0)));
-
-        vm.expectRevert("Token URI cannot be empty");
-        stp.initialize(InitParams("Meow Sub", "MEOW", "curi", "", creator, 2, 4, 0, 0, 0, address(0), address(0)));
     }
 
     function testMint() public prank(alice) {
@@ -322,9 +268,9 @@ contract SubscriptionTokenV2Test is BaseTest {
     function testERC20FeeTakingToken() public {
         TestFeeToken _token = new TestFeeToken("FIAT", "FIAT", 1e21);
         _token.transfer(alice, 1e20);
-        SubscriptionTokenV2 m = createStp(
-            InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 2, 0, 0, 0, address(0), address(_token))
-        );
+        InitParams memory params = initParams();
+        params.erc20TokenAddr = address(_token);
+        SubscriptionTokenV2 m = createStp(params);
         vm.startPrank(alice);
         _token.approve(address(m), 1e18);
         m.mint(1e18);

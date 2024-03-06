@@ -128,6 +128,23 @@ abstract contract BaseTest is Test {
 
     SubscriptionTokenV2 internal stp;
 
+    function initParams() internal view returns (InitParams memory) {
+        return InitParams({
+            name: "Meow Sub",
+            symbol: "MEOW",
+            contractUri: "curi",
+            tokenUri: "turi",
+            owner: creator,
+            tokensPerSecond: 2,
+            minimumPurchaseSeconds: 2,
+            rewardBps: 0,
+            numRewardHalvings: 6,
+            feeBps: 0,
+            feeRecipient: address(0),
+            erc20TokenAddr: address(0)
+        });
+    }
+
     function createStp(InitParams memory params) internal returns (SubscriptionTokenV2) {
         stp = new SubscriptionTokenV2();
         vm.store(
@@ -175,10 +192,9 @@ abstract contract BaseTest is Test {
         _token.transfer(bob, 1e20);
         _token.transfer(charlie, 1e20);
         _token.transfer(creator, 1e20);
-
-        return createStp(
-            InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 2, 0, 0, 0, address(0), address(_token))
-        );
+        InitParams memory params = initParams();
+        params.erc20TokenAddr = address(_token);
+        return createStp(params);
     }
 
     function createETHSub(uint256 minPurchase, uint16 feeBps, uint16 rewardBps)
@@ -186,21 +202,12 @@ abstract contract BaseTest is Test {
         virtual
         returns (SubscriptionTokenV2 sub)
     {
-        // SubscriptionTokenV2 m = new SubscriptionTokenV2();
-        // vm.store(address(m), bytes32(uint256(0)), bytes32(0));
-        if (feeBps > 0) {
-            sub = createStp(
-                InitParams(
-                    "Meow Sub", "MEOW", "curi", "turi", creator, 2, minPurchase, rewardBps, 6, feeBps, fees, address(0)
-                )
-            );
-        } else {
-            sub = createStp(
-                InitParams(
-                    "Meow Sub", "MEOW", "curi", "turi", creator, 2, minPurchase, rewardBps, 6, 0, address(0), address(0)
-                )
-            );
-        }
+        InitParams memory params = initParams();
+        params.minimumPurchaseSeconds = minPurchase;
+        params.feeBps = feeBps;
+        params.feeRecipient = feeBps > 0 ? fees : address(0);
+        params.rewardBps = rewardBps;
+        return createStp(params);
     }
 
     function testIgnore() internal {}

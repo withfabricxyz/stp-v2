@@ -22,10 +22,10 @@ library TierLib {
     }
 
     function updateSupplyCap(Tier storage self, uint256 newCap) internal {
-      if (newCap != 0 && newCap < self.numSubs) {
-          revert("Supply cap must be >= current count or 0");
-      }
-      self.maxSupply = uint32(newCap);
+        if (newCap != 0 && newCap < self.numSubs) {
+            revert("Supply cap must be >= current count or 0");
+        }
+        self.maxSupply = uint32(newCap);
     }
 
     /////////////////////
@@ -39,8 +39,6 @@ library TierLib {
     function hasSupply(Tier storage self) internal view returns (bool) {
         return self.maxSupply == 0 || self.numSubs < (self.maxSupply + self.numFrozenSubs);
     }
-
-
 
     function tokensPerSecond(Tier storage self) internal view returns (uint256) {
         return self.pricePerPeriod / self.periodDurationSeconds;

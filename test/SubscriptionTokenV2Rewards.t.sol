@@ -17,8 +17,11 @@ contract SubscriptionTokenV2RewardsTest is BaseTest {
     }
 
     function testSingleHalving() public {
-        SubscriptionTokenV2 m =
-            createStp(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 10, 500, 1, 0, address(0), address(0)));
+        InitParams memory params = initParams();
+        params.rewardBps = 500;
+        params.numRewardHalvings = 1;
+        params.minimumPurchaseSeconds = 10;
+        SubscriptionTokenV2 m = createStp(params);
         assertEq(m.rewardMultiplier(), 2);
         vm.warp(block.timestamp + 11);
         assertEq(m.rewardMultiplier(), 1);
@@ -137,12 +140,10 @@ contract SubscriptionTokenV2RewardsTest is BaseTest {
     }
 
     function testSlashingNoRewards() public {
-        vm.store(
-            address(stp),
-            bytes32(uint256(0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00)),
-            bytes32(0)
-        );
-        stp.initialize(InitParams("Meow Sub", "MEOW", "curi", "turi", creator, 2, 10, 0, 1, 0, address(0), address(0)));
+        InitParams memory params = initParams();
+        params.numRewardHalvings = 1;
+        params.minimumPurchaseSeconds = 10;
+        stp = createStp(params);
 
         mint(alice, 2592000 * 2);
         mint(bob, 1e8);
