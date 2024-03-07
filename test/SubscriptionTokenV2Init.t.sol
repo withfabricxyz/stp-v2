@@ -5,15 +5,13 @@ import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/InitParams.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
-import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {AllocationLib} from "src/libraries/AllocationLib.sol";
 
 contract SubscriptionTokenV2InitTest is BaseTest {
     InitParams private params;
 
     function setUp() public {
+        stp = new SubscriptionTokenV2();
         vm.store(
             address(stp),
             bytes32(uint256(0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00)),

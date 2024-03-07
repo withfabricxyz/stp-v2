@@ -107,9 +107,6 @@ contract SubscriptionTokenV2 is
         mintFor(msg.sender, msg.value);
     }
 
-    // function initializeTier() internal initializer {
-    // }
-
     function initFees(FeeParams memory fees) private {
         require(fees.bips <= _MAX_FEE_BIPS, "Fee bps too high");
         if (fees.collector != address(0)) {
@@ -130,25 +127,12 @@ contract SubscriptionTokenV2 is
         _rewardParams = rewards;
     }
 
-    function initializeTier(TierInitParams memory params) private {
-        require(params.periodDurationSeconds > 0, "Period duration must be > 0");
-        require(params.pricePerPeriod > 0, "Price per period must be > 0");
-
+    function initializeTier(uint8 id, TierInitParams memory params) private {
         _tierCount += 1;
-        _tiers[_tierCount] = Tier({
-            id: _tierCount,
-            periodDurationSeconds: params.periodDurationSeconds,
-            paused: params.paused,
-            payWhatYouWant: params.payWhatYouWant,
-            maxSupply: params.maxSupply,
-            numSubs: 0,
-            numFrozenSubs: 0,
-            rewardMultiplier: params.rewardMultiplier,
-            allowList: params.allowList,
-            initialMintPrice: params.initialMintPrice,
-            pricePerPeriod: params.pricePerPeriod,
-            maxMintablePeriods: params.maxMintablePeriods
-        });
+        if (id != _tierCount) {
+            revert TierLib.InvalidTierId();
+        }
+        _tiers[id] = TierLib.validateAndBuild(id, params);
     }
 
     function initialize(
@@ -160,7 +144,7 @@ contract SubscriptionTokenV2 is
         // initialize(params);
         initRewards(rewards);
         initFees(fees);
-        initializeTier(tier);
+        initializeTier(1, tier);
 
         require(bytes(params.name).length > 0, "Name cannot be empty");
         require(bytes(params.symbol).length > 0, "Symbol cannot be empty");
@@ -209,7 +193,7 @@ contract SubscriptionTokenV2 is
      */
     function withdrawRewards() external {
         Subscription memory sub = _subscriptions[msg.sender];
-        require(_isActive(sub), "Subscription not active");
+        require(sub.isActive(), "Subscription not active");
         uint256 rewardAmount = _rewardBalance(sub);
         require(rewardAmount > 0, "No rewards to withdraw");
         sub.rewardsWithdrawn += rewardAmount;
@@ -227,13 +211,13 @@ contract SubscriptionTokenV2 is
     function slashRewards(address account) external {
         require(_rewardParams.rewardBps > 0, "Rewards disabled");
         Subscription memory slasher = _subscriptions[msg.sender];
-        require(_isActive(slasher), "Subscription not active");
+        require(slasher.isActive(), "Subscription not active");
 
         Subscription memory sub = _subscriptions[account];
         require(sub.rewardPoints > 0, "No reward points to slash");
 
         // Expiration + grace period (50% of purchased time)
-        uint256 slashPoint = _subscriptionExpiresAt(sub) + (sub.secondsPurchased / 2);
+        uint256 slashPoint = sub.expiresAt() + (sub.secondsPurchased / 2);
         require(block.timestamp >= slashPoint, "Not slashable");
 
         // Deflate the reward points pool and account for prior reward withdrawals
@@ -364,6 +348,14 @@ contract SubscriptionTokenV2 is
     }
 
     /////////////////////////
+    // Tier Management
+    /////////////////////////
+
+    function createTier(uint8 tierId, TierInitParams memory params) external onlyOwner {
+        initializeTier(tierId, params);
+    }
+
+    /////////////////////////
     // Sponsored Calls
     /////////////////////////
 
@@ -450,7 +442,7 @@ contract SubscriptionTokenV2 is
 
         _allocateFeesAndRewards(remaining);
 
-        emit Purchase(account, sub.tokenId, amount, tv, rp, _subscriptionExpiresAt(sub));
+        emit Purchase(account, sub.tokenId, amount, tv, rp, sub.expiresAt());
     }
 
     /**
@@ -651,25 +643,7 @@ contract SubscriptionTokenV2 is
         // Mint the NFT if it does not exist before grant event for indexers
         _maybeMint(account, sub.tokenId);
 
-        emit Grant(account, sub.tokenId, numSeconds, _subscriptionExpiresAt(sub));
-    }
-
-    /// @dev The amount of granted time remaining for a given subscription
-    function _grantTimeRemaining(Subscription memory sub) internal view returns (uint256) {
-        uint256 expiresAt = sub.grantOffset + sub.secondsGranted;
-        if (expiresAt <= block.timestamp) {
-            return 0;
-        }
-        return expiresAt - block.timestamp;
-    }
-
-    /// @dev The amount of purchased time remaining for a given subscription
-    function _purchaseTimeRemaining(Subscription memory sub) internal view returns (uint256) {
-        uint256 expiresAt = sub.purchaseOffset + sub.secondsPurchased;
-        if (expiresAt <= block.timestamp) {
-            return 0;
-        }
-        return expiresAt - block.timestamp;
+        emit Grant(account, sub.tokenId, numSeconds, sub.expiresAt());
     }
 
     /// @dev Refund the remaining time for the given accounts subscription, and clear grants
@@ -702,13 +676,6 @@ contract SubscriptionTokenV2 is
         return (tokenAmount * referralBps) / _MAX_BIPS;
     }
 
-    /// @dev The timestamp when the subscription expires
-    function _subscriptionExpiresAt(Subscription memory sub) internal pure returns (uint256) {
-        uint256 purchase = sub.purchaseOffset + sub.secondsPurchased;
-        uint256 grant = sub.grantOffset + sub.secondsGranted;
-        return purchase > grant ? purchase : grant;
-    }
-
     /// @dev The reward balance for a given subscription
     function _rewardBalance(Subscription memory sub) internal view returns (uint256) {
         uint256 userShare = (_rewardPoolTotal - _rewardPoolSlashed) * sub.rewardPoints / _totalRewardPoints;
@@ -716,11 +683,6 @@ contract SubscriptionTokenV2 is
             return 0;
         }
         return userShare - sub.rewardsWithdrawn;
-    }
-
-    /// @dev Determine if a subscription is active
-    function _isActive(Subscription memory sub) internal view returns (bool) {
-        return _subscriptionExpiresAt(sub) > block.timestamp;
     }
 
     ////////////////////////
@@ -796,7 +758,7 @@ contract SubscriptionTokenV2 is
         returns (uint256 tokenId, uint256 refundableAmount, uint256 rewardPoints, uint256 expiresAt)
     {
         Subscription memory sub = _subscriptions[account];
-        return (sub.tokenId, sub.secondsPurchased, sub.rewardPoints, _subscriptionExpiresAt(sub));
+        return (sub.tokenId, sub.secondsPurchased, sub.rewardPoints, sub.expiresAt());
     }
 
     /**
@@ -847,8 +809,7 @@ contract SubscriptionTokenV2 is
      * @return numSeconds the number of seconds which can be refunded
      */
     function refundableBalanceOf(address account) public view returns (uint256 numSeconds) {
-        Subscription memory sub = _subscriptions[account];
-        return _purchaseTimeRemaining(sub);
+        return _subscriptions[account].purchasedTimeRemaining();
     }
 
     /**
@@ -929,8 +890,7 @@ contract SubscriptionTokenV2 is
      * @return numSeconds the number of seconds remaining in the subscription
      */
     function balanceOf(address account) public view override returns (uint256 numSeconds) {
-        Subscription memory sub = _subscriptions[account];
-        return _purchaseTimeRemaining(sub) + _grantTimeRemaining(sub);
+        return _subscriptions[account].remainingSeconds();
     }
 
     /**
