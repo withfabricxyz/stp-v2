@@ -5,7 +5,7 @@ import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/InitParams.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {AllocationLib} from "src/libraries/AllocationLib.sol";
@@ -22,6 +22,10 @@ contract SubscriptionTokenV2Test is BaseTest {
         deal(charlie, 1e19);
         deal(creator, 1e19);
         deal(fees, 1e19);
+    }
+
+    function testVersion() public {
+        assertEq(2, stp.stpVersion());
     }
 
     function testMint() public prank(alice) {
@@ -256,7 +260,7 @@ contract SubscriptionTokenV2Test is BaseTest {
         stp.updateMetadata("be", "");
         vm.stopPrank();
 
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, this));
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, this, 0x00));
         stp.updateMetadata("x", "z");
     }
 

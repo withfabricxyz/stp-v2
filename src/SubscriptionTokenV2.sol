@@ -4,10 +4,11 @@ pragma solidity ^0.8.20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {Ownable2StepUpgradeable} from "@openzeppelin-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import {ERC721Upgradeable} from "@openzeppelin-upgradeable/contracts/token/ERC721/ERC721Upgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/ReentrancyGuardUpgradeable.sol";
+import {AccessControlDefaultAdminRulesUpgradeable} from
+    "@openzeppelin-upgradeable/contracts/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 
 import {Tier} from "./types/Tier.sol";
 import {InitParams, TierInitParams, FeeParams, RewardParams} from "./types/InitParams.sol";
@@ -31,9 +32,9 @@ import {RewardLib} from "./libraries/RewardLib.sol";
  */
 contract SubscriptionTokenV2 is
     ERC721Upgradeable,
-    Ownable2StepUpgradeable,
     ReentrancyGuardUpgradeable,
     PausableUpgradeable,
+    AccessControlDefaultAdminRulesUpgradeable,
     ISubscriptionTokenV2
 {
     using SafeERC20 for IERC20;
@@ -42,6 +43,9 @@ contract SubscriptionTokenV2 is
     using TierLib for Tier;
     using SubscriptionLib for Subscription;
     using RewardLib for RewardParams;
+
+    bytes32 public constant ISSUER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
 
     /// @dev The maximum number of reward halvings (limiting this prevents overflow)
     uint256 private constant _MAX_REWARD_HALVINGS = 32;
@@ -153,18 +157,16 @@ contract SubscriptionTokenV2 is
         require(params.owner != address(0), "Owner address cannot be 0x0");
 
         __ERC721_init(params.name, params.symbol);
-        _transferOwnership(params.owner);
+        // _transferOwnership(params.owner);
+        __AccessControlDefaultAdminRules_init(0, params.owner);
         __Pausable_init();
         __ReentrancyGuard_init();
+        __AccessControl_init();
+
         _allocation = Allocation(0, 0, params.erc20TokenAddr);
         _contractURI = params.contractUri;
         _tokenURI = params.tokenUri;
     }
-
-    // /**
-    //  * @dev Initialize acts as the constructor, as this contract is intended to work with proxy contracts.
-    //  * @param params the init params (See Common.InitParams)
-    //  */
 
     /////////////////////////
     // Subscriber Calls
@@ -258,7 +260,7 @@ contract SubscriptionTokenV2 is
      * @notice Withdraw available funds as the owner to a specific account
      * @param account the account to transfer funds to
      */
-    function withdrawTo(address account) public onlyOwner {
+    function withdrawTo(address account) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(account != address(0), "Account cannot be 0x0");
         uint256 balance = creatorBalance();
         require(balance > 0, "No Balance");
@@ -271,7 +273,7 @@ contract SubscriptionTokenV2 is
      * @param numTokensIn an optional amount of tokens to transfer in before refunding
      * @param accounts the list of accounts to refund and revoke grants for
      */
-    function refund(uint256 numTokensIn, address[] memory accounts) external payable onlyOwner {
+    function refund(uint256 numTokensIn, address[] memory accounts) external payable onlyRole(DEFAULT_ADMIN_ROLE) {
         require(accounts.length > 0, "No accounts to refund");
         if (numTokensIn > 0) {
             // uint256 finalAmount = _transferIn(msg.sender, numTokensIn);
@@ -291,7 +293,7 @@ contract SubscriptionTokenV2 is
      * @param contractUri the collection metadata URI
      * @param tokenUri the token metadata URI
      */
-    function updateMetadata(string memory contractUri, string memory tokenUri) external onlyOwner {
+    function updateMetadata(string memory contractUri, string memory tokenUri) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(bytes(contractUri).length > 0, "Contract URI cannot be empty");
         require(bytes(tokenUri).length > 0, "Token URI cannot be empty");
         _contractURI = contractUri;
@@ -303,7 +305,7 @@ contract SubscriptionTokenV2 is
      * @param accounts the list of accounts to grant time to
      * @param secondsToAdd the number of seconds to grant for each account
      */
-    function grantTime(address[] memory accounts, uint256 secondsToAdd) external onlyOwner {
+    function grantTime(address[] memory accounts, uint256 secondsToAdd) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(secondsToAdd > 0, "Seconds to add must be > 0");
         require(accounts.length > 0, "No accounts to grant time to");
         for (uint256 i = 0; i < accounts.length; i++) {
@@ -314,18 +316,18 @@ contract SubscriptionTokenV2 is
     /**
      * @notice Pause minting to allow for migrations or other actions
      */
-    function pause() external onlyOwner {
+    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _pause();
     }
 
     /**
      * @notice Unpause to resume subscription minting
      */
-    function unpause() external onlyOwner {
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
     }
 
-    function setTierSupplyCap(uint256 supplyCap, uint16 tierId) public onlyOwner {
+    function setTierSupplyCap(uint256 supplyCap, uint16 tierId) public onlyRole(DEFAULT_ADMIN_ROLE) {
         _getTier(tierId).updateSupplyCap(supplyCap);
         emit SupplyCapChange(supplyCap);
     }
@@ -334,7 +336,7 @@ contract SubscriptionTokenV2 is
      * @notice Update the maximum number of tokens (subscriptions)
      * @param supplyCap the new supply cap (must be greater than token count or 0 for unlimited)
      */
-    function setSupplyCap(uint256 supplyCap) external onlyOwner {
+    function setSupplyCap(uint256 supplyCap) external onlyRole(DEFAULT_ADMIN_ROLE) {
         setTierSupplyCap(supplyCap, 1);
     }
 
@@ -342,7 +344,7 @@ contract SubscriptionTokenV2 is
      * @notice Set a transfer recipient for automated/sponsored transfers
      * @param recipient the recipient address
      */
-    function setTransferRecipient(address recipient) external onlyOwner {
+    function setTransferRecipient(address recipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _transferRecipient = recipient;
         emit TransferRecipientChange(recipient);
     }
@@ -351,7 +353,7 @@ contract SubscriptionTokenV2 is
     // Tier Management
     /////////////////////////
 
-    function createTier(uint8 tierId, TierInitParams memory params) external onlyOwner {
+    function createTier(uint8 tierId, TierInitParams memory params) external onlyRole(DEFAULT_ADMIN_ROLE) {
         initializeTier(tierId, params);
     }
 
@@ -517,7 +519,7 @@ contract SubscriptionTokenV2 is
      * @param code the unique integer code for the referral
      * @param bps the reward basis points
      */
-    function createReferralCode(uint256 code, uint16 bps) external onlyOwner {
+    function createReferralCode(uint256 code, uint16 bps) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(bps <= _MAX_BIPS, "bps too high");
         require(bps > 0, "bps must be > 0");
         uint16 existing = _referralCodes[code];
@@ -530,7 +532,7 @@ contract SubscriptionTokenV2 is
      * @notice Delete a referral code
      * @param code the unique integer code for the referral
      */
-    function deleteReferralCode(uint256 code) external onlyOwner {
+    function deleteReferralCode(uint256 code) external onlyRole(DEFAULT_ADMIN_ROLE) {
         delete _referralCodes[code];
         emit ReferralDestroyed(code);
     }
@@ -880,6 +882,14 @@ contract SubscriptionTokenV2 is
         return _tokenURI;
     }
 
+    /**
+     * @notice Fetch the current version of the contract
+     * @return version the current version
+     */
+    function stpVersion() external pure returns (uint8 version) {
+        return 2;
+    }
+
     //////////////////////
     // Overrides
     //////////////////////
@@ -897,10 +907,12 @@ contract SubscriptionTokenV2 is
      * @notice Renounce ownership of the contract, transferring all remaining funds to the creator and fee collector
      *         and pausing the contract to prevent further inflows.
      */
-    function renounceOwnership() public override onlyOwner {
+    function renounceOwnership() public onlyRole(DEFAULT_ADMIN_ROLE) {
         _transferAllBalances(msg.sender);
         _pause();
-        _transferOwnership(address(0));
+        // TODO: What?
+        // _renounceRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        // _transferOwnership(address(0));
     }
 
     /// @dev Transfers may occur if the destination does not have a subscription
@@ -919,6 +931,15 @@ contract SubscriptionTokenV2 is
         return from;
     }
 
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(AccessControlDefaultAdminRulesUpgradeable, ERC721Upgradeable)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
+
     //////////////////////
     // Recovery Functions
     //////////////////////
@@ -927,7 +948,7 @@ contract SubscriptionTokenV2 is
      * @notice Reconcile the ERC20 balance of the contract with the internal state
      * @dev The prevents lost funds if ERC20 tokens are transferred to the contract directly
      */
-    function reconcileERC20Balance() external onlyOwner {
+    function reconcileERC20Balance() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _allocation.reconcileBalance();
     }
 
@@ -937,7 +958,10 @@ contract SubscriptionTokenV2 is
      * @param recipientAddress the address to send the tokens to
      * @param tokenAmount the amount of tokens to send
      */
-    function recoverERC20(address tokenAddress, address recipientAddress, uint256 tokenAmount) external onlyOwner {
+    function recoverERC20(address tokenAddress, address recipientAddress, uint256 tokenAmount)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         require(tokenAddress != erc20Address(), "Cannot recover subscription token");
         IERC20(tokenAddress).safeTransfer(recipientAddress, tokenAmount);
     }
@@ -946,7 +970,7 @@ contract SubscriptionTokenV2 is
      * @notice Recover native tokens which bypassed receive. Only callable for erc20 denominated contracts.
      * @param recipient the address to send the tokens to
      */
-    function recoverNativeTokens(address recipient) external onlyOwner {
+    function recoverNativeTokens(address recipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(_allocation.isERC20(), "Not supported, use reconcileNativeBalance");
         uint256 balance = address(this).balance;
         require(balance > 0, "No balance to recover");
@@ -957,7 +981,7 @@ contract SubscriptionTokenV2 is
     /**
      * @notice Reconcile native tokens which bypassed receive/mint. Only callable for native denominated contracts.
      */
-    function reconcileNativeBalance() external onlyOwner {
+    function reconcileNativeBalance() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _allocation.reconcileBalance();
     }
 }

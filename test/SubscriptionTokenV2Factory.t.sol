@@ -5,7 +5,7 @@ import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams, DeployParams, TierInitParams, RewardParams} from "src/types/InitParams.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 import {SubscriptionTokenV2Factory} from "src/SubscriptionTokenV2Factory.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 contract SubscriptionTokenV2FactoryTest is BaseTest {
     /// @dev Emitted upon a successful contract deployment
@@ -133,7 +133,7 @@ contract SubscriptionTokenV2FactoryTest is BaseTest {
     //     assertEq(1e12, deploy);
 
     //     vm.startPrank(alice);
-    //     vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
+    //     vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, 0x00));
     //     factory.updateMinimumDeployFee(1e12);
     // }
 
@@ -169,7 +169,7 @@ contract SubscriptionTokenV2FactoryTest is BaseTest {
     //     factory.updateMinimumDeployFee(1e12);
     //     factory.deploySubscription{value: 1e12}("test", "tst", "curi", "turi", 1e9, 2e9, 0, address(0), 0);
     //     vm.startPrank(alice);
-    //     vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
+    //     vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, 0x00));
     //     factory.transferDeployFees(alice);
     // }
 

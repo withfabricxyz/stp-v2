@@ -24,6 +24,7 @@ struct RewardParams {
     uint48 rewardPeriodSeconds;
     uint48 startTimestamp;
 }
+// uint8 gracePeriodDivisor;
 
 /// @dev The initialization parameters for a subscription token
 struct InitParams {
