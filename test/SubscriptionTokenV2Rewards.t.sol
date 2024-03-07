@@ -13,20 +13,26 @@ contract SubscriptionTokenV2RewardsTest is BaseTest {
         deal(doug, 1e19);
         deal(creator, 1e19);
         deal(fees, 1e19);
+
         stp = createETHSub(2592000, 0, 500);
+        tierParams.periodDurationSeconds = 2592000;
+        tierParams.pricePerPeriod = 2592000 * 2;
+        rewardParams.rewardBps = 500;
+        rewardParams.numRewardHalvings = 6;
+        rewardParams.rewardPeriodSeconds = 2592000;
+        reinitStp();
     }
 
     function testSingleHalving() public {
-        InitParams memory params = initParams();
-        params.rewardBps = 500;
-        params.numRewardHalvings = 1;
-        params.minimumPurchaseSeconds = 10;
-        SubscriptionTokenV2 m = createStp(params);
-        assertEq(m.rewardMultiplier(), 2);
+        rewardParams.rewardBps = 500;
+        rewardParams.numRewardHalvings = 1;
+        rewardParams.rewardPeriodSeconds = 10;
+        reinitStp();
+        assertEq(stp.rewardMultiplier(), 2);
         vm.warp(block.timestamp + 11);
-        assertEq(m.rewardMultiplier(), 1);
+        assertEq(stp.rewardMultiplier(), 1);
         vm.warp(block.timestamp + 21);
-        assertEq(m.rewardMultiplier(), 0);
+        assertEq(stp.rewardMultiplier(), 0);
     }
 
     function testDecay() public {
@@ -140,10 +146,9 @@ contract SubscriptionTokenV2RewardsTest is BaseTest {
     }
 
     function testSlashingNoRewards() public {
-        InitParams memory params = initParams();
-        params.numRewardHalvings = 1;
-        params.minimumPurchaseSeconds = 10;
-        stp = createStp(params);
+        rewardParams.rewardBps = 0;
+
+        reinitStp();
 
         mint(alice, 2592000 * 2);
         mint(bob, 1e8);

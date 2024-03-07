@@ -14,8 +14,6 @@ contract SubscriptionTokenV2InitTest is BaseTest {
     InitParams private params;
 
     function setUp() public {
-        params = initParams();
-        stp = createStp(params);
         vm.store(
             address(stp),
             bytes32(uint256(0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00)),
@@ -24,87 +22,87 @@ contract SubscriptionTokenV2InitTest is BaseTest {
     }
 
     function testOwnerZero() public {
-        params.owner = address(0);
+        initParams.owner = address(0);
 
         vm.expectRevert("Owner address cannot be 0x0");
-        stp.initialize(params);
+        stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 
-    function testTps() public {
-        params.tokensPerSecond = 0;
+    // function testTps() public {
+    //     initParams.tokensPerSecond = 0;
 
-        vm.expectRevert("Tokens per second must be > 0");
-        stp.initialize(params);
-    }
+    //     vm.expectRevert("Tokens per second must be > 0");
+    //     stp.initialize(initParams, tierParams, rewardParams, feeParams);
+    // }
 
     function testFeeBps() public {
-        params.feeBps = 1500;
+        feeParams.bips = 1500;
 
         vm.expectRevert("Fee bps too high");
-        stp.initialize(params);
+        stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 
     function testFeeRequirement() public {
-        params.feeRecipient = fees;
+        feeParams.collector = fees;
 
         vm.expectRevert("Fees required when fee recipient is present");
-        stp.initialize(params);
+        stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 
     function testMinPurchase() public {
-        params.minimumPurchaseSeconds = 0;
+        tierParams.periodDurationSeconds = 0;
 
-        vm.expectRevert("Min purchase seconds must be > 0");
-        stp.initialize(params);
+        vm.expectRevert("Period duration must be > 0");
+        stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 
     function testRewardBpsTooHigh() public {
-        params.rewardBps = 11000;
+        rewardParams.rewardBps = 11000;
 
         vm.expectRevert("Reward bps too high");
-        stp.initialize(params);
+        stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 
     function testRewardHalvingsTooHigh() public {
-        params.numRewardHalvings = 33;
+        rewardParams.numRewardHalvings = 33;
 
         vm.expectRevert("Reward halvings too high");
-        stp.initialize(params);
+        stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 
     function testRewardHalvingsTooLow() public {
-        params.numRewardHalvings = 0;
-        params.rewardBps = 500;
+        rewardParams.numRewardHalvings = 0;
+        rewardParams.rewardBps = 500;
 
         vm.expectRevert("Reward halvings too low");
-        stp.initialize(params);
+        stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 
     function testEmptyName() public {
-        params.name = "";
+        initParams.name = "";
 
         vm.expectRevert("Name cannot be empty");
-        stp.initialize(params);
+        stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 
     function testEmptySymbol() public {
-        params.symbol = "";
+        initParams.symbol = "";
 
         vm.expectRevert("Symbol cannot be empty");
-        stp.initialize(params);
+        stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 
     function testEmptyContractURI() public {
-        params.contractUri = "";
+        initParams.contractUri = "";
 
         vm.expectRevert("Contract URI cannot be empty");
-        stp.initialize(params);
+        stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 
     function testEmptyTokenURI() public {
-        params.tokenUri = "";
+        initParams.tokenUri = "";
 
         vm.expectRevert("Token URI cannot be empty");
-        stp.initialize(params);
+        stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 }

@@ -12,10 +12,10 @@ import {AllocationLib} from "src/libraries/AllocationLib.sol";
 
 contract SubscriptionTokenV2Test is BaseTest {
     function setUp() public {
-        InitParams memory params = initParams();
-        params.minimumPurchaseSeconds = 4;
-        params.numRewardHalvings = 0;
-        stp = createStp(params);
+        tierParams.periodDurationSeconds = 4;
+        tierParams.pricePerPeriod = 8;
+        rewardParams.numRewardHalvings = 0;
+        stp = reinitStp();
 
         deal(alice, 1e19);
         deal(bob, 1e19);
@@ -268,13 +268,12 @@ contract SubscriptionTokenV2Test is BaseTest {
     function testERC20FeeTakingToken() public {
         TestFeeToken _token = new TestFeeToken("FIAT", "FIAT", 1e21);
         _token.transfer(alice, 1e20);
-        InitParams memory params = initParams();
-        params.erc20TokenAddr = address(_token);
-        SubscriptionTokenV2 m = createStp(params);
+        initParams.erc20TokenAddr = address(_token);
+        reinitStp();
         vm.startPrank(alice);
-        _token.approve(address(m), 1e18);
-        m.mint(1e18);
-        assertEq(m.balanceOf(alice), 1e18 / 2 / 2);
+        _token.approve(address(stp), 1e18);
+        stp.mint(1e18);
+        assertEq(stp.balanceOf(alice), 1e18 / 2 / 2);
         vm.stopPrank();
     }
 

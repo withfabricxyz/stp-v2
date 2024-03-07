@@ -13,9 +13,13 @@ contract SubscriptionTokenV2FeeTest is BaseTest {
         deal(charlie, 1e19);
         deal(creator, 1e19);
         deal(fees, 1e19);
+
+        feeParams.bips = 500;
+        feeParams.collector = fees;
+        reinitStp();
     }
 
-    function testAllocation() public withFees {
+    function testAllocation() public {
         (address recipient, uint16 bps) = stp.feeSchedule();
 
         assertEq(bps, 500);
@@ -36,7 +40,7 @@ contract SubscriptionTokenV2FeeTest is BaseTest {
         assertEq(stp.feeBalance(), expectedFee);
     }
 
-    function testFeeTransfer() public withFees {
+    function testFeeTransfer() public {
         mint(alice, 1e18);
         withdraw();
 
@@ -53,7 +57,7 @@ contract SubscriptionTokenV2FeeTest is BaseTest {
         stp.transferFees();
     }
 
-    function testWithdrawWithFees() public withFees {
+    function testWithdrawWithFees() public {
         mint(alice, 1e18);
         mint(bob, 1e18);
 
@@ -71,7 +75,7 @@ contract SubscriptionTokenV2FeeTest is BaseTest {
         vm.stopPrank();
     }
 
-    function testFeeCollectorUpdate() public withFees {
+    function testFeeCollectorUpdate() public {
         vm.startPrank(fees);
         vm.expectEmit(true, true, false, true, address(stp));
         emit FeeCollectorChange(fees, charlie);
@@ -81,7 +85,7 @@ contract SubscriptionTokenV2FeeTest is BaseTest {
         vm.stopPrank();
     }
 
-    function testFeeCollectorRelinquish() public withFees {
+    function testFeeCollectorRelinquish() public {
         mint(alice, 5e18);
         withdraw();
 
@@ -102,7 +106,7 @@ contract SubscriptionTokenV2FeeTest is BaseTest {
         assertEq(stp.creatorBalance(), expectedFee);
     }
 
-    function testRenounce() public withFees {
+    function testRenounce() public {
         mint(alice, 1e18);
         withdraw();
         mint(alice, 1e17);
@@ -116,7 +120,7 @@ contract SubscriptionTokenV2FeeTest is BaseTest {
         assertEq(stp.feeBalance(), 0);
     }
 
-    function testTransferAll() public withFees {
+    function testTransferAll() public {
         mint(alice, 1e18);
         mint(bob, 1e18);
 

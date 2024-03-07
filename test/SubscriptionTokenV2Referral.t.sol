@@ -11,7 +11,9 @@ contract SubscriptionTokenV2ReferralTest is BaseTest {
         deal(bob, 1e19);
         deal(creator, 1e19);
         deal(fees, 1e19);
-        stp = createETHSub(1, 0, 0);
+        // tierParams.periodDurationSeconds = 1;
+        // tierParams.pricePerPeriod = 2;
+        reinitStp();
     }
 
     function testCreate() public prank(creator) {

@@ -12,7 +12,8 @@ contract SubscriptionTokenV2GrantsTest is BaseTest {
         deal(charlie, 1e19);
         deal(creator, 1e19);
         deal(fees, 1e19);
-        stp = createETHSub(1, 0, 0);
+        tierParams.periodDurationSeconds = 1;
+        reinitStp();
     }
 
     function testGrant() public {
@@ -48,8 +49,8 @@ contract SubscriptionTokenV2GrantsTest is BaseTest {
         stp.grantTime(list(alice), 1e15);
         vm.stopPrank();
         mint(alice, 1e18);
-        assertEq(stp.balanceOf(alice), 1e15 + 1e18 / 2);
-        assertEq(stp.refundableBalanceOf(alice), 1e18 / 2);
+        assertEq(stp.balanceOf(alice), 1e15 + 1e18 / 4);
+        assertEq(stp.refundableBalanceOf(alice), 1e18 / 4);
     }
 
     function testGrantRefund() public {

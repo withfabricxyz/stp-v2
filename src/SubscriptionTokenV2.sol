@@ -10,13 +10,14 @@ import {ERC721Upgradeable} from "@openzeppelin-upgradeable/contracts/token/ERC72
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/ReentrancyGuardUpgradeable.sol";
 
 import {Tier} from "./types/Tier.sol";
-import {InitParams} from "./types/InitParams.sol";
+import {InitParams, TierInitParams, FeeParams, RewardParams} from "./types/InitParams.sol";
 import {Allocation} from "./types/Allocation.sol";
 import {Subscription} from "./types/Subscription.sol";
 import {AllocationLib} from "./libraries/AllocationLib.sol";
 import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
 import {TierLib} from "./libraries/TierLib.sol";
 import {ISubscriptionTokenV2} from "./interfaces/ISubscriptionTokenV2.sol";
+import {RewardLib} from "./libraries/RewardLib.sol";
 
 /**
  * @title Subscription Token Protocol Version 1
@@ -40,6 +41,7 @@ contract SubscriptionTokenV2 is
     using AllocationLib for Allocation;
     using TierLib for Tier;
     using SubscriptionLib for Subscription;
+    using RewardLib for RewardParams;
 
     /// @dev The maximum number of reward halvings (limiting this prevents overflow)
     uint256 private constant _MAX_REWARD_HALVINGS = 32;
@@ -64,14 +66,7 @@ contract SubscriptionTokenV2 is
     /// @dev The total number of tokens allocated for the fee collector (accounting)
     uint256 private _feeBalance;
 
-    /// @dev The protocol fee basis points (10000 = 100%, max = _MAX_FEE_BIPS)
-    uint16 private _feeBps;
-
-    /// @dev The protocol fee collector address (for withdraws or sponsored transfers)
-    address private _feeCollector;
-
-    /// @dev The block timestamp of the contract deployment (used for reward halvings)
-    uint256 private _deployBlockTime;
+    FeeParams private _feeParams;
 
     /// @dev The reward pool size (used to calculate reward withdraws accurately)
     uint256 private _totalRewardPoints;
@@ -85,11 +80,7 @@ contract SubscriptionTokenV2 is
     /// @dev The reward pool tokens slashed (used to calculate reward withdraws accurately)
     uint256 private _rewardPoolSlashed;
 
-    /// @dev The basis points for reward allocations
-    uint16 private _rewardBps;
-
-    /// @dev The number of reward halvings. This is used to calculate the reward multiplier for early supporters, if the creator chooses to reward them.
-    uint256 private _numRewardHalvings;
+    RewardParams private _rewardParams;
 
     /// @dev The address of the account which can receive transfers via sponsored calls
     address private _transferRecipient;
@@ -116,44 +107,66 @@ contract SubscriptionTokenV2 is
         mintFor(msg.sender, msg.value);
     }
 
-    /**
-     * @dev Initialize acts as the constructor, as this contract is intended to work with proxy contracts.
-     * @param params the init params (See Common.InitParams)
-     */
-    function initialize(InitParams memory params) public initializer {
+    // function initializeTier() internal initializer {
+    // }
+
+    function initFees(FeeParams memory fees) private {
+        require(fees.bips <= _MAX_FEE_BIPS, "Fee bps too high");
+        if (fees.collector != address(0)) {
+            require(fees.bips > 0, "Fees required when fee recipient is present");
+        }
+        _feeParams = fees;
+    }
+
+    function initRewards(RewardParams memory rewards) private {
+        require(rewards.rewardBps <= _MAX_BIPS, "Reward bps too high");
+        require(rewards.numRewardHalvings <= _MAX_REWARD_HALVINGS, "Reward halvings too high");
+        if (rewards.rewardBps > 0) {
+            require(rewards.numRewardHalvings > 0, "Reward halvings too low");
+        }
+        if (rewards.startTimestamp == 0) {
+            rewards.startTimestamp = uint48(block.timestamp);
+        }
+        _rewardParams = rewards;
+    }
+
+    function initializeTier(TierInitParams memory params) private {
+        require(params.periodDurationSeconds > 0, "Period duration must be > 0");
+        require(params.pricePerPeriod > 0, "Price per period must be > 0");
+
+        _tierCount += 1;
+        _tiers[_tierCount] = Tier({
+            id: _tierCount,
+            periodDurationSeconds: params.periodDurationSeconds,
+            paused: params.paused,
+            payWhatYouWant: params.payWhatYouWant,
+            maxSupply: params.maxSupply,
+            numSubs: 0,
+            numFrozenSubs: 0,
+            rewardMultiplier: params.rewardMultiplier,
+            allowList: params.allowList,
+            initialMintPrice: params.initialMintPrice,
+            pricePerPeriod: params.pricePerPeriod,
+            maxMintablePeriods: params.maxMintablePeriods
+        });
+    }
+
+    function initialize(
+        InitParams memory params,
+        TierInitParams memory tier,
+        RewardParams memory rewards,
+        FeeParams memory fees
+    ) public initializer {
+        // initialize(params);
+        initRewards(rewards);
+        initFees(fees);
+        initializeTier(tier);
+
         require(bytes(params.name).length > 0, "Name cannot be empty");
         require(bytes(params.symbol).length > 0, "Symbol cannot be empty");
         require(bytes(params.contractUri).length > 0, "Contract URI cannot be empty");
         require(bytes(params.tokenUri).length > 0, "Token URI cannot be empty");
         require(params.owner != address(0), "Owner address cannot be 0x0");
-        require(params.tokensPerSecond > 0, "Tokens per second must be > 0");
-        require(params.minimumPurchaseSeconds > 0, "Min purchase seconds must be > 0");
-        require(params.feeBps <= _MAX_FEE_BIPS, "Fee bps too high");
-        require(params.rewardBps <= _MAX_BIPS, "Reward bps too high");
-        require(params.numRewardHalvings <= _MAX_REWARD_HALVINGS, "Reward halvings too high");
-        if (params.feeRecipient != address(0)) {
-            require(params.feeBps > 0, "Fees required when fee recipient is present");
-        }
-        if (params.rewardBps > 0) {
-            require(params.numRewardHalvings > 0, "Reward halvings too low");
-        }
-
-        // For now let's set things to normal
-        _tiers[1] = Tier({
-            id: 1,
-            periodDurationSeconds: uint32(params.minimumPurchaseSeconds),
-            paused: false,
-            payWhatYouWant: false,
-            maxSupply: 0,
-            numSubs: 0,
-            numFrozenSubs: 0,
-            rewardMultiplier: 1,
-            allowList: 0,
-            initialMintPrice: 0,
-            pricePerPeriod: params.minimumPurchaseSeconds * params.tokensPerSecond,
-            maxMintablePeriods: 24
-        });
-        _tierCount = 1;
 
         __ERC721_init(params.name, params.symbol);
         _transferOwnership(params.owner);
@@ -162,12 +175,12 @@ contract SubscriptionTokenV2 is
         _allocation = Allocation(0, 0, params.erc20TokenAddr);
         _contractURI = params.contractUri;
         _tokenURI = params.tokenUri;
-        _rewardBps = params.rewardBps;
-        _numRewardHalvings = params.numRewardHalvings;
-        _feeBps = params.feeBps;
-        _feeCollector = params.feeRecipient;
-        _deployBlockTime = block.timestamp;
     }
+
+    // /**
+    //  * @dev Initialize acts as the constructor, as this contract is intended to work with proxy contracts.
+    //  * @param params the init params (See Common.InitParams)
+    //  */
 
     /////////////////////////
     // Subscriber Calls
@@ -212,7 +225,7 @@ contract SubscriptionTokenV2 is
      * @param account the account of the subscription to slash
      */
     function slashRewards(address account) external {
-        require(_rewardBps > 0, "Rewards disabled");
+        require(_rewardParams.rewardBps > 0, "Rewards disabled");
         Subscription memory slasher = _subscriptions[msg.sender];
         require(_isActive(slasher), "Subscription not active");
 
@@ -459,7 +472,7 @@ contract SubscriptionTokenV2 is
 
     // @inheritdoc ISubscriptionTokenV2
     function distributeRewards(uint256 numTokens) external payable override {
-        require(_rewardBps > 0, "Rewards disabled");
+        require(_totalRewardPoints > 0, "No reward points");
         require(numTokens > 0, "Num rewards must be > 0");
         uint256 finalAmount = _allocation.transferIn(msg.sender, numTokens);
         _rewardPoolBalance += finalAmount;
@@ -477,7 +490,7 @@ contract SubscriptionTokenV2 is
      * @return feeBps the fee basis points
      */
     function feeSchedule() external view returns (address feeCollector, uint16 feeBps) {
-        return (_feeCollector, _feeBps);
+        return (_feeParams.collector, _feeParams.bips);
     }
 
     /**
@@ -493,13 +506,13 @@ contract SubscriptionTokenV2 is
      * @param newCollector the new fee collector address
      */
     function updateFeeRecipient(address newCollector) external {
-        require(msg.sender == _feeCollector, "Unauthorized");
+        require(msg.sender == _feeParams.collector, "Unauthorized");
         // Give tokens back to creator and set fee rate to 0
         if (newCollector == address(0)) {
             _feeBalance = 0;
-            _feeBps = 0;
+            _feeParams.bips = 0;
         }
-        _feeCollector = newCollector;
+        _feeParams.collector = newCollector;
         emit FeeCollectorChange(msg.sender, newCollector);
     }
 
@@ -575,10 +588,10 @@ contract SubscriptionTokenV2 is
 
     /// @dev Allocate tokens to the fee collector
     function _allocateFees(uint256 amount) internal returns (uint256) {
-        if (_feeBps == 0) {
+        if (_feeParams.bips == 0) {
             return amount;
         }
-        uint256 fee = (amount * _feeBps) / _MAX_BIPS;
+        uint256 fee = (amount * _feeParams.bips) / _MAX_BIPS;
         _feeBalance += fee;
         emit FeeAllocated(fee);
         return amount - fee;
@@ -586,10 +599,10 @@ contract SubscriptionTokenV2 is
 
     /// @dev Allocate tokens to the reward pool
     function _allocateRewards(uint256 amount) internal returns (uint256) {
-        if (_rewardBps == 0 || _totalRewardPoints == 0) {
+        if (_rewardParams.rewardBps == 0 || _totalRewardPoints == 0) {
             return amount;
         }
-        uint256 rewards = (amount * _rewardBps) / _MAX_BIPS;
+        uint256 rewards = (amount * _rewardParams.rewardBps) / _MAX_BIPS;
         _rewardPoolBalance += rewards;
         _rewardPoolTotal += rewards;
         emit RewardsAllocated(rewards);
@@ -609,8 +622,8 @@ contract SubscriptionTokenV2 is
         }
         uint256 balance = _feeBalance;
         _feeBalance = 0;
-        _allocation.transferOut(_feeCollector, balance);
-        emit FeeTransfer(msg.sender, _feeCollector, balance);
+        _allocation.transferOut(_feeParams.collector, balance);
+        emit FeeTransfer(msg.sender, _feeParams.collector, balance);
     }
 
     /// @dev Transfer all remaining balances to the creator and fee collector (if applicable)
@@ -742,14 +755,7 @@ contract SubscriptionTokenV2 is
      * @return multiplier the current value
      */
     function rewardMultiplier() public view returns (uint256 multiplier) {
-        if (_numRewardHalvings == 0) {
-            return 0;
-        }
-        uint256 halvings = (block.timestamp - _deployBlockTime) / _getTier(1).periodDurationSeconds;
-        if (halvings > _numRewardHalvings) {
-            return 0;
-        }
-        return (2 ** _numRewardHalvings) / (2 ** halvings);
+        return _rewardParams.currentMultiplier();
     }
 
     /**
@@ -798,7 +804,7 @@ contract SubscriptionTokenV2 is
      * @return bps reward basis points
      */
     function rewardBps() external view returns (uint16 bps) {
-        return _rewardBps;
+        return _rewardParams.rewardBps;
     }
 
     /**

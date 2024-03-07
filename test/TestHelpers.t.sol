@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {Test} from "@forge/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {InitParams} from "src/types/InitParams.sol";
+import {InitParams, TierInitParams, FeeParams, RewardParams} from "src/types/InitParams.sol";
 
 // Test token which charges 50% fee on transfer
 contract TestFeeToken is ERC20 {
@@ -109,11 +109,6 @@ abstract contract BaseTest is Test {
         vm.stopPrank();
     }
 
-    modifier withFees() {
-        stp = createETHSub(1, 500, 0);
-        _;
-    }
-
     modifier erc20() {
         stp = createERC20Sub();
         _;
@@ -126,33 +121,41 @@ abstract contract BaseTest is Test {
     address internal charlie = 0xb4C79Dab8F259C7AEe6e5b2Aa729821864227e7A;
     address internal doug = 0xB4c79dAb8f259c7aee6e5b2aa729821864227E7b;
 
-    SubscriptionTokenV2 internal stp;
+    TierInitParams internal tierParams = TierInitParams({
+        periodDurationSeconds: 2,
+        maxSupply: 0,
+        maxMintablePeriods: 0,
+        rewardMultiplier: 1,
+        paused: false,
+        payWhatYouWant: false,
+        allowList: 0,
+        initialMintPrice: 0,
+        pricePerPeriod: 4
+    });
 
-    function initParams() internal view returns (InitParams memory) {
-        return InitParams({
-            name: "Meow Sub",
-            symbol: "MEOW",
-            contractUri: "curi",
-            tokenUri: "turi",
-            owner: creator,
-            tokensPerSecond: 2,
-            minimumPurchaseSeconds: 2,
-            rewardBps: 0,
-            numRewardHalvings: 6,
-            feeBps: 0,
-            feeRecipient: address(0),
-            erc20TokenAddr: address(0)
-        });
-    }
+    FeeParams internal feeParams = FeeParams({collector: address(0), bips: 0});
 
-    function createStp(InitParams memory params) internal returns (SubscriptionTokenV2) {
-        stp = new SubscriptionTokenV2();
+    RewardParams internal rewardParams =
+        RewardParams({rewardBps: 0, numRewardHalvings: 6, rewardPeriodSeconds: 2, startTimestamp: 0});
+
+    InitParams internal initParams = InitParams({
+        name: "Meow Sub",
+        symbol: "MEOW",
+        contractUri: "curi",
+        tokenUri: "turi",
+        owner: creator,
+        erc20TokenAddr: address(0)
+    });
+
+    SubscriptionTokenV2 internal stp = new SubscriptionTokenV2();
+
+    function reinitStp() public returns (SubscriptionTokenV2) {
         vm.store(
             address(stp),
             bytes32(uint256(0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00)),
             bytes32(0)
         );
-        stp.initialize(params);
+        stp.initialize(initParams, tierParams, rewardParams, feeParams);
         return stp;
     }
 
@@ -192,9 +195,8 @@ abstract contract BaseTest is Test {
         _token.transfer(bob, 1e20);
         _token.transfer(charlie, 1e20);
         _token.transfer(creator, 1e20);
-        InitParams memory params = initParams();
-        params.erc20TokenAddr = address(_token);
-        return createStp(params);
+        initParams.erc20TokenAddr = address(_token);
+        return reinitStp();
     }
 
     function createETHSub(uint256 minPurchase, uint16 feeBps, uint16 rewardBps)
@@ -202,12 +204,13 @@ abstract contract BaseTest is Test {
         virtual
         returns (SubscriptionTokenV2 sub)
     {
-        InitParams memory params = initParams();
-        params.minimumPurchaseSeconds = minPurchase;
-        params.feeBps = feeBps;
-        params.feeRecipient = feeBps > 0 ? fees : address(0);
-        params.rewardBps = rewardBps;
-        return createStp(params);
+        tierParams.periodDurationSeconds = uint32(minPurchase);
+        tierParams.pricePerPeriod = minPurchase * 2;
+        feeParams.bips = feeBps;
+        feeParams.collector = feeBps > 0 ? fees : address(0);
+        rewardParams.rewardBps = rewardBps;
+        rewardParams.numRewardHalvings = 6;
+        return reinitStp();
     }
 
     function testIgnore() internal {}

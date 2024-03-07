@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {SubscriptionTokenV2} from "./SubscriptionTokenV2.sol";
-import {InitParams} from "./types/InitParams.sol";
+import {InitParams, TierInitParams, DeployParams, FeeParams} from "./types/InitParams.sol";
 
 /**
  *
@@ -65,56 +65,48 @@ contract SubscriptionTokenV2Factory is Ownable2Step {
         _feeDeployMin = 0;
     }
 
-    /**
-     * @notice Deploy a new Clone of a SubscriptionTokenV2 contract
-     *
-     * @param name the name of the collection
-     * @param symbol the symbol of the collection
-     * @param contractURI the metadata URI for the collection
-     * @param tokenURI the metadata URI for the tokens
-     * @param tokensPerSecond the number of base tokens required for a single second of time
-     * @param minimumPurchaseSeconds the minimum number of seconds an account can purchase
-     * @param rewardBps the basis points for reward allocations
-     * @param erc20TokenAddr the address of the ERC20 token used for purchases, or the 0x0 for native
-     * @param feeConfigId the fee configuration id to use for this deployment (if the id is invalid, the default fee is used)
-     */
-    function deploySubscription(
-        string memory name,
-        string memory symbol,
-        string memory contractURI,
-        string memory tokenURI,
-        uint256 tokensPerSecond,
-        uint256 minimumPurchaseSeconds,
-        uint16 rewardBps,
-        address erc20TokenAddr,
-        uint256 feeConfigId
-    ) public payable feeRequired returns (address) {
+    // /**
+    //  * @notice Deploy a new Clone of a SubscriptionTokenV2 contract
+    //  *
+    //  * @param name the name of the collection
+    //  * @param symbol the symbol of the collection
+    //  * @param contractURI the metadata URI for the collection
+    //  * @param tokenURI the metadata URI for the tokens
+    //  * @param tokensPerSecond the number of base tokens required for a single second of time
+    //  * @param minimumPurchaseSeconds the minimum number of seconds an account can purchase
+    //  * @param rewardBps the basis points for reward allocations
+    //  * @param erc20TokenAddr the address of the ERC20 token used for purchases, or the 0x0 for native
+    //  * @param feeConfigId the fee configuration id to use for this deployment (if the id is invalid, the default fee is used)
+    //  */
+    function deploySubscription(DeployParams memory params) public payable feeRequired returns (address) {
         // If an invalid fee id is provided, use the default fee (0)
-        FeeConfig memory fees = _feeConfigs[feeConfigId];
-        if (feeConfigId != 0 && fees.collector == address(0)) {
-            fees = _feeConfigs[0];
-        }
+        FeeParams memory fees = _feeConfig(params.feeConfigId);
 
         address deployment = Clones.clone(_implementation);
+        // SubscriptionTokenV2 token = SubscriptionTokenV2(payable(deployment));
+
+        // Initialize rewards
+        if (params.initParams.owner == address(0)) {
+            params.initParams.owner = msg.sender;
+        }
+
+        // params.initParams.feeBps = fees.bips;
+        // params.rewardParams.rewardBps = params.initParams.rewardBps;
+
         SubscriptionTokenV2(payable(deployment)).initialize(
-            InitParams(
-                name,
-                symbol,
-                contractURI,
-                tokenURI,
-                msg.sender,
-                tokensPerSecond,
-                minimumPurchaseSeconds,
-                rewardBps,
-                _DEFAULT_REWARD_HALVINGS,
-                fees.basisPoints,
-                fees.collector,
-                erc20TokenAddr
-            )
+            params.initParams, params.tierParams, params.rewardParams, fees
         );
-        emit Deployment(deployment, feeConfigId);
+        emit Deployment(deployment, params.feeConfigId); // TODO: Extra data for event to bind to dapp records
 
         return deployment;
+    }
+
+    function _feeConfig(uint256 feeConfigId) internal view returns (FeeParams memory fees) {
+        FeeConfig memory _fees = _feeConfigs[feeConfigId];
+        if (feeConfigId != 0 && _fees.collector == address(0)) {
+            _fees = _feeConfigs[0];
+        }
+        return FeeParams({collector: _fees.collector, bips: _fees.basisPoints});
     }
 
     /**
