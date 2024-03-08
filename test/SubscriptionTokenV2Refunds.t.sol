@@ -39,7 +39,11 @@ contract SubscriptionTokenV2RefundsTest is BaseTest {
         stp.refund(0, subscribers);
 
         vm.stopPrank();
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, this, 0x00));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, this, keccak256("MANAGER_ROLE")
+            )
+        );
         stp.refund(0, list(alice));
     }
 

@@ -44,8 +44,7 @@ contract SubscriptionTokenV2 is
     using SubscriptionLib for Subscription;
     using RewardLib for RewardParams;
 
-    bytes32 public constant ISSUER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
+    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
     /// @dev The maximum number of reward halvings (limiting this prevents overflow)
     uint256 private constant _MAX_REWARD_HALVINGS = 32;
@@ -101,6 +100,19 @@ contract SubscriptionTokenV2 is
 
     ////////////////////////////////////
 
+    modifier onlyManager() {
+        address account = _msgSender();
+        if (!hasRole(DEFAULT_ADMIN_ROLE, account) && !hasRole(MANAGER_ROLE, account)) {
+            revert AccessControlUnauthorizedAccount(account, MANAGER_ROLE);
+        }
+        _;
+    }
+
+    modifier onlyAdmin() {
+        _checkRole(DEFAULT_ADMIN_ROLE);
+        _;
+    }
+
     /// @dev Disable initializers on the logic contract
     constructor() {
         _disableInitializers();
@@ -145,7 +157,6 @@ contract SubscriptionTokenV2 is
         RewardParams memory rewards,
         FeeParams memory fees
     ) public initializer {
-        // initialize(params);
         initRewards(rewards);
         initFees(fees);
         initializeTier(1, tier);
@@ -157,8 +168,7 @@ contract SubscriptionTokenV2 is
         require(params.owner != address(0), "Owner address cannot be 0x0");
 
         __ERC721_init(params.name, params.symbol);
-        // _transferOwnership(params.owner);
-        __AccessControlDefaultAdminRules_init(0, params.owner);
+        __AccessControlDefaultAdminRules_init(0, params.owner); // TODO: Understand the first timestamp param
         __Pausable_init();
         __ReentrancyGuard_init();
         __AccessControl_init();
@@ -273,7 +283,7 @@ contract SubscriptionTokenV2 is
      * @param numTokensIn an optional amount of tokens to transfer in before refunding
      * @param accounts the list of accounts to refund and revoke grants for
      */
-    function refund(uint256 numTokensIn, address[] memory accounts) external payable onlyRole(DEFAULT_ADMIN_ROLE) {
+    function refund(uint256 numTokensIn, address[] memory accounts) external payable onlyManager {
         require(accounts.length > 0, "No accounts to refund");
         if (numTokensIn > 0) {
             // uint256 finalAmount = _transferIn(msg.sender, numTokensIn);
@@ -305,7 +315,7 @@ contract SubscriptionTokenV2 is
      * @param accounts the list of accounts to grant time to
      * @param secondsToAdd the number of seconds to grant for each account
      */
-    function grantTime(address[] memory accounts, uint256 secondsToAdd) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function grantTime(address[] memory accounts, uint256 secondsToAdd) external onlyManager {
         require(secondsToAdd > 0, "Seconds to add must be > 0");
         require(accounts.length > 0, "No accounts to grant time to");
         for (uint256 i = 0; i < accounts.length; i++) {
