@@ -40,7 +40,7 @@ contract SubscriptionTokenV2FactoryTest is BaseTest {
     //         params.tokenUri,
     //         params.tokensPerSecond,
     //         params.minimumPurchaseSeconds,
-    //         params.rewardBps,
+    //         params.bips,
     //         params.erc20TokenAddr,
     //         params.feeBps
     //     );
@@ -62,7 +62,7 @@ contract SubscriptionTokenV2FactoryTest is BaseTest {
         assertEq(nft.contractURI(), "curi");
         assertEq(nft.timeValue(2), 1);
         assertEq(nft.erc20Address(), address(0));
-        assertEq(nft.rewardBps(), 0);
+        assertEq(nft.bips(), 0);
     }
 
     // function testDeploymentWithReferral() public {

@@ -92,7 +92,7 @@ abstract contract BaseTest is Test {
     );
 
     /// @dev Emitted when a new referral code is created
-    event ReferralCreated(uint256 id, uint16 rewardBps);
+    event ReferralCreated(uint256 id, uint16 bips);
 
     /// @dev Emitted when a referral code is deleted
     event ReferralDestroyed(uint256 id);
@@ -136,7 +136,7 @@ abstract contract BaseTest is Test {
     FeeParams internal feeParams = FeeParams({collector: address(0), bips: 0});
 
     RewardParams internal rewardParams =
-        RewardParams({rewardBps: 0, numRewardHalvings: 6, rewardPeriodSeconds: 2, startTimestamp: 0});
+        RewardParams({bips: 0, numPeriods: 6, periodSeconds: 2, startTimestamp: 0, minMultiplier: 0});
 
     InitParams internal initParams = InitParams({
         name: "Meow Sub",
@@ -200,7 +200,7 @@ abstract contract BaseTest is Test {
         return reinitStp();
     }
 
-    function createETHSub(uint256 minPurchase, uint16 feeBps, uint16 rewardBps)
+    function createETHSub(uint256 minPurchase, uint16 feeBps, uint16 bips)
         public
         virtual
         returns (SubscriptionTokenV2 sub)
@@ -209,8 +209,8 @@ abstract contract BaseTest is Test {
         tierParams.pricePerPeriod = minPurchase * 2;
         feeParams.bips = feeBps;
         feeParams.collector = feeBps > 0 ? fees : address(0);
-        rewardParams.rewardBps = rewardBps;
-        rewardParams.numRewardHalvings = 6;
+        rewardParams.bips = bips;
+        rewardParams.numPeriods = 6;
         return reinitStp();
     }
 

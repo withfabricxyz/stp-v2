@@ -132,15 +132,7 @@ contract SubscriptionTokenV2 is
     }
 
     function initRewards(RewardParams memory rewards) private {
-        require(rewards.rewardBps <= _MAX_BIPS, "Reward bps too high");
-        require(rewards.numRewardHalvings <= _MAX_REWARD_HALVINGS, "Reward halvings too high");
-        if (rewards.rewardBps > 0) {
-            require(rewards.numRewardHalvings > 0, "Reward halvings too low");
-        }
-        if (rewards.startTimestamp == 0) {
-            rewards.startTimestamp = uint48(block.timestamp);
-        }
-        _rewardParams = rewards;
+        _rewardParams = rewards.validate();
     }
 
     function initializeTier(uint8 id, TierInitParams memory params) private {
@@ -221,7 +213,7 @@ contract SubscriptionTokenV2 is
      * @param account the account of the subscription to slash
      */
     function slashRewards(address account) external {
-        require(_rewardParams.rewardBps > 0, "Rewards disabled");
+        require(_rewardParams.bips > 0, "Rewards disabled");
         Subscription memory slasher = _subscriptions[msg.sender];
         require(slasher.isActive(), "Subscription not active");
 
@@ -603,10 +595,10 @@ contract SubscriptionTokenV2 is
 
     /// @dev Allocate tokens to the reward pool
     function _allocateRewards(uint256 amount) internal returns (uint256) {
-        if (_rewardParams.rewardBps == 0 || _totalRewardPoints == 0) {
+        if (_rewardParams.bips == 0 || _totalRewardPoints == 0) {
             return amount;
         }
-        uint256 rewards = (amount * _rewardParams.rewardBps) / _MAX_BIPS;
+        uint256 rewards = (amount * _rewardParams.bips) / _MAX_BIPS;
         _rewardPoolBalance += rewards;
         _rewardPoolTotal += rewards;
         emit RewardsAllocated(rewards);
@@ -777,8 +769,8 @@ contract SubscriptionTokenV2 is
      * @notice The percentage (as basis points) of creator earnings which are rewarded to subscribers
      * @return bps reward basis points
      */
-    function rewardBps() external view returns (uint16 bps) {
-        return _rewardParams.rewardBps;
+    function bips() external view returns (uint16 bps) {
+        return _rewardParams.bips;
     }
 
     /**

@@ -58,7 +58,7 @@ interface ISubscriptionTokenV2 {
     );
 
     /// @dev Emitted when a new referral code is created
-    event ReferralCreated(uint256 id, uint16 rewardBps);
+    event ReferralCreated(uint256 id, uint16 bips);
 
     /// @dev Emitted when a referral code is deleted
     event ReferralDestroyed(uint256 id);

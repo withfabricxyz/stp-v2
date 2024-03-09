@@ -14,7 +14,7 @@ contract SubscriptionTokenV2RefundsTest is BaseTest {
     function setUp() public {
         tierParams.periodDurationSeconds = 4;
         tierParams.pricePerPeriod = 8;
-        rewardParams.numRewardHalvings = 0;
+        rewardParams.numPeriods = 0;
         stp = reinitStp();
 
         deal(alice, 1e19);

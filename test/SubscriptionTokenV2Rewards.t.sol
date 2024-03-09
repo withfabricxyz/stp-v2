@@ -17,16 +17,16 @@ contract SubscriptionTokenV2RewardsTest is BaseTest {
         stp = createETHSub(2592000, 0, 500);
         tierParams.periodDurationSeconds = 2592000;
         tierParams.pricePerPeriod = 2592000 * 2;
-        rewardParams.rewardBps = 500;
-        rewardParams.numRewardHalvings = 6;
-        rewardParams.rewardPeriodSeconds = 2592000;
+        rewardParams.bips = 500;
+        rewardParams.numPeriods = 6;
+        rewardParams.periodSeconds = 2592000;
         reinitStp();
     }
 
     function testSingleHalving() public {
-        rewardParams.rewardBps = 500;
-        rewardParams.numRewardHalvings = 1;
-        rewardParams.rewardPeriodSeconds = 10;
+        rewardParams.bips = 500;
+        rewardParams.numPeriods = 1;
+        rewardParams.periodSeconds = 10;
         reinitStp();
         assertEq(stp.rewardMultiplier(), 2);
         vm.warp(block.timestamp + 11);
@@ -146,7 +146,7 @@ contract SubscriptionTokenV2RewardsTest is BaseTest {
     }
 
     function testSlashingNoRewards() public {
-        rewardParams.rewardBps = 0;
+        rewardParams.bips = 0;
 
         reinitStp();
 

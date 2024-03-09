@@ -6,6 +6,7 @@ import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/InitParams.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 import {AllocationLib} from "src/libraries/AllocationLib.sol";
+import {RewardLib} from "src/libraries/RewardLib.sol";
 
 contract SubscriptionTokenV2InitTest is BaseTest {
     InitParams private params;
@@ -54,25 +55,9 @@ contract SubscriptionTokenV2InitTest is BaseTest {
         stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 
-    function testRewardBpsTooHigh() public {
-        rewardParams.rewardBps = 11000;
-
-        vm.expectRevert("Reward bps too high");
-        stp.initialize(initParams, tierParams, rewardParams, feeParams);
-    }
-
-    function testRewardHalvingsTooHigh() public {
-        rewardParams.numRewardHalvings = 33;
-
-        vm.expectRevert("Reward halvings too high");
-        stp.initialize(initParams, tierParams, rewardParams, feeParams);
-    }
-
-    function testRewardHalvingsTooLow() public {
-        rewardParams.numRewardHalvings = 0;
-        rewardParams.rewardBps = 500;
-
-        vm.expectRevert("Reward halvings too low");
+    function testInvalidRewards() public {
+        rewardParams.bips = 11000;
+        vm.expectRevert(abi.encodeWithSelector(RewardLib.RewardBipsTooHigh.selector, 11000));
         stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 

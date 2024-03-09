@@ -74,7 +74,7 @@ contract SubscriptionTokenV2Factory is Ownable2Step {
     //  * @param tokenURI the metadata URI for the tokens
     //  * @param tokensPerSecond the number of base tokens required for a single second of time
     //  * @param minimumPurchaseSeconds the minimum number of seconds an account can purchase
-    //  * @param rewardBps the basis points for reward allocations
+    //  * @param bips the basis points for reward allocations
     //  * @param erc20TokenAddr the address of the ERC20 token used for purchases, or the 0x0 for native
     //  * @param feeConfigId the fee configuration id to use for this deployment (if the id is invalid, the default fee is used)
     //  */
@@ -91,7 +91,7 @@ contract SubscriptionTokenV2Factory is Ownable2Step {
         }
 
         // params.initParams.feeBps = fees.bips;
-        // params.rewardParams.rewardBps = params.initParams.rewardBps;
+        // params.rewardParams.bips = params.initParams.bips;
 
         SubscriptionTokenV2(payable(deployment)).initialize(
             params.initParams, params.tierParams, params.rewardParams, fees
