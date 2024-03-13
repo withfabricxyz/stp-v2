@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {SubscriptionTokenV2} from "./SubscriptionTokenV2.sol";
-import {InitParams, TierInitParams, DeployParams, FeeParams} from "./types/InitParams.sol";
+import {InitParams, Tier, DeployParams, FeeParams} from "./types/InitParams.sol";
 
 /**
  *

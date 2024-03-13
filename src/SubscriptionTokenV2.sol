@@ -11,7 +11,7 @@ import {AccessControlDefaultAdminRulesUpgradeable} from
     "@openzeppelin-upgradeable/contracts/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 
 import {Tier} from "./types/Tier.sol";
-import {InitParams, TierInitParams, FeeParams, RewardParams} from "./types/InitParams.sol";
+import {InitParams, Tier, FeeParams, RewardParams} from "./types/InitParams.sol";
 import {Allocation} from "./types/Allocation.sol";
 import {Subscription} from "./types/Subscription.sol";
 import {AllocationLib} from "./libraries/AllocationLib.sol";
@@ -94,9 +94,14 @@ contract SubscriptionTokenV2 is
     /// @dev The collection of referral codes for referral rewards
     mapping(uint256 => uint16) private _referralCodes;
 
+    /// @dev The number of tiers created
     uint16 private _tierCount;
+
     /// @dev The available tiers (default tier has id = 1)
     mapping(uint16 => Tier) private _tiers;
+
+    /// @dev The supply cap for each tier
+    mapping(uint16 => uint32) private _tierSubCounts;
 
     ////////////////////////////////////
 
@@ -135,23 +140,21 @@ contract SubscriptionTokenV2 is
         _rewardParams = rewards.validate();
     }
 
-    function initializeTier(uint8 id, TierInitParams memory params) private {
+    function initializeTier(Tier memory params) private {
         _tierCount += 1;
-        if (id != _tierCount) {
+        if (params.id != _tierCount) {
             revert TierLib.InvalidTierId();
         }
-        _tiers[id] = TierLib.validateAndBuild(id, params);
+        _tiers[params.id] = params.validate();
     }
 
-    function initialize(
-        InitParams memory params,
-        TierInitParams memory tier,
-        RewardParams memory rewards,
-        FeeParams memory fees
-    ) public initializer {
+    function initialize(InitParams memory params, Tier memory tier, RewardParams memory rewards, FeeParams memory fees)
+        public
+        initializer
+    {
         initRewards(rewards);
         initFees(fees);
-        initializeTier(1, tier);
+        initializeTier(tier);
 
         require(bytes(params.name).length > 0, "Name cannot be empty");
         require(bytes(params.symbol).length > 0, "Symbol cannot be empty");
@@ -213,16 +216,9 @@ contract SubscriptionTokenV2 is
      * @param account the account of the subscription to slash
      */
     function slashRewards(address account) external {
-        require(_rewardParams.bips > 0, "Rewards disabled");
         Subscription memory slasher = _subscriptions[msg.sender];
         require(slasher.isActive(), "Subscription not active");
-
-        Subscription memory sub = _subscriptions[account];
-        require(sub.rewardPoints > 0, "No reward points to slash");
-
-        // Expiration + grace period (50% of purchased time)
-        uint256 slashPoint = sub.expiresAt() + (sub.secondsPurchased / 2);
-        require(block.timestamp >= slashPoint, "Not slashable");
+        Subscription storage sub = _subscriptions[account];
 
         // Deflate the reward points pool and account for prior reward withdrawals
         _totalRewardPoints -= sub.rewardPoints;
@@ -234,9 +230,7 @@ contract SubscriptionTokenV2 is
         }
 
         emit RewardPointsSlashed(account, msg.sender, sub.rewardPoints);
-        sub.rewardPoints = 0;
-        sub.rewardsWithdrawn = 0;
-        _subscriptions[account] = sub;
+        RewardLib.slash(_rewardParams, sub);
     }
 
     /////////////////////////
@@ -329,8 +323,8 @@ contract SubscriptionTokenV2 is
         _unpause();
     }
 
-    function setTierSupplyCap(uint256 supplyCap, uint16 tierId) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        _getTier(tierId).updateSupplyCap(supplyCap);
+    function setTierSupplyCap(uint16 tierId, uint32 supplyCap) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _getTier(tierId).updateSupplyCap(_tierSubCounts[tierId], supplyCap);
         emit SupplyCapChange(supplyCap);
     }
 
@@ -338,8 +332,8 @@ contract SubscriptionTokenV2 is
      * @notice Update the maximum number of tokens (subscriptions)
      * @param supplyCap the new supply cap (must be greater than token count or 0 for unlimited)
      */
-    function setSupplyCap(uint256 supplyCap) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        setTierSupplyCap(supplyCap, 1);
+    function setSupplyCap(uint32 supplyCap) external {
+        setTierSupplyCap(1, supplyCap);
     }
 
     /**
@@ -355,8 +349,8 @@ contract SubscriptionTokenV2 is
     // Tier Management
     /////////////////////////
 
-    function createTier(uint8 tierId, TierInitParams memory params) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        initializeTier(tierId, params);
+    function createTier(Tier memory params) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        initializeTier(params);
     }
 
     /////////////////////////
@@ -395,6 +389,9 @@ contract SubscriptionTokenV2 is
         uint256 amount = _allocation.transferIn(msg.sender, numTokens);
 
         // We need to make sure the price is right
+        //
+
+        // TODO: Validate tier id
 
         Tier storage tier;
         Subscription storage sub = _subscriptions[account];
@@ -402,13 +399,13 @@ contract SubscriptionTokenV2 is
             sub.tierId = tierId == 0 ? 1 : tierId;
 
             tier = _getTier(sub.tierId);
+            uint32 subs = _tierSubCounts[sub.tierId];
 
-            if (!tier.hasSupply()) {
+            if (!tier.hasSupply(subs)) {
                 revert TierHasNoSupply(tier.id);
             }
 
-            tier.numSubs += 1;
-
+            _tierSubCounts[sub.tierId] = subs + 1;
             _tokenCounter += 1;
             sub.tokenId = _tokenCounter;
 
@@ -854,8 +851,8 @@ contract SubscriptionTokenV2 is
      * @return cap the max number of subscriptions
      */
     function supplyDetail() external view returns (uint256 count, uint256 cap) {
-        Tier storage tier = _getTier(1);
-        return (tier.numSubs - tier.numFrozenSubs, tier.maxSupply);
+        Tier memory tier = _getTier(1);
+        return (_tierSubCounts[tier.id], tier.maxSupply);
     }
 
     /**

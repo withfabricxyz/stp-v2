@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Tier} from "../types/Tier.sol";
-import {TierInitParams} from "../types/InitParams.sol";
+import {Tier} from "../types/InitParams.sol";
 
 /// @dev The initialization parameters for a subscription token
 library TierLib {
@@ -19,50 +19,37 @@ library TierLib {
     // UPDATE FUNCTIONS
     /////////////////////
 
-    function setPricePerPeriod(Tier storage self, uint32 _periodDurationSeconds) internal {
-        self.periodDurationSeconds = _periodDurationSeconds;
+    function setPricePerPeriod(Tier storage tier, uint32 _periodDurationSeconds) internal {
+        tier.periodDurationSeconds = _periodDurationSeconds;
     }
 
-    function updateSupplyCap(Tier storage self, uint256 newCap) internal {
-        if (newCap != 0 && newCap < self.numSubs) {
+    function updateSupplyCap(Tier storage tier, uint32 subCount, uint32 newCap) internal {
+        if (newCap != 0 && newCap < subCount) {
             revert("Supply cap must be >= current count or 0");
         }
-        self.maxSupply = uint32(newCap);
+        tier.maxSupply = uint32(newCap);
     }
 
     /////////////////////
     // VIEW FUNCTIONS
     /////////////////////
 
-    function validateAndBuild(uint8 id, TierInitParams memory self) internal pure returns (Tier memory) {
-        require(self.periodDurationSeconds > 0, "Period duration must be > 0");
-        require(self.pricePerPeriod > 0, "Price per period must be > 0");
+    function validate(Tier memory tier) internal pure returns (Tier memory) {
+        require(tier.periodDurationSeconds > 0, "Period duration must be > 0");
+        require(tier.pricePerPeriod > 0, "Price per period must be > 0");
 
-        return Tier({
-            id: id,
-            periodDurationSeconds: self.periodDurationSeconds,
-            paused: self.paused,
-            payWhatYouWant: self.payWhatYouWant,
-            maxSupply: self.maxSupply,
-            numSubs: 0,
-            numFrozenSubs: 0,
-            rewardMultiplier: self.rewardMultiplier,
-            allowList: self.allowList,
-            initialMintPrice: self.initialMintPrice,
-            pricePerPeriod: self.pricePerPeriod,
-            maxMintablePeriods: self.maxMintablePeriods
-        });
+        return tier;
     }
 
-    function mintPrice(Tier storage self, uint256 numPeriods, bool firstMint) internal view returns (uint256) {
-        return self.pricePerPeriod * numPeriods + (firstMint ? self.initialMintPrice : 0);
+    function mintPrice(Tier memory tier, uint256 numPeriods, bool firstMint) internal pure returns (uint256) {
+        return tier.pricePerPeriod * numPeriods + (firstMint ? tier.initialMintPrice : 0);
     }
 
-    function hasSupply(Tier storage self) internal view returns (bool) {
-        return self.maxSupply == 0 || self.numSubs < (self.maxSupply + self.numFrozenSubs);
+    function hasSupply(Tier memory tier, uint32 subCount) internal pure returns (bool) {
+        return tier.maxSupply == 0 || subCount < tier.maxSupply;
     }
 
-    function tokensPerSecond(Tier storage self) internal view returns (uint256) {
-        return self.pricePerPeriod / self.periodDurationSeconds;
+    function tokensPerSecond(Tier memory tier) internal pure returns (uint256) {
+        return tier.pricePerPeriod / tier.periodDurationSeconds;
     }
 }

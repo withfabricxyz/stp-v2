@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {Test} from "@forge/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {InitParams, TierInitParams, FeeParams, RewardParams} from "src/types/InitParams.sol";
+import {InitParams, Tier, FeeParams, RewardParams} from "src/types/InitParams.sol";
 
 // Test token which charges 50% fee on transfer
 contract TestFeeToken is ERC20 {
@@ -121,7 +121,8 @@ abstract contract BaseTest is Test {
     address internal charlie = 0xb4C79Dab8F259C7AEe6e5b2Aa729821864227e7A;
     address internal doug = 0xB4c79dAb8f259c7aee6e5b2aa729821864227E7b;
 
-    TierInitParams internal tierParams = TierInitParams({
+    Tier internal tierParams = Tier({
+        id: 1,
         periodDurationSeconds: 2,
         maxSupply: 0,
         maxMintablePeriods: 0,
@@ -135,8 +136,16 @@ abstract contract BaseTest is Test {
 
     FeeParams internal feeParams = FeeParams({collector: address(0), bips: 0});
 
-    RewardParams internal rewardParams =
-        RewardParams({bips: 0, numPeriods: 6, periodSeconds: 2, startTimestamp: 0, minMultiplier: 0});
+    RewardParams internal rewardParams = RewardParams({
+        bips: 0,
+        numPeriods: 6,
+        periodSeconds: 2,
+        startTimestamp: 0,
+        minMultiplier: 0,
+        slashable: true,
+        formulaBase: 2,
+        slashGracePeriod: 0
+    });
 
     InitParams internal initParams = InitParams({
         name: "Meow Sub",

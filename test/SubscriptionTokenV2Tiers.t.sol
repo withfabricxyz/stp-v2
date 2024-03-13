@@ -14,20 +14,27 @@ contract SubscriptionTokenV2TiersTest is BaseTest {
     }
 
     function testValidTier() public prank(creator) {
-        stp.createTier(2, tierParams);
+        tierParams.id = 2;
+        stp.createTier(tierParams);
     }
 
     function testInvalidTierId() public prank(creator) {
+        tierParams.id = 3;
         vm.expectRevert(abi.encodeWithSelector(TierLib.InvalidTierId.selector));
-        stp.createTier(3, tierParams);
+        stp.createTier(tierParams);
+
+        tierParams.id = 0;
         vm.expectRevert(abi.encodeWithSelector(TierLib.InvalidTierId.selector));
-        stp.createTier(0, tierParams);
+        stp.createTier(tierParams);
+
+        tierParams.id = 1;
         vm.expectRevert(abi.encodeWithSelector(TierLib.InvalidTierId.selector));
-        stp.createTier(1, tierParams);
+        stp.createTier(tierParams);
     }
 
     function testInvalidUser() public {
+        tierParams.id = 2;
         vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, this, 0x00));
-        stp.createTier(2, tierParams);
+        stp.createTier(tierParams);
     }
 }

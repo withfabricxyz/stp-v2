@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/InitParams.sol";
+import {RewardLib} from "src/libraries/RewardLib.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 
 contract SubscriptionTokenV2RewardsTest is BaseTest {
@@ -155,7 +156,7 @@ contract SubscriptionTokenV2RewardsTest is BaseTest {
 
         vm.warp(2592000 * 3);
         vm.startPrank(bob);
-        vm.expectRevert("Rewards disabled");
+        vm.expectRevert(abi.encodeWithSelector(RewardLib.RewardsDisabled.selector));
         stp.slashRewards(alice);
         vm.stopPrank();
     }
@@ -204,7 +205,7 @@ contract SubscriptionTokenV2RewardsTest is BaseTest {
         withdraw();
         vm.startPrank(bob);
         stp.slashRewards(alice);
-        vm.expectRevert("No reward points to slash");
+        vm.expectRevert(abi.encodeWithSelector(RewardLib.RewardSlashingNotPossible.selector));
         stp.slashRewards(alice);
         vm.stopPrank();
     }
@@ -213,7 +214,8 @@ contract SubscriptionTokenV2RewardsTest is BaseTest {
         mint(alice, 2592000 * 2);
         mint(bob, 1e8);
         vm.startPrank(alice);
-        vm.expectRevert("Not slashable");
+        (,,, uint256 expiresAt) = stp.subscriptionOf(alice);
+        vm.expectRevert(abi.encodeWithSelector(RewardLib.RewardSlashingNotReady.selector, expiresAt));
         stp.slashRewards(alice);
         vm.warp(60 days);
         vm.expectRevert("Subscription not active");

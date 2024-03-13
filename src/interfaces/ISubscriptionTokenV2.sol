@@ -105,6 +105,17 @@ interface ISubscriptionTokenV2 {
         external
         payable;
 
+    //~~~~~~~~~~~ V2 ~~~~~~~~~~~~//
+
+    // function mintPrice(address account, uint8 tierId, uint32 numPeriods) external view returns (uint256);
+
+    /**
+     * @notice Mark subscriptions as inactive and move them to the inactive tier
+     * @dev This checks each subscription and moves it to the inactive tier (tierId = 0) if it has expired
+     * @param subscribers the list of subscriber addresses to mark as inactive
+     */
+    // function markInactive(address[] calldata subscribers) external;
+
     //////////////////
     // Rewards
     //////////////////
