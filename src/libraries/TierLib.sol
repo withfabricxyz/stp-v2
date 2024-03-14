@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {Tier} from "../types/Tier.sol";
-import {Tier} from "../types/InitParams.sol";
-import {Subscription} from "../types/Subscription.sol";
+import {Tier, Subscription} from "../types/Index.sol";
 
 /// @dev The initialization parameters for a subscription token
 library TierLib {

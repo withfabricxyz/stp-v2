@@ -10,10 +10,7 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/contracts/ut
 import {AccessControlDefaultAdminRulesUpgradeable} from
     "@openzeppelin-upgradeable/contracts/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 
-import {Tier} from "./types/Tier.sol";
-import {InitParams, Tier, FeeParams, RewardParams} from "./types/InitParams.sol";
-import {Allocation} from "./types/Allocation.sol";
-import {Subscription} from "./types/Subscription.sol";
+import {InitParams, Tier, FeeParams, RewardParams, Tier, Allocation, Subscription} from "./types/Index.sol";
 import {AllocationLib} from "./libraries/AllocationLib.sol";
 import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
 import {TierLib} from "./libraries/TierLib.sol";

@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "@forge/Test.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
-import {Tier, TierGate} from "src/types/Tier.sol";
+import {Tier, TierGate} from "src/types/Index.sol";
 
 contract TierTestShim {
     function mintPrice(Tier memory tier, uint256 numPeriods, bool firstMint) external pure returns (uint256) {
@@ -17,6 +17,8 @@ contract TierTestShim {
     function tokensPerSecond(Tier memory tier) external pure returns (uint256) {
         return TierLib.tokensPerSecond(tier);
     }
+
+    function testIgnore() internal {}
 }
 
 contract TierLibTest is Test {

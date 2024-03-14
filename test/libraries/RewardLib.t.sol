@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "@forge/Test.sol";
 import {RewardLib} from "src/libraries/RewardLib.sol";
-import {RewardParams} from "src/types/InitParams.sol";
+import {RewardParams} from "src/types/Index.sol";
 
 // We need to create a shim contract to call the internal functions of RewardLib in order to get
 // foundry to generate the coverage report correctly
@@ -19,6 +19,8 @@ contract RewardTestShim {
     function rewardValue(RewardParams memory params, uint256 numTokens) external pure returns (uint256 tokens) {
         return RewardLib.rewardValue(params, numTokens);
     }
+
+    function testIgnore() internal {}
 }
 
 contract RewardLibTest is Test {

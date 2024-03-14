@@ -4,8 +4,7 @@ pragma solidity ^0.8.20;
 import {Test} from "@forge/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {InitParams, Tier, FeeParams, RewardParams} from "src/types/InitParams.sol";
-import {TierGate, TierGateType} from "src/types/Tier.sol";
+import {InitParams, Tier, FeeParams, RewardParams, TierGate, TierGateType} from "src/types/Index.sol";
 
 // Test token which charges 50% fee on transfer
 contract TestFeeToken is ERC20 {
@@ -22,6 +21,8 @@ contract TestFeeToken is ERC20 {
         super.transferFrom(from, to, amount >> 1);
         return true;
     }
+
+    function testIgnore() internal {}
 }
 
 contract TestERC20Token is ERC20 {
@@ -35,6 +36,8 @@ contract TestERC20Token is ERC20 {
     function decimals() public view override returns (uint8) {
         return _decimals;
     }
+
+    function testIgnore() internal {}
 }
 
 contract SelfDestruct {
@@ -42,6 +45,8 @@ contract SelfDestruct {
         // solc-ignore-next-line missing-receive
         selfdestruct(payable(recipient));
     }
+
+    function testIgnore() internal {}
 }
 
 abstract contract BaseTest is Test {

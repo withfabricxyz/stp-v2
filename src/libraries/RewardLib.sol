@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {RewardParams} from "src/types/InitParams.sol";
-import {Subscription} from "src/types/Subscription.sol";
+import {RewardParams, Subscription} from "src/types/Index.sol";
 import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
 
 library RewardLib {
