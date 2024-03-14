@@ -5,6 +5,7 @@ import {Test} from "@forge/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams, Tier, FeeParams, RewardParams} from "src/types/InitParams.sol";
+import {TierGate, TierGateType} from "src/types/Tier.sol";
 
 // Test token which charges 50% fee on transfer
 contract TestFeeToken is ERC20 {
@@ -128,10 +129,10 @@ abstract contract BaseTest is Test {
         maxMintablePeriods: 0,
         rewardMultiplier: 1,
         paused: false,
-        payWhatYouWant: false,
-        allowList: 0,
+        transferrable: true,
         initialMintPrice: 0,
-        pricePerPeriod: 4
+        pricePerPeriod: 4,
+        gate: TierGate({gateType: TierGateType.NONE, contractAddress: address(0), componentId: 0, balanceMin: 0})
     });
 
     FeeParams internal feeParams = FeeParams({collector: address(0), bips: 0});

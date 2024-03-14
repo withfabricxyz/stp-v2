@@ -3,13 +3,31 @@ pragma solidity ^0.8.20;
 
 import {Tier} from "../types/Tier.sol";
 import {Tier} from "../types/InitParams.sol";
+import {Subscription} from "../types/Subscription.sol";
 
 /// @dev The initialization parameters for a subscription token
 library TierLib {
     /////////////////////
     // ERRORS
     /////////////////////
-    error InvalidTierId();
+
+    /// @dev The tier id must be > 0 and monotonic
+    error TierInvalidId();
+
+    /// @dev The tier duration must be > 0
+    error TierInvalidDuration();
+
+    /// @dev The supply cap must be >= current count or 0
+    error TierInvalidSupplyCap();
+
+    /// @dev The tier id was not found
+    error TierNotFound(uint16 tierId);
+
+    /// @dev The tier has no supply
+    error TierHasNoSupply(uint16 tierId);
+
+    /// @dev The tier does not allow transferring tokens
+    error TierTransferDisabled();
 
     /////////////////////
     // EVENTS
@@ -25,9 +43,9 @@ library TierLib {
 
     function updateSupplyCap(Tier storage tier, uint32 subCount, uint32 newCap) internal {
         if (newCap != 0 && newCap < subCount) {
-            revert("Supply cap must be >= current count or 0");
+            revert TierInvalidSupplyCap();
         }
-        tier.maxSupply = uint32(newCap);
+        tier.maxSupply = newCap;
     }
 
     /////////////////////
@@ -35,9 +53,9 @@ library TierLib {
     /////////////////////
 
     function validate(Tier memory tier) internal pure returns (Tier memory) {
-        require(tier.periodDurationSeconds > 0, "Period duration must be > 0");
-        require(tier.pricePerPeriod > 0, "Price per period must be > 0");
-
+        if (tier.periodDurationSeconds == 0) {
+            revert TierInvalidDuration();
+        }
         return tier;
     }
 
@@ -52,4 +70,12 @@ library TierLib {
     function tokensPerSecond(Tier memory tier) internal pure returns (uint256) {
         return tier.pricePerPeriod / tier.periodDurationSeconds;
     }
+
+    // function checkPurchase(Tier memory tier, Subscription memory sub, uint256 tokenAmount) internal pure returns (uint256) {
+    //     // TODO: Check amount
+    //     // TODO: Check period is valid
+    //     // TODO: Check max periods
+    //     // TODO: Check token gate
+    //     return tier.pricePerPeriod / tier.periodDurationSeconds;
+    // }
 }

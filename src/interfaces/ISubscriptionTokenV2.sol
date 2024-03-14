@@ -3,12 +3,6 @@ pragma solidity ^0.8.20;
 
 interface ISubscriptionTokenV2 {
     //////////////////
-    // ERRORS
-    //////////////////
-    error TierNotFound(uint16 tierId);
-    error TierHasNoSupply(uint16 tierId);
-
-    //////////////////
     // EVENTS
     //////////////////
 

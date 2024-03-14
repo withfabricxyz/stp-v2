@@ -7,6 +7,7 @@ import {InitParams} from "src/types/InitParams.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 import {AllocationLib} from "src/libraries/AllocationLib.sol";
 import {RewardLib} from "src/libraries/RewardLib.sol";
+import {TierLib} from "src/libraries/TierLib.sol";
 
 contract SubscriptionTokenV2InitTest is BaseTest {
     InitParams private params;
@@ -51,7 +52,7 @@ contract SubscriptionTokenV2InitTest is BaseTest {
     function testMinPurchase() public {
         tierParams.periodDurationSeconds = 0;
 
-        vm.expectRevert("Period duration must be > 0");
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidDuration.selector));
         stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 

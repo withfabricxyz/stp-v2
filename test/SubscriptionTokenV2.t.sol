@@ -9,6 +9,7 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {AllocationLib} from "src/libraries/AllocationLib.sol";
+import {TierLib} from "src/libraries/TierLib.sol";
 
 contract SubscriptionTokenV2Test is BaseTest {
     function setUp() public {
@@ -368,7 +369,7 @@ contract SubscriptionTokenV2Test is BaseTest {
         mint(alice, 1e18);
 
         vm.startPrank(bob);
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.TierHasNoSupply.selector, 1));
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierHasNoSupply.selector, 1));
         stp.mint{value: 1e18}(1e18);
         vm.stopPrank();
 
@@ -378,7 +379,7 @@ contract SubscriptionTokenV2Test is BaseTest {
 
         mint(bob, 1e18);
         vm.startPrank(creator);
-        vm.expectRevert("Supply cap must be >= current count or 0");
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidSupplyCap.selector));
         stp.setSupplyCap(1);
         vm.stopPrank();
     }

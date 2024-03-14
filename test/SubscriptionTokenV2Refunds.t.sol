@@ -9,6 +9,7 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {AllocationLib} from "src/libraries/AllocationLib.sol";
+import {TierLib} from "src/libraries/TierLib.sol";
 
 contract SubscriptionTokenV2RefundsTest is BaseTest {
     function setUp() public {
@@ -110,58 +111,6 @@ contract SubscriptionTokenV2RefundsTest is BaseTest {
 
     /// ERC20
 
-    function testERC20Mint() public erc20 prank(alice) {
-        assert(stp.erc20Address() != address(0));
-        assertEq(token().balanceOf(alice), 1e20);
-        token().approve(address(stp), 1e18);
-        stp.mint(1e18);
-        assertEq(token().balanceOf(address(stp)), 1e18);
-        assertEq(stp.balanceOf(alice), 5e17);
-        (uint256 tokenId,,,) = stp.subscriptionOf(alice);
-        assertEq(stp.ownerOf(tokenId), alice);
-    }
-
-    function testMintInvalidERC20() public erc20 prank(alice) {
-        vm.expectRevert(abi.encodeWithSelector(AllocationLib.NativeTokensNotAcceptedForERC20Subscriptions.selector));
-        stp.mint{value: 1e17}(1e18);
-        vm.expectRevert(
-            abi.encodeWithSelector(AllocationLib.InsufficientBalanceOrAllowance.selector, token().balanceOf(alice), 0)
-        );
-        stp.mint(1e18);
-    }
-
-    function testERC20FeeTakingToken() public {
-        TestFeeToken _token = new TestFeeToken("FIAT", "FIAT", 1e21);
-        _token.transfer(alice, 1e20);
-        initParams.erc20TokenAddr = address(_token);
-        reinitStp();
-        vm.startPrank(alice);
-        _token.approve(address(stp), 1e18);
-        stp.mint(1e18);
-        assertEq(stp.balanceOf(alice), 1e18 / 2 / 2);
-        vm.stopPrank();
-    }
-
-    function testWithdrawERC20() public erc20 {
-        mint(alice, 1e18);
-        mint(bob, 1e18);
-
-        uint256 beforeBalance = token().balanceOf(creator);
-        vm.startPrank(creator);
-        assertEq(stp.creatorBalance(), 2e18);
-        vm.expectEmit(true, true, false, true, address(stp));
-        emit Withdraw(creator, 2e18);
-        stp.withdraw();
-        assertEq(stp.creatorBalance(), 0);
-        assertEq(stp.totalCreatorEarnings(), 2e18);
-
-        vm.expectRevert("No Balance");
-        stp.withdraw();
-        vm.stopPrank();
-
-        assertEq(beforeBalance + 2e18, token().balanceOf(creator));
-    }
-
     function testRefundERC20() public erc20 {
         mint(alice, 1e18);
         uint256 beforeBalance = token().balanceOf(alice);
@@ -177,93 +126,6 @@ contract SubscriptionTokenV2RefundsTest is BaseTest {
         stp.withdraw();
         vm.expectRevert("Insufficient balance for refund");
         stp.refund(0, list(alice));
-        vm.stopPrank();
-    }
-
-    function testReconcile() public erc20 prank(creator) {
-        // No-op
-        stp.reconcileERC20Balance();
-
-        token().transfer(address(stp), 1e17);
-        stp.reconcileERC20Balance();
-        assertEq(stp.creatorBalance(), 1e17);
-    }
-
-    function testRecoverERC20Self() public erc20 prank(creator) {
-        address addr = stp.erc20Address();
-        vm.expectRevert("Cannot recover subscription token");
-        stp.recoverERC20(addr, alice, 1e17);
-    }
-
-    function testRecoverERC20() public prank(creator) {
-        TestERC20Token token = new TestERC20Token("FIAT", "FIAT", 18);
-        token.transfer(address(stp), 1e17);
-        stp.recoverERC20(address(token), alice, 1e17);
-        assertEq(token.balanceOf(alice), 1e17);
-    }
-
-    function testReconcileNative() public prank(creator) {
-        SelfDestruct attack = new SelfDestruct();
-
-        // no op
-        stp.reconcileNativeBalance();
-
-        deal(address(attack), 1e18);
-        attack.destroy(address(stp));
-
-        assertEq(address(stp).balance, 1e18);
-        assertEq(stp.creatorBalance(), 0);
-        stp.reconcileNativeBalance();
-        assertEq(stp.creatorBalance(), 1e18);
-
-        vm.expectRevert("Not supported, use reconcileNativeBalance");
-        stp.recoverNativeTokens(bob);
-    }
-
-    function testRecoverNative() public erc20 prank(creator) {
-        SelfDestruct attack = new SelfDestruct();
-
-        vm.expectRevert("No balance to recover");
-        stp.recoverNativeTokens(bob);
-
-        deal(address(attack), 1e18);
-        attack.destroy(address(stp));
-
-        assertEq(address(stp).balance, 1e18);
-
-        vm.expectRevert("Failed to transfer Ether");
-        stp.recoverNativeTokens(address(this));
-
-        stp.recoverNativeTokens(bob);
-        assertEq(stp.creatorBalance(), 0);
-        assertEq(bob.balance, 1e19 + 1e18);
-    }
-
-    /// Supply Cap
-    function testSupplyCap() public {
-        vm.startPrank(creator);
-        vm.expectEmit(true, true, false, true, address(stp));
-        emit SupplyCapChange(1);
-        stp.setSupplyCap(1);
-        (uint256 count, uint256 supply) = stp.supplyDetail();
-        assertEq(supply, 1);
-        assertEq(count, 0);
-        vm.stopPrank();
-        mint(alice, 1e18);
-
-        vm.startPrank(bob);
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.TierHasNoSupply.selector, 1));
-        stp.mint{value: 1e18}(1e18);
-        vm.stopPrank();
-
-        vm.startPrank(creator);
-        stp.setSupplyCap(0);
-        vm.stopPrank();
-
-        mint(bob, 1e18);
-        vm.startPrank(creator);
-        vm.expectRevert("Supply cap must be >= current count or 0");
-        stp.setSupplyCap(1);
         vm.stopPrank();
     }
 }

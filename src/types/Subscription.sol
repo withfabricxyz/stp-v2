@@ -20,3 +20,4 @@ struct Subscription {
     /// @dev The tier id of the subscription
     uint16 tierId;
 }
+// uint16 lastTierId; // track the last tier id for the subscription (for renewal from inactive)

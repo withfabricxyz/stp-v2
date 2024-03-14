@@ -143,7 +143,7 @@ contract SubscriptionTokenV2 is
     function initializeTier(Tier memory params) private {
         _tierCount += 1;
         if (params.id != _tierCount) {
-            revert TierLib.InvalidTierId();
+            revert TierLib.TierInvalidId();
         }
         _tiers[params.id] = params.validate();
     }
@@ -163,7 +163,7 @@ contract SubscriptionTokenV2 is
         require(params.owner != address(0), "Owner address cannot be 0x0");
 
         __ERC721_init(params.name, params.symbol);
-        __AccessControlDefaultAdminRules_init(0, params.owner); // TODO: Understand the first timestamp param
+        __AccessControlDefaultAdminRules_init(0, params.owner);
         __Pausable_init();
         __ReentrancyGuard_init();
         __AccessControl_init();
@@ -402,7 +402,7 @@ contract SubscriptionTokenV2 is
             uint32 subs = _tierSubCounts[sub.tierId];
 
             if (!tier.hasSupply(subs)) {
-                revert TierHasNoSupply(tier.id);
+                revert TierLib.TierHasNoSupply(tier.id);
             }
 
             _tierSubCounts[sub.tierId] = subs + 1;
@@ -552,7 +552,7 @@ contract SubscriptionTokenV2 is
     function _getTier(uint16 tierId) internal view returns (Tier storage) {
         Tier storage tier = _tiers[tierId];
         if (tier.id == 0) {
-            revert TierNotFound(tierId);
+            revert TierLib.TierNotFound(tierId);
         }
         return tier;
     }
@@ -914,11 +914,20 @@ contract SubscriptionTokenV2 is
         // _transferOwnership(address(0));
     }
 
-    /// @dev Transfers may occur if the destination does not have a subscription
+    /// @dev Transfers may occur if the destination does not have a subscription and the tier allows it
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         address from = super._update(to, tokenId, auth);
         if (from == address(0)) {
             return from;
+        }
+
+        // TODO: test
+        Subscription memory sub = _subscriptions[from];
+        if (sub.tierId != 0) {
+            Tier memory tier = _tiers[sub.tierId];
+            if (!tier.transferrable) {
+                revert TierLib.TierTransferDisabled();
+            }
         }
 
         require(_subscriptions[to].tokenId == 0, "Cannot transfer to existing subscribers");

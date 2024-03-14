@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "@forge/Test.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
-import {Tier} from "src/types/Tier.sol";
+import {Tier, TierGate} from "src/types/Tier.sol";
 
 contract TierTestShim {
     function mintPrice(Tier memory tier, uint256 numPeriods, bool firstMint) external pure returns (uint256) {
@@ -23,17 +23,18 @@ contract TierLibTest is Test {
     TierTestShim public shim = new TierTestShim();
 
     function defaults() internal pure returns (Tier memory) {
+        TierGate memory gate;
         return Tier({
             id: 1,
             periodDurationSeconds: 2592000,
             paused: false,
-            payWhatYouWant: false,
+            transferrable: true,
             maxSupply: 0,
             rewardMultiplier: 0,
-            allowList: 0,
             initialMintPrice: 0.01 ether,
             pricePerPeriod: 0.005 ether,
-            maxMintablePeriods: 24
+            maxMintablePeriods: 24,
+            gate: gate
         });
     }
 
@@ -42,5 +43,14 @@ contract TierLibTest is Test {
         assertEq(shim.mintPrice(tier, 1, false), 0.005 ether);
         assertEq(shim.mintPrice(tier, 12, false), 0.005 * 12 ether);
         assertEq(shim.mintPrice(tier, 12, true), 0.005 * 12 ether + 0.01 ether);
+    }
+
+    function testFreeMint() public {
+        Tier memory tier = defaults();
+        tier.pricePerPeriod = 0;
+        tier.initialMintPrice = 0;
+        assertEq(shim.mintPrice(tier, 1, false), 0);
+        assertEq(shim.mintPrice(tier, 12, false), 0);
+        assertEq(shim.mintPrice(tier, 12, true), 0);
     }
 }

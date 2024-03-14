@@ -18,17 +18,17 @@ contract SubscriptionTokenV2TiersTest is BaseTest {
         stp.createTier(tierParams);
     }
 
-    function testInvalidTierId() public prank(creator) {
+    function testTierInvalidId() public prank(creator) {
         tierParams.id = 3;
-        vm.expectRevert(abi.encodeWithSelector(TierLib.InvalidTierId.selector));
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidId.selector));
         stp.createTier(tierParams);
 
         tierParams.id = 0;
-        vm.expectRevert(abi.encodeWithSelector(TierLib.InvalidTierId.selector));
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidId.selector));
         stp.createTier(tierParams);
 
         tierParams.id = 1;
-        vm.expectRevert(abi.encodeWithSelector(TierLib.InvalidTierId.selector));
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidId.selector));
         stp.createTier(tierParams);
     }
 
