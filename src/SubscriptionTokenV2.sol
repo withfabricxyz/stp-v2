@@ -133,10 +133,6 @@ contract SubscriptionTokenV2 is
         _feeParams = fees;
     }
 
-    function initRewards(RewardParams memory rewards) private {
-        _rewardParams = rewards.validate();
-    }
-
     function initializeTier(Tier memory params) private {
         _tierCount += 1;
         if (params.id != _tierCount) {
@@ -149,7 +145,7 @@ contract SubscriptionTokenV2 is
         public
         initializer
     {
-        initRewards(rewards);
+        _rewardParams = rewards.validate();
         initFees(fees);
         initializeTier(tier);
 
@@ -294,16 +290,31 @@ contract SubscriptionTokenV2 is
     }
 
     /**
-     * @notice Grant time to a list of accounts, so they can access content without paying
-     * @param accounts the list of accounts to grant time to
-     * @param secondsToAdd the number of seconds to grant for each account
+     * @notice Grant time to a given account
+     * @param account the account to grant time to
+     * @param numSeconds the number of seconds to grant
+     * @param tierId the tier id to grant time to (0 to match current tier, or default for new)
      */
-    function grantTime(address[] memory accounts, uint256 secondsToAdd) external onlyManager {
-        require(secondsToAdd > 0, "Seconds to add must be > 0");
-        require(accounts.length > 0, "No accounts to grant time to");
-        for (uint256 i = 0; i < accounts.length; i++) {
-            _grantTime(accounts[i], secondsToAdd);
-        }
+    function grantTime(address account, uint256 numSeconds, uint16 tierId) external onlyManager {
+        Subscription storage sub = _fetchSubscription(account);
+
+        // Mint the NFT if it does not exist before grant event for indexers
+        // TODO: Can this be in the fetch?
+        _maybeMint(account, sub.tokenId);
+
+        sub.grantTime(numSeconds);
+
+        emit Grant(account, sub.tokenId, numSeconds, sub.expiresAt());
+    }
+
+    /**
+     * @notice Revoke time from a given account
+     * @param account the account to revoke time from
+     */
+    function revokeTime(address account) external onlyManager {
+        Subscription storage sub = _getSub(account);
+        uint256 time = sub.revokeTime();
+        emit GrantRevoke(account, sub.tokenId, time, sub.expiresAt());
     }
 
     /**
@@ -554,12 +565,22 @@ contract SubscriptionTokenV2 is
         return tier;
     }
 
-    /// @dev Get or build a new subscription
-    function _fetchSubscription(address account) internal returns (Subscription memory) {
-        Subscription memory sub = _subscriptions[account];
+    function _getSub(address account) internal view returns (Subscription storage) {
+        Subscription storage sub = _subscriptions[account];
+        if (sub.tokenId == 0) {
+            revert SubscriptionLib.SubscriptionNotFound(account);
+        }
+        return sub;
+    }
+
+    /// @dev Get or build a new subscription (for writing)
+    function _fetchSubscription(address account) internal returns (Subscription storage) {
+        Subscription storage sub = _subscriptions[account];
         if (sub.tokenId == 0) {
             _tokenCounter += 1;
-            sub = Subscription(_tokenCounter, 0, 0, block.timestamp, block.timestamp, 0, 0, 1);
+            sub.tokenId = _tokenCounter;
+
+            // sub = Subscription(_tokenCounter, 0, 0, block.timestamp, block.timestamp, 0, 0, 1);
         }
         return sub;
     }
@@ -625,23 +646,6 @@ contract SubscriptionTokenV2 is
 
         // Transfer protocol fees
         _transferFees();
-    }
-
-    /// @dev Grant time to a given account
-    function _grantTime(address account, uint256 numSeconds) internal {
-        Subscription memory sub = _fetchSubscription(account);
-        // Adjust offset to account for existing time
-        if (block.timestamp > sub.grantOffset + sub.secondsGranted) {
-            sub.grantOffset = block.timestamp - sub.secondsGranted;
-        }
-
-        sub.secondsGranted += numSeconds;
-        _subscriptions[account] = sub;
-
-        // Mint the NFT if it does not exist before grant event for indexers
-        _maybeMint(account, sub.tokenId);
-
-        emit Grant(account, sub.tokenId, numSeconds, sub.expiresAt());
     }
 
     /// @dev Refund the remaining time for the given accounts subscription, and clear grants

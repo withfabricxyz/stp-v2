@@ -41,6 +41,10 @@ library GateLib {
             revert GateInvalid();
         }
 
+        if (gate.gateType == GateType.ERC1155 && gate.componentId == 0) {
+            revert GateInvalid();
+        }
+
         return gate;
     }
 

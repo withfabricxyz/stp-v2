@@ -26,10 +26,30 @@ contract GateLibTest is BaseTest {
         return Gate({gateType: GateType.NONE, contractAddress: address(0), componentId: 0, balanceMin: 1});
     }
 
-    function testValid() public {
+    function testValidation() public {
         Gate memory gate = defaults();
-        Gate memory validated = shim.validate(gate);
-        assertEq(shim.balanceOf(validated, alice), 0);
+        shim.validate(gate);
+
+        gate.gateType = GateType.ERC20;
+        vm.expectRevert(abi.encodeWithSelector(GateLib.GateInvalid.selector));
+        shim.validate(gate);
+
+        gate.contractAddress = address(1);
+        gate.balanceMin = 0;
+        vm.expectRevert(abi.encodeWithSelector(GateLib.GateInvalid.selector));
+        shim.validate(gate);
+
+        gate.balanceMin = 1;
+        gate.gateType = GateType.ERC1155;
+        vm.expectRevert(abi.encodeWithSelector(GateLib.GateInvalid.selector));
+        shim.validate(gate);
+
+        gate.componentId = 2 ** 17;
+        shim.validate(gate);
+
+        gate.gateType = GateType.STPV2;
+        vm.expectRevert(abi.encodeWithSelector(GateLib.GateInvalid.selector));
+        shim.validate(gate);
     }
 
     function testNone() public {

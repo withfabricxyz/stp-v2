@@ -5,6 +5,10 @@ import {Subscription, Tier} from "../types/Index.sol";
 
 /// @dev The initialization parameters for a subscription token
 library SubscriptionLib {
+    error SubscriptionGrantInvalidTime();
+
+    error SubscriptionNotFound(address account);
+
     /// @dev Transfer tokens into the contract, either native or ERC20
     function initialize(Subscription storage sub, address from) internal returns (uint256) {}
 
@@ -39,6 +43,27 @@ library SubscriptionLib {
 
     function remainingSeconds(Subscription memory sub) internal view returns (uint256) {
         return purchasedTimeRemaining(sub) + grantedTimeRemaining(sub);
+    }
+
+    function grantTime(Subscription storage sub, uint256 secondsToGrant) internal {
+        if (secondsToGrant == 0) {
+            revert SubscriptionGrantInvalidTime();
+        }
+
+        // Adjust offset to account for existing time
+        if (block.timestamp > sub.grantOffset + sub.secondsGranted) {
+            sub.grantOffset = block.timestamp - sub.secondsGranted;
+        }
+
+        sub.secondsGranted += secondsToGrant;
+        // TODO: I want this, what is the issue with creating the token before?
+        // emit Grant(account, sub.tokenId, numSeconds, sub.expiresAt());
+    }
+
+    function revokeTime(Subscription storage sub) internal returns (uint256) {
+        uint256 remaining = grantedTimeRemaining(sub);
+        sub.secondsGranted = 0;
+        return remaining;
     }
 
     // function purchase(Subscription storage sub, Tier storage tier, uint256 numTokens) internal {}

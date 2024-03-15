@@ -31,6 +31,9 @@ interface ISubscriptionTokenV2 {
     /// @dev Emitted when a subscriber is granted time by the creator
     event Grant(address indexed account, uint256 indexed tokenId, uint256 secondsGranted, uint256 expiresAt);
 
+    /// @dev Emitted when a subscriber is revoked time by the creator
+    event GrantRevoke(address indexed account, uint256 indexed tokenId, uint256 secondsRevoked, uint256 expiresAt);
+
     /// @dev Emitted when the creator refunds a subscribers remaining time
     event Refund(address indexed account, uint256 indexed tokenId, uint256 tokensTransferred, uint256 timeReclaimed);
 
@@ -106,6 +109,10 @@ interface ISubscriptionTokenV2 {
      * @return version the current version
      */
     function stpVersion() external pure returns (uint8 version);
+
+    function grantTime(address account, uint256 numSeconds, uint16 tierId) external;
+
+    function revokeTime(address account) external;
 
     // function mintPrice(address account, uint8 tierId, uint32 numPeriods) external view returns (uint256);
 
