@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
+import {Tier} from "src/types/Index.sol";
+
 interface ISubscriptionTokenV2 {
     //////////////////
     // EVENTS
@@ -110,8 +112,28 @@ interface ISubscriptionTokenV2 {
      */
     function stpVersion() external pure returns (uint8 version);
 
+    //////////////////
+    // ADMIN
+    //////////////////
+
+    /**
+     * @notice Create a new Tier
+     * @param params The tier parameters
+     */
+    function createTier(Tier memory params) external;
+
+    /**
+     * @notice Grant time to an account on a specific tier
+     * @param account the account to grant time to
+     * @param numSeconds the number of seconds to grant
+     * @param tierId the id of the tier to assign them to if they are not on a tier
+     */
     function grantTime(address account, uint256 numSeconds, uint16 tierId) external;
 
+    /**
+     * @notice Revoke time from an account
+     * @param account the account to revoke time from
+     */
     function revokeTime(address account) external;
 
     // function mintPrice(address account, uint8 tierId, uint32 numPeriods) external view returns (uint256);

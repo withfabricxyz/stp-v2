@@ -66,4 +66,13 @@ contract GrantsTest is BaseTest {
         vm.stopPrank();
         assertEq(stp.balanceOf(alice), 1e18 / 4);
     }
+
+    function multicall() public prank(creator) {
+        bytes[] memory calls = new bytes[](2);
+        calls[0] = abi.encodeWithSelector(stp.grantTime.selector, alice, 1e15, 1);
+        calls[1] = abi.encodeWithSelector(stp.grantTime.selector, bob, 1e15, 1);
+        stp.multicall(calls);
+        assertEq(stp.balanceOf(alice), 1e15);
+        assertEq(stp.balanceOf(bob), 1e15);
+    }
 }

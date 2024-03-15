@@ -9,6 +9,7 @@ import {ERC721Upgradeable} from "@openzeppelin-upgradeable/contracts/token/ERC72
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/ReentrancyGuardUpgradeable.sol";
 import {AccessControlDefaultAdminRulesUpgradeable} from
     "@openzeppelin-upgradeable/contracts/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
+import {MulticallUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/MulticallUpgradeable.sol";
 
 import {InitParams, Tier, FeeParams, RewardParams, Tier, Allocation, Subscription} from "./types/Index.sol";
 import {AllocationLib} from "./libraries/AllocationLib.sol";
@@ -32,6 +33,7 @@ contract SubscriptionTokenV2 is
     ReentrancyGuardUpgradeable,
     PausableUpgradeable,
     AccessControlDefaultAdminRulesUpgradeable,
+    MulticallUpgradeable,
     ISubscriptionTokenV2
 {
     using SafeERC20 for IERC20;
@@ -296,13 +298,11 @@ contract SubscriptionTokenV2 is
      * @param tierId the tier id to grant time to (0 to match current tier, or default for new)
      */
     function grantTime(address account, uint256 numSeconds, uint16 tierId) external onlyManager {
-        Subscription storage sub = _fetchSubscription(account);
-
+        Subscription storage sub = _fetchSubscription(account, tierId);
+        sub.grantTime(numSeconds);
         // Mint the NFT if it does not exist before grant event for indexers
         // TODO: Can this be in the fetch?
         _maybeMint(account, sub.tokenId);
-
-        sub.grantTime(numSeconds);
 
         emit Grant(account, sub.tokenId, numSeconds, sub.expiresAt());
     }
@@ -315,33 +315,6 @@ contract SubscriptionTokenV2 is
         Subscription storage sub = _getSub(account);
         uint256 time = sub.revokeTime();
         emit GrantRevoke(account, sub.tokenId, time, sub.expiresAt());
-    }
-
-    /**
-     * @notice Pause minting to allow for migrations or other actions
-     */
-    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _pause();
-    }
-
-    /**
-     * @notice Unpause to resume subscription minting
-     */
-    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _unpause();
-    }
-
-    function setTierSupplyCap(uint16 tierId, uint32 supplyCap) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        _getTier(tierId).updateSupplyCap(_tierSubCounts[tierId], supplyCap);
-        emit SupplyCapChange(supplyCap);
-    }
-
-    /**
-     * @notice Update the maximum number of tokens (subscriptions)
-     * @param supplyCap the new supply cap (must be greater than token count or 0 for unlimited)
-     */
-    function setSupplyCap(uint32 supplyCap) external {
-        setTierSupplyCap(1, supplyCap);
     }
 
     /**
@@ -359,6 +332,33 @@ contract SubscriptionTokenV2 is
 
     function createTier(Tier memory params) external onlyRole(DEFAULT_ADMIN_ROLE) {
         initializeTier(params);
+    }
+
+    function setTierSupplyCap(uint16 tierId, uint32 supplyCap) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _getTier(tierId).updateSupplyCap(_tierSubCounts[tierId], supplyCap);
+        emit SupplyCapChange(supplyCap);
+    }
+
+    /**
+     * @notice Update the maximum number of tokens (subscriptions)
+     * @param supplyCap the new supply cap (must be greater than token count or 0 for unlimited)
+     */
+    function setSupplyCap(uint32 supplyCap) external {
+        setTierSupplyCap(1, supplyCap);
+    }
+
+    /**
+     * @notice Pause minting to allow for migrations or other actions
+     */
+    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _pause(); // TODO: _getTier(1).pause();
+    }
+
+    /**
+     * @notice Unpause to resume subscription minting
+     */
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _unpause(); // TODO: _getTier(1).unpause();
     }
 
     /////////////////////////
@@ -390,6 +390,14 @@ contract SubscriptionTokenV2 is
         _mintOrRenew(account, numTokens, 0, referralCode, referrer);
     }
 
+    function _mint(address account, uint256 numTokens, uint16 tierId) internal {
+        // TODO: mint a new NFT (different logic than renew)
+    }
+
+    function _renew(address account, uint256 numTokens, uint16 tierId) internal {
+        // TODO: renew the NFT
+    }
+
     function _mintOrRenew(address account, uint256 numTokens, uint16 tierId, uint256 referralCode, address referrer)
         internal
     {
@@ -397,13 +405,15 @@ contract SubscriptionTokenV2 is
         uint256 amount = _allocation.transferIn(msg.sender, numTokens);
 
         // We need to make sure the price is right
-        //
+        // If tier is 0, we need to check the current tier or last tier of sub
+        // if tier is 0 and new sub, default to 0 tier
 
         // TODO: Validate tier id
 
-        Tier storage tier;
+        Tier memory tier;
         Subscription storage sub = _subscriptions[account];
         if (sub.tokenId == 0) {
+            // _mint()
             sub.tierId = tierId == 0 ? 1 : tierId;
 
             tier = _getTier(sub.tierId);
@@ -574,13 +584,14 @@ contract SubscriptionTokenV2 is
     }
 
     /// @dev Get or build a new subscription (for writing)
-    function _fetchSubscription(address account) internal returns (Subscription storage) {
+    function _fetchSubscription(address account, uint16 tierId) internal returns (Subscription storage) {
         Subscription storage sub = _subscriptions[account];
         if (sub.tokenId == 0) {
+            // checkTier(tierId);
             _tokenCounter += 1;
             sub.tokenId = _tokenCounter;
-
-            // sub = Subscription(_tokenCounter, 0, 0, block.timestamp, block.timestamp, 0, 0, 1);
+            sub.tierId = tierId;
+            // _safeMint(account, sub.tokenId);
         }
         return sub;
     }
@@ -761,6 +772,10 @@ contract SubscriptionTokenV2 is
     {
         Subscription memory sub = _subscriptions[account];
         return (sub.tokenId, sub.secondsPurchased, sub.rewardPoints, sub.expiresAt());
+    }
+
+    function subscriptionDetail(address account) external view returns (Subscription memory subscription) {
+        return _subscriptions[account];
     }
 
     /**
