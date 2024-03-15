@@ -101,6 +101,12 @@ interface ISubscriptionTokenV2 {
 
     //~~~~~~~~~~~ V2 ~~~~~~~~~~~~//
 
+    /**
+     * @notice Fetch the current version of the contract
+     * @return version the current version
+     */
+    function stpVersion() external pure returns (uint8 version);
+
     // function mintPrice(address account, uint8 tierId, uint32 numPeriods) external view returns (uint256);
 
     /**
@@ -109,6 +115,14 @@ interface ISubscriptionTokenV2 {
      * @param subscribers the list of subscriber addresses to mark as inactive
      */
     // function markInactive(address[] calldata subscribers) external;
+
+    /**
+     * @notice Get the balance of an account in a specific tier
+     * @param tierId the tier id filter
+     * @param account the account to check the balance of
+     * @return the balance of the account in the specified tier
+     */
+    function tierBalanceOf(uint16 tierId, address account) external view returns (uint256);
 
     //////////////////
     // Rewards

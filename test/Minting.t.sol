@@ -26,12 +26,5 @@ contract MintingTest is BaseTest {
         assertTrue(stp.balanceOf(alice) > 0);
     }
 
-
-
-
-
-
     // Mint Params
-
-
 }

@@ -123,8 +123,8 @@ struct Subscription {
     uint256 rewardsWithdrawn;
     /// @dev The tier id of the subscription
     uint16 tierId;
-    // uint16 lastTierId; // track the last tier id for the subscription (for renewal from inactive)
 }
+// uint16 lastTierId; // track the last tier id for the subscription (for renewal from inactive)
 
 struct Allocation {
     uint256 tokensIn;

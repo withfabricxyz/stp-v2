@@ -51,12 +51,17 @@ library TierLib {
     // VIEW FUNCTIONS
     /////////////////////
 
-    function validate(Tier memory tier) internal pure returns (Tier memory) {
+    function validate(Tier memory tier) internal view returns (Tier memory) {
         if (tier.periodDurationSeconds == 0) {
             revert TierInvalidDuration();
         }
 
         tier.gate = GateLib.validate(tier.gate);
+
+        // Gates can refer to other tiers, but not self
+        if (tier.gate.contractAddress == address(this) && tier.gate.componentId == tier.id) {
+            revert GateLib.GateInvalid();
+        }
 
         return tier;
     }

@@ -878,12 +878,18 @@ contract SubscriptionTokenV2 is
         return _tokenURI;
     }
 
-    /**
-     * @notice Fetch the current version of the contract
-     * @return version the current version
-     */
+    /// @inheritdoc ISubscriptionTokenV2
     function stpVersion() external pure returns (uint8 version) {
         return 2;
+    }
+
+    /// @inheritdoc ISubscriptionTokenV2
+    function tierBalanceOf(uint16 tierId, address account) external view returns (uint256 numSeconds) {
+        Subscription memory sub = _subscriptions[account];
+        if (sub.tierId != tierId) {
+            return 0;
+        }
+        return sub.remainingSeconds();
     }
 
     //////////////////////
@@ -936,6 +942,7 @@ contract SubscriptionTokenV2 is
         return from;
     }
 
+    /// @inheritdoc ERC721Upgradeable
     function supportsInterface(bytes4 interfaceId)
         public
         view
