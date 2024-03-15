@@ -19,8 +19,6 @@ contract RewardTestShim {
     function rewardValue(RewardParams memory params, uint256 numTokens) external pure returns (uint256 tokens) {
         return RewardLib.rewardValue(params, numTokens);
     }
-
-    function testIgnore() internal {}
 }
 
 contract RewardLibTest is Test {

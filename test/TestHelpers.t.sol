@@ -3,8 +3,21 @@ pragma solidity ^0.8.20;
 
 import {Test} from "@forge/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {InitParams, Tier, FeeParams, RewardParams, TierGate, TierGateType} from "src/types/Index.sol";
+import {InitParams, Tier, FeeParams, RewardParams, Gate, GateType} from "src/types/Index.sol";
+
+contract TestERC1155Token is ERC1155 {
+    constructor() ERC1155("test") {
+        _mint(msg.sender, 1, 1, "token");
+    }
+
+    function mint(address account, uint256 id, uint256 amount) external {
+        _mint(account, id, amount, "");
+    }
+
+    function testIgnore() internal {}
+}
 
 // Test token which charges 50% fee on transfer
 contract TestFeeToken is ERC20 {
@@ -137,7 +150,7 @@ abstract contract BaseTest is Test {
         transferrable: true,
         initialMintPrice: 0,
         pricePerPeriod: 4,
-        gate: TierGate({gateType: TierGateType.NONE, contractAddress: address(0), componentId: 0, balanceMin: 0})
+        gate: Gate({gateType: GateType.NONE, contractAddress: address(0), componentId: 0, balanceMin: 0})
     });
 
     FeeParams internal feeParams = FeeParams({collector: address(0), bips: 0});

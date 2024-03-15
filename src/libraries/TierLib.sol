@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Tier, Subscription} from "../types/Index.sol";
+import {GateLib} from "./GateLib.sol";
 
 /// @dev The initialization parameters for a subscription token
 library TierLib {
@@ -54,6 +55,9 @@ library TierLib {
         if (tier.periodDurationSeconds == 0) {
             revert TierInvalidDuration();
         }
+
+        tier.gate = GateLib.validate(tier.gate);
+
         return tier;
     }
 
