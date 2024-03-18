@@ -6,7 +6,7 @@ import {InitParams} from "src/types/Index.sol";
 import {RewardLib} from "src/libraries/RewardLib.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 
-contract SubscriptionTokenV2RewardsTest is BaseTest {
+contract RewardsTest is BaseTest {
     function setUp() public {
         deal(alice, 1e20);
         deal(bob, 1e19);
@@ -340,5 +340,10 @@ contract SubscriptionTokenV2RewardsTest is BaseTest {
 
         uint256 b2 = stp.rewardBalanceOf(alice);
         assertEq(b1 + 0.5 ether, b2);
+    }
+
+    function testDistributeNoRewards() public prank(creator) {
+        vm.expectRevert(abi.encodeWithSelector(RewardLib.RewardsDisabled.selector));
+        stp.distributeRewards{value: 1e18}(1e18);
     }
 }

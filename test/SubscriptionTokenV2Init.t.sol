@@ -21,19 +21,19 @@ contract SubscriptionTokenV2InitTest is BaseTest {
         );
     }
 
+    function testDefaults() public {
+        stp = reinitStp();
+        assertEq(initParams.tokenUri, stp.baseTokenURI());
+        assertEq(initParams.contractUri, stp.contractURI());
+        assertEq(initParams.erc20TokenAddr, stp.erc20Address());
+    }
+
     function testOwnerZero() public {
         initParams.owner = address(0);
 
         vm.expectRevert("Owner address cannot be 0x0");
         stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
-
-    // function testTps() public {
-    //     initParams.tokensPerSecond = 0;
-
-    //     vm.expectRevert("Tokens per second must be > 0");
-    //     stp.initialize(initParams, tierParams, rewardParams, feeParams);
-    // }
 
     function testFeeBps() public {
         feeParams.bips = 1500;

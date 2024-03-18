@@ -290,9 +290,8 @@ contract SubscriptionTokenV2 is
         sub.grantTime(numSeconds);
         // Mint the NFT if it does not exist before grant event for indexers
         // TODO: Can this be in the fetch?
-        _maybeMint(account, sub.tokenId);
-
         emit Grant(account, sub.tokenId, numSeconds, sub.expiresAt());
+        _maybeMint(account, sub.tokenId);
     }
 
     /**
@@ -375,29 +374,29 @@ contract SubscriptionTokenV2 is
         _mintOrRenew(account, numTokens, 0, referralCode, referrer);
     }
 
-    /**
-     * @dev Create a new subscription and NFT for the given account
-     */
-    function _mint(Subscription storage sub, address account, uint256 numTokens, uint16 tierId) internal {
-        Tier memory tier = _getTier(tierId == 0 ? 1 : tierId);
-        tier.checkSupply(_tierSubCounts[tier.id]);
-        tier.checkMintPrice(numTokens);
+    // /**
+    //  * @dev Create a new subscription and NFT for the given account
+    //  */
+    // function _mint(Subscription storage sub, address account, uint256 numTokens, uint16 tierId) internal {
+    //     Tier memory tier = _getTier(tierId == 0 ? 1 : tierId);
+    //     tier.checkSupply(_tierSubCounts[tier.id]);
+    //     tier.checkMintPrice(numTokens);
 
-        // TODO paused?
+    //     // TODO paused?
 
-        // This may perform a call to another contract
-        tier.checkGate(account);
+    //     // This may perform a call to another contract
+    //     tier.checkGate(account);
 
-        // Create the NFT token (and ensure receivable)
-        _safeMint(account, sub.tokenId);
-    }
+    //     // Create the NFT token (and ensure receivable)
+    //     _safeMint(account, sub.tokenId);
+    // }
 
-    function _renew(Subscription storage sub, uint256 numTokens, uint16 tierId) internal {
-        // TODO: renew the NFT
-        // Validate renewal price
-        // Ensure same tier
-        // TODO: Paused?
-    }
+    // function _renew(Subscription storage sub, uint256 numTokens, uint16 tierId) internal {
+    //     // TODO: renew the NFT
+    //     // Validate renewal price
+    //     // Ensure same tier
+    //     // TODO: Paused?
+    // }
 
     function _mintOrRenew(address account, uint256 numTokens, uint16 tierId, uint256 referralCode, address referrer)
         internal
@@ -481,8 +480,9 @@ contract SubscriptionTokenV2 is
 
     // @inheritdoc ISubscriptionTokenV2
     function distributeRewards(uint256 numTokens) external payable override {
-        require(_totalRewardPoints > 0, "No reward points");
-        require(numTokens > 0, "Num rewards must be > 0");
+        if (_totalRewardPoints == 0) {
+            revert RewardLib.RewardsDisabled();
+        }
         uint256 finalAmount = _allocation.transferIn(msg.sender, numTokens);
         _rewardPoolBalance += finalAmount;
         _rewardPoolTotal += finalAmount;

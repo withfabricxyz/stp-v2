@@ -14,6 +14,7 @@ library AllocationLib {
     error NativeTokensNotAcceptedForERC20Subscriptions();
     error InsufficientBalanceOrAllowance(uint256 preBalance, uint256 allowance);
     error FailedToTransferEther(address to, uint256 amount);
+    error InvalidZeroTransfer();
 
     function total(Allocation storage self) internal view returns (uint256) {
         return self.tokensIn;
@@ -37,6 +38,10 @@ library AllocationLib {
 
     /// @dev Transfer tokens into the contract, either native or ERC20
     function transferIn(Allocation storage self, address from, uint256 amount) internal returns (uint256) {
+        if (amount == 0) {
+            revert InvalidZeroTransfer();
+        }
+
         if (!isERC20(self)) {
             if (msg.value != amount) {
                 revert PurchaseAmountMustMatchValueSent(amount, msg.value);

@@ -27,6 +27,7 @@ contract RefundsTests is BaseTest {
     function testRefund() public {
         mint(alice, 1e18);
         (uint256 tokenId,,,) = stp.subscriptionOf(alice);
+        assertEq(stp.estimatedRefund(alice), 1e18);
         vm.startPrank(creator);
         vm.expectEmit(true, true, false, true, address(stp));
         emit Refund(alice, tokenId, 1e18, 1e18 / 2);

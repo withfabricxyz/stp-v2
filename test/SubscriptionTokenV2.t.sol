@@ -8,6 +8,7 @@ import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelper
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {AllocationLib} from "src/libraries/AllocationLib.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
 
@@ -226,6 +227,17 @@ contract SubscriptionTokenV2Test is BaseTest {
         stp.transferFrom(alice, bob, tokenId);
     }
 
+    function testDisallowedTransfer() public {
+        tierParams.transferrable = false;
+        stp = reinitStp();
+        mint(alice, 1e18);
+        vm.startPrank(alice);
+        stp.approve(bob, 1);
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierTransferDisabled.selector));
+        stp.transferFrom(alice, bob, 1);
+        vm.stopPrank();
+    }
+
     function testUpdateMetadata() public {
         mint(alice, 1e18);
 
@@ -365,5 +377,9 @@ contract SubscriptionTokenV2Test is BaseTest {
         vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidSupplyCap.selector));
         stp.setSupplyCap(1);
         vm.stopPrank();
+    }
+
+    function testEIP165() public {
+        assertTrue(stp.supportsInterface(type(IERC721).interfaceId));
     }
 }
