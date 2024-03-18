@@ -9,6 +9,9 @@ library SubscriptionLib {
 
     error SubscriptionNotFound(address account);
 
+    /// @dev Emitted when the creator refunds a subscribers remaining time
+    event Refund(address indexed account, uint256 indexed tokenId, uint256 tokensTransferred, uint256 timeReclaimed);
+
     /// @dev Transfer tokens into the contract, either native or ERC20
     function initialize(Subscription storage sub, address from) internal returns (uint256) {}
 
@@ -63,7 +66,39 @@ library SubscriptionLib {
     function revokeTime(Subscription storage sub) internal returns (uint256) {
         uint256 remaining = grantedTimeRemaining(sub);
         sub.secondsGranted = 0;
+        // emit GrantRevoke(account, sub.tokenId, remaining);
         return remaining;
+    }
+
+    function estimatedRefund(Subscription memory sub) internal view returns (uint256) {
+        uint256 divisor = sub.secondsPurchased / purchasedTimeRemaining(sub);
+        return divisor > 0 ? sub.totalPurchased / divisor : 0;
+
+        // return purchasedTimeRemaining(sub); // TODO: We need to store the purchase price so we can compute the average (weak)
+    }
+
+    function deactivate(Subscription storage sub) internal {
+        // assert no time remaining
+        // sub.secondsPurchased = 0;
+        // sub.secondsGranted = 0;
+        sub.tierId = 0;
+        // sub.lastTierId = sub.tierId;
+        // emit Deactivatation(account, sub.tokenId);
+    }
+
+    function refund(Subscription storage sub, address account, uint256 numTokens) internal returns (uint256) {
+        uint256 remaining = purchasedTimeRemaining(sub);
+        uint256 tokenAmount = numTokens > 0 ? numTokens : estimatedRefund(sub);
+
+        // if(tokenAmount > sub.tokensTransferred) {
+        //   revert InvalidRefundAmount(account);
+        // }
+        // sub.tokensTransferred -= tokenAmount;
+
+        sub.secondsPurchased -= remaining;
+
+        emit Refund(account, sub.tokenId, tokenAmount, remaining);
+        return tokenAmount;
     }
 
     // function purchase(Subscription storage sub, Tier storage tier, uint256 numTokens) internal {}

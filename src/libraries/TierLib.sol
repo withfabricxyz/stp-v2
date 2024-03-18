@@ -28,16 +28,33 @@ library TierLib {
     /// @dev The tier does not allow transferring tokens
     error TierTransferDisabled();
 
+    /// @dev The tier price is invalid
+    error TierInvalidMintPrice(uint256 mintPrice);
+
     /////////////////////
     // EVENTS
     /////////////////////
+
+    /// @dev The tier is paused
+    event TierPaused(uint16 tierId);
+
+    /// @dev The tier is unpaused
+    event TierUnpaused(uint16 tierId);
+
+    /// @dev The tier price has changed
+    event TierPriceChange(uint16 tierId, uint256 oldPricePerPeriod, uint256 pricePerPeriod);
+
+    /// @dev the supply cap has changed
+    event TierSupplyCapChange(uint16 tierId, uint32 newCap);
 
     /////////////////////
     // UPDATE FUNCTIONS
     /////////////////////
 
-    function setPricePerPeriod(Tier storage tier, uint32 _periodDurationSeconds) internal {
-        tier.periodDurationSeconds = _periodDurationSeconds;
+    function setPricePerPeriod(Tier storage tier, uint256 price) internal {
+        uint256 oldPrice = tier.pricePerPeriod;
+        tier.pricePerPeriod = price;
+        emit TierPriceChange(tier.id, oldPrice, tier.pricePerPeriod);
     }
 
     function updateSupplyCap(Tier storage tier, uint32 subCount, uint32 newCap) internal {
@@ -45,6 +62,17 @@ library TierLib {
             revert TierInvalidSupplyCap();
         }
         tier.maxSupply = newCap;
+        emit TierSupplyCapChange(tier.id, newCap);
+    }
+
+    function pause(Tier storage tier) internal {
+        tier.paused = true;
+        emit TierPaused(tier.id);
+    }
+
+    function unpause(Tier storage tier) internal {
+        tier.paused = false;
+        emit TierUnpaused(tier.id);
     }
 
     /////////////////////
@@ -66,6 +94,31 @@ library TierLib {
         return tier;
     }
 
+    function checkMintPrice(Tier memory tier, uint256 tokensIn) internal pure {
+        uint256 minPrice = mintPrice(tier, 1, true);
+        if (tokensIn < minPrice) {
+            revert TierInvalidMintPrice(minPrice);
+        }
+    }
+
+    function checkSupply(Tier memory tier, uint32 subCount) internal pure {
+        if (!hasSupply(tier, subCount)) {
+            revert TierHasNoSupply(tier.id);
+        }
+    }
+
+    function checkGate(Tier memory tier, address account) internal view {
+        GateLib.checkAccount(tier.gate, account);
+    }
+
+    // function checkRenewal(Tier memory tier, uint256 numTokens, bool firstMint) internal pure {
+    //     uint256 numPeriods = numTokens / tier.pricePerPeriod;
+    //     uint256 remainder = numTokens % tier.pricePerPeriod;
+    //     if (mintPrice(tier, numPeriods, firstMint) == 0) {
+    //         revert TierTransferDisabled();
+    //     }
+    // }
+
     function mintPrice(Tier memory tier, uint256 numPeriods, bool firstMint) internal pure returns (uint256) {
         return tier.pricePerPeriod * numPeriods + (firstMint ? tier.initialMintPrice : 0);
     }
@@ -77,12 +130,4 @@ library TierLib {
     function tokensPerSecond(Tier memory tier) internal pure returns (uint256) {
         return tier.pricePerPeriod / tier.periodDurationSeconds;
     }
-
-    // function checkPurchase(Tier memory tier, Subscription memory sub, uint256 tokenAmount) internal pure returns (uint256) {
-    //     // TODO: Check amount
-    //     // TODO: Check period is valid
-    //     // TODO: Check max periods
-    //     // TODO: Check token gate
-    //     return tier.pricePerPeriod / tier.periodDurationSeconds;
-    // }
 }

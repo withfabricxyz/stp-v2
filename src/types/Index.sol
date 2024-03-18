@@ -109,6 +109,7 @@ struct DeployParams {
 struct Subscription {
     /// @dev The tokenId for the subscription
     uint256 tokenId;
+    uint256 totalPurchased;
     /// @dev The number of seconds purchased
     uint256 secondsPurchased;
     /// @dev The number of seconds granted by the creator

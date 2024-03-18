@@ -150,23 +150,6 @@ contract SubscriptionTokenV2Test is BaseTest {
         assertEq(aliceBalance, alice.balance);
     }
 
-    function testPausing() public {
-        vm.startPrank(creator);
-        stp.pause();
-        vm.stopPrank();
-
-        vm.startPrank(alice);
-        vm.expectRevert(abi.encodeWithSelector(PausableUpgradeable.EnforcedPause.selector));
-        stp.mint{value: 1e17}(1e17);
-        vm.stopPrank();
-
-        vm.startPrank(creator);
-        stp.unpause();
-        vm.stopPrank();
-
-        mint(alice, 1e17);
-    }
-
     /// ERC20
 
     function testERC20Mint() public erc20 prank(alice) {

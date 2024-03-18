@@ -58,6 +58,11 @@ contract GrantsTest is BaseTest {
         assertEq(stp.balanceOf(alice), 0);
     }
 
+    function testInvalidRevoke() public prank(creator) {
+        vm.expectRevert(abi.encodeWithSelector(SubscriptionLib.SubscriptionNotFound.selector, alice));
+        stp.revokeTime(alice);
+    }
+
     function testGrantRevokeWithPayment() public {
         mint(alice, 1e18);
         vm.startPrank(creator);

@@ -31,7 +31,6 @@ import {RewardLib} from "./libraries/RewardLib.sol";
 contract SubscriptionTokenV2 is
     ERC721Upgradeable,
     ReentrancyGuardUpgradeable,
-    PausableUpgradeable,
     AccessControlDefaultAdminRulesUpgradeable,
     MulticallUpgradeable,
     ISubscriptionTokenV2
@@ -44,9 +43,6 @@ contract SubscriptionTokenV2 is
     using RewardLib for RewardParams;
 
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
-
-    /// @dev The maximum number of reward halvings (limiting this prevents overflow)
-    uint256 private constant _MAX_REWARD_HALVINGS = 32;
 
     /// @dev Maximum protocol fee basis points (12.5%)
     uint16 private constant _MAX_FEE_BIPS = 1250;
@@ -159,7 +155,6 @@ contract SubscriptionTokenV2 is
 
         __ERC721_init(params.name, params.symbol);
         __AccessControlDefaultAdminRules_init(0, params.owner);
-        __Pausable_init();
         __ReentrancyGuard_init();
         __AccessControl_init();
 
@@ -251,7 +246,7 @@ contract SubscriptionTokenV2 is
      * @notice Withdraw available funds as the owner to a specific account
      * @param account the account to transfer funds to
      */
-    function withdrawTo(address account) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function withdrawTo(address account) public onlyAdmin {
         require(account != address(0), "Account cannot be 0x0");
         uint256 balance = creatorBalance();
         require(balance > 0, "No Balance");
@@ -259,23 +254,16 @@ contract SubscriptionTokenV2 is
     }
 
     /**
-     * @notice Refund one or more accounts remaining purchased time and revoke any granted time
-     * @dev This refunds accounts using creator balance, and can also transfer in to top up the fund. Any excess value is withdrawable.
-     * @param numTokensIn an optional amount of tokens to transfer in before refunding
-     * @param accounts the list of accounts to refund and revoke grants for
+     * @notice Refund an account, clearing the subscription and revoking any grants, and paying out a set amount
+     * @dev This refunds using the creator balance. If there is not enough balance, it will fail.
+     * @param account the account to refund
+     * @param numTokens the amount of tokens to refund
      */
-    function refund(uint256 numTokensIn, address[] memory accounts) external payable onlyManager {
-        require(accounts.length > 0, "No accounts to refund");
-        if (numTokensIn > 0) {
-            // uint256 finalAmount = _transferIn(msg.sender, numTokensIn);
-            uint256 finalAmount = _allocation.transferIn(msg.sender, numTokensIn);
-            emit RefundTopUp(finalAmount);
-        } else if (msg.value > 0) {
-            revert("Unexpected value transfer");
-        }
-        require(canRefund(accounts), "Insufficient balance for refund");
-        for (uint256 i = 0; i < accounts.length; i++) {
-            _refund(accounts[i]);
+    function refund(address account, uint256 numTokens) external onlyAdmin {
+        Subscription storage sub = _getSub(account);
+        uint256 tokensToSend = sub.refund(account, numTokens);
+        if (tokensToSend > 0) {
+            _allocation.transferOut(account, tokensToSend);
         }
     }
 
@@ -284,7 +272,7 @@ contract SubscriptionTokenV2 is
      * @param contractUri the collection metadata URI
      * @param tokenUri the token metadata URI
      */
-    function updateMetadata(string memory contractUri, string memory tokenUri) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updateMetadata(string memory contractUri, string memory tokenUri) external onlyAdmin {
         require(bytes(contractUri).length > 0, "Contract URI cannot be empty");
         require(bytes(tokenUri).length > 0, "Token URI cannot be empty");
         _contractURI = contractUri;
@@ -321,7 +309,7 @@ contract SubscriptionTokenV2 is
      * @notice Set a transfer recipient for automated/sponsored transfers
      * @param recipient the recipient address
      */
-    function setTransferRecipient(address recipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setTransferRecipient(address recipient) external onlyAdmin {
         _transferRecipient = recipient;
         emit TransferRecipientChange(recipient);
     }
@@ -330,13 +318,17 @@ contract SubscriptionTokenV2 is
     // Tier Management
     /////////////////////////
 
-    function createTier(Tier memory params) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function createTier(Tier memory params) external onlyAdmin {
         initializeTier(params);
     }
 
-    function setTierSupplyCap(uint16 tierId, uint32 supplyCap) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setTierSupplyCap(uint16 tierId, uint32 supplyCap) public onlyAdmin {
         _getTier(tierId).updateSupplyCap(_tierSubCounts[tierId], supplyCap);
-        emit SupplyCapChange(supplyCap);
+        emit SupplyCapChange(supplyCap); // TODO
+    }
+
+    function setTierPrice(uint16 tierId, uint256 pricePerPeriod) external onlyAdmin {
+        _getTier(tierId).setPricePerPeriod(pricePerPeriod);
     }
 
     /**
@@ -347,18 +339,12 @@ contract SubscriptionTokenV2 is
         setTierSupplyCap(1, supplyCap);
     }
 
-    /**
-     * @notice Pause minting to allow for migrations or other actions
-     */
-    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _pause(); // TODO: _getTier(1).pause();
+    function pauseTier(uint16 tierId) external onlyManager {
+        _getTier(tierId).pause();
     }
 
-    /**
-     * @notice Unpause to resume subscription minting
-     */
-    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _unpause(); // TODO: _getTier(1).unpause();
+    function unpauseTier(uint16 tierId) external onlyManager {
+        _getTier(tierId).unpause();
     }
 
     /////////////////////////
@@ -370,7 +356,7 @@ contract SubscriptionTokenV2 is
      * @param account the account to mint or renew time for
      * @param numTokens the amount of ERC20 tokens or native tokens to transfer
      */
-    function mintFor(address account, uint256 numTokens) public payable whenNotPaused {
+    function mintFor(address account, uint256 numTokens) public payable {
         _mintOrRenew(account, numTokens, 0, 0, address(0));
     }
 
@@ -384,18 +370,33 @@ contract SubscriptionTokenV2 is
     function mintWithReferralFor(address account, uint256 numTokens, uint256 referralCode, address referrer)
         public
         payable
-        whenNotPaused
     {
         require(referrer != address(0), "Referrer cannot be 0x0");
         _mintOrRenew(account, numTokens, 0, referralCode, referrer);
     }
 
-    function _mint(address account, uint256 numTokens, uint16 tierId) internal {
-        // TODO: mint a new NFT (different logic than renew)
+    /**
+     * @dev Create a new subscription and NFT for the given account
+     */
+    function _mint(Subscription storage sub, address account, uint256 numTokens, uint16 tierId) internal {
+        Tier memory tier = _getTier(tierId == 0 ? 1 : tierId);
+        tier.checkSupply(_tierSubCounts[tier.id]);
+        tier.checkMintPrice(numTokens);
+
+        // TODO paused?
+
+        // This may perform a call to another contract
+        tier.checkGate(account);
+
+        // Create the NFT token (and ensure receivable)
+        _safeMint(account, sub.tokenId);
     }
 
-    function _renew(address account, uint256 numTokens, uint16 tierId) internal {
+    function _renew(Subscription storage sub, uint256 numTokens, uint16 tierId) internal {
         // TODO: renew the NFT
+        // Validate renewal price
+        // Ensure same tier
+        // TODO: Paused?
     }
 
     function _mintOrRenew(address account, uint256 numTokens, uint16 tierId, uint256 referralCode, address referrer)
@@ -428,12 +429,8 @@ contract SubscriptionTokenV2 is
             sub.tokenId = _tokenCounter;
 
             _safeMint(account, sub.tokenId);
-            // sub.purchase(tier, tokensTransferred);
-            // _subscriptions[account] = sub;??
         } else {
             tier = _tiers[sub.tierId];
-            // Tier paused?
-            // sub.purchase(tier, tokensTransferred);
         }
 
         if (block.timestamp > sub.purchaseOffset + sub.secondsPurchased) {
@@ -442,6 +439,7 @@ contract SubscriptionTokenV2 is
 
         uint256 rp = amount * rewardMultiplier() * tier.rewardMultiplier;
         uint256 tv = timeValue(amount); // Need to get this from the tier
+        sub.totalPurchased += amount;
         sub.secondsPurchased += tv;
         sub.rewardPoints += rp;
         // _subscriptions[account] = sub; ???
@@ -536,7 +534,7 @@ contract SubscriptionTokenV2 is
      * @param code the unique integer code for the referral
      * @param bps the reward basis points
      */
-    function createReferralCode(uint256 code, uint16 bps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function createReferralCode(uint256 code, uint16 bps) external onlyAdmin {
         require(bps <= _MAX_BIPS, "bps too high");
         require(bps > 0, "bps must be > 0");
         uint16 existing = _referralCodes[code];
@@ -549,7 +547,7 @@ contract SubscriptionTokenV2 is
      * @notice Delete a referral code
      * @param code the unique integer code for the referral
      */
-    function deleteReferralCode(uint256 code) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function deleteReferralCode(uint256 code) external onlyAdmin {
         delete _referralCodes[code];
         emit ReferralDestroyed(code);
     }
@@ -659,27 +657,6 @@ contract SubscriptionTokenV2 is
         _transferFees();
     }
 
-    /// @dev Refund the remaining time for the given accounts subscription, and clear grants
-    function _refund(address account) internal {
-        Subscription memory sub = _subscriptions[account];
-        if (sub.secondsPurchased == 0 && sub.secondsGranted == 0) {
-            return;
-        }
-
-        sub.secondsGranted = 0;
-        uint256 balance = refundableBalanceOf(account);
-        uint256 tokens = balance * tps();
-        if (balance > 0) {
-            sub.secondsPurchased -= balance;
-            _subscriptions[account] = sub;
-            _allocation.transferOut(account, tokens);
-        } else {
-            _subscriptions[account] = sub;
-        }
-
-        emit Refund(account, sub.tokenId, tokens, balance);
-    }
-
     /// @dev Compute the reward amount for a given token amount and referral code
     function _referralAmount(uint256 tokenAmount, uint256 referralCode) internal view returns (uint256) {
         uint16 referralBps = _referralCodes[referralCode];
@@ -702,27 +679,8 @@ contract SubscriptionTokenV2 is
     // Informational
     ////////////////////////
 
-    /**
-     * @notice Determine the total cost for refunding the given accounts
-     * @dev The value will change from block to block, so this is only an estimate
-     * @param accounts the list of accounts to refund
-     * @return numTokens total number of tokens for refund
-     */
-    function refundableTokenBalanceOfAll(address[] memory accounts) public view returns (uint256 numTokens) {
-        uint256 amount;
-        for (uint256 i = 0; i < accounts.length; i++) {
-            amount += refundableBalanceOf(accounts[i]);
-        }
-        return amount * tps();
-    }
-
-    /**
-     * @notice Determines if a refund can be processed for the given accounts with the current balance
-     * @param accounts the list of accounts to refund
-     * @return refundable true if the refund can be processed from the current balance
-     */
-    function canRefund(address[] memory accounts) public view returns (bool refundable) {
-        return creatorBalance() >= refundableTokenBalanceOfAll(accounts);
+    function estimatedRefund(address account) public view returns (uint256) {
+        return _getSub(account).estimatedRefund();
     }
 
     /**
@@ -928,12 +886,12 @@ contract SubscriptionTokenV2 is
      * @notice Renounce ownership of the contract, transferring all remaining funds to the creator and fee collector
      *         and pausing the contract to prevent further inflows.
      */
-    function renounceOwnership() public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function renounceOwnership() public onlyAdmin {
         _transferAllBalances(msg.sender);
-        _pause();
         // TODO: What?
         // _renounceRole(DEFAULT_ADMIN_ROLE, _msgSender());
         // _transferOwnership(address(0));
+        // pause all tiers?
     }
 
     /// @dev Transfers may occur if the destination does not have a subscription and the tier allows it
@@ -979,7 +937,7 @@ contract SubscriptionTokenV2 is
      * @notice Reconcile the ERC20 balance of the contract with the internal state
      * @dev The prevents lost funds if ERC20 tokens are transferred to the contract directly
      */
-    function reconcileERC20Balance() external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function reconcileERC20Balance() external onlyAdmin {
         _allocation.reconcileBalance();
     }
 
@@ -989,10 +947,7 @@ contract SubscriptionTokenV2 is
      * @param recipientAddress the address to send the tokens to
      * @param tokenAmount the amount of tokens to send
      */
-    function recoverERC20(address tokenAddress, address recipientAddress, uint256 tokenAmount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function recoverERC20(address tokenAddress, address recipientAddress, uint256 tokenAmount) external onlyAdmin {
         require(tokenAddress != erc20Address(), "Cannot recover subscription token");
         IERC20(tokenAddress).safeTransfer(recipientAddress, tokenAmount);
     }
@@ -1001,7 +956,7 @@ contract SubscriptionTokenV2 is
      * @notice Recover native tokens which bypassed receive. Only callable for erc20 denominated contracts.
      * @param recipient the address to send the tokens to
      */
-    function recoverNativeTokens(address recipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function recoverNativeTokens(address recipient) external onlyAdmin {
         require(_allocation.isERC20(), "Not supported, use reconcileNativeBalance");
         uint256 balance = address(this).balance;
         require(balance > 0, "No balance to recover");
@@ -1012,7 +967,7 @@ contract SubscriptionTokenV2 is
     /**
      * @notice Reconcile native tokens which bypassed receive/mint. Only callable for native denominated contracts.
      */
-    function reconcileNativeBalance() external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function reconcileNativeBalance() external onlyAdmin {
         _allocation.reconcileBalance();
     }
 }
