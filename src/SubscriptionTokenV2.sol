@@ -11,15 +11,15 @@ import {AccessControlDefaultAdminRulesUpgradeable} from
     "@openzeppelin-upgradeable/contracts/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import {MulticallUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/MulticallUpgradeable.sol";
 
-import {InitParams, Tier, FeeParams, RewardParams, Tier, Allocation, Subscription} from "./types/Index.sol";
-import {AllocationLib} from "./libraries/AllocationLib.sol";
+import {InitParams, Tier, FeeParams, RewardParams, Tier, Pool, Subscription} from "./types/Index.sol";
+import {PoolLib} from "./libraries/PoolLib.sol";
 import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
 import {TierLib} from "./libraries/TierLib.sol";
 import {ISubscriptionTokenV2} from "./interfaces/ISubscriptionTokenV2.sol";
 import {RewardLib} from "./libraries/RewardLib.sol";
 
 /**
- * @title Subscription Token Protocol Version 1
+ * @title Subscription Token Protocol Version 2
  * @author Fabric Inc.
  * @notice An NFT contract which allows users to mint time and access token gated content while time remains.
  * @dev The balanceOf function returns the number of seconds remaining in the subscription. Token gated systems leverage
@@ -37,7 +37,7 @@ contract SubscriptionTokenV2 is
 {
     using SafeERC20 for IERC20;
     using Strings for uint256;
-    using AllocationLib for Allocation;
+    using PoolLib for Pool;
     using TierLib for Tier;
     using SubscriptionLib for Subscription;
     using RewardLib for RewardParams;
@@ -56,24 +56,18 @@ contract SubscriptionTokenV2 is
     /// @dev The metadata URI for the tokens. Note: if it ends with /, then we append the tokenId
     string private _tokenURI;
 
-    Allocation private _allocation;
+    Pool private _creatorPool;
+    Pool private _rewardPool;
+    Pool private _rewardPointsPool;
+    Pool private _feePool;
 
     /// @dev The token counter for mint id generation and enforcing supply caps
     uint256 private _tokenCounter;
-
-    /// @dev The total number of tokens allocated for the fee collector (accounting)
-    uint256 private _feeBalance;
 
     FeeParams private _feeParams;
 
     /// @dev The reward pool size (used to calculate reward withdraws accurately)
     uint256 private _totalRewardPoints;
-
-    /// @dev The reward pool balance (accounting)
-    uint256 private _rewardPoolBalance;
-
-    /// @dev The reward pool total (used to calculate reward withdraws accurately)
-    uint256 private _rewardPoolTotal;
 
     /// @dev The reward pool tokens slashed (used to calculate reward withdraws accurately)
     uint256 private _rewardPoolSlashed;
@@ -158,7 +152,9 @@ contract SubscriptionTokenV2 is
         __ReentrancyGuard_init();
         __AccessControl_init();
 
-        _allocation = Allocation(0, 0, params.erc20TokenAddr);
+        _creatorPool = Pool(0, 0, params.erc20TokenAddr);
+        _rewardPool = Pool(0, 0, params.erc20TokenAddr);
+        _feePool = Pool(0, 0, params.erc20TokenAddr);
         _contractURI = params.contractUri;
         _tokenURI = params.tokenUri;
     }
@@ -189,14 +185,14 @@ contract SubscriptionTokenV2 is
      * @notice Withdraw available rewards. This is only possible if the subscription is active.
      */
     function withdrawRewards() external {
+        // TODO!
         Subscription memory sub = _subscriptions[msg.sender];
         require(sub.isActive(), "Subscription not active");
         uint256 rewardAmount = _rewardBalance(sub);
         require(rewardAmount > 0, "No rewards to withdraw");
         sub.rewardsWithdrawn += rewardAmount;
         _subscriptions[msg.sender] = sub;
-        _rewardPoolBalance -= rewardAmount;
-        _allocation.transferOut(msg.sender, rewardAmount);
+        _rewardPool.transferOut(msg.sender, rewardAmount);
         emit RewardWithdraw(msg.sender, rewardAmount);
     }
 
@@ -216,7 +212,7 @@ contract SubscriptionTokenV2 is
 
         // If all points are slashed, move left-over funds to creator
         if (_totalRewardPoints == 0) {
-            _rewardPoolBalance = 0;
+            _rewardPool.liquidateTo(_creatorPool);
         }
 
         emit RewardPointsSlashed(account, msg.sender, sub.rewardPoints);
@@ -237,9 +233,8 @@ contract SubscriptionTokenV2 is
     /**
      * @notice Withdraw available funds and transfer fees as the owner
      */
-    function withdrawAndTransferFees() external {
-        withdrawTo(msg.sender);
-        _transferFees();
+    function withdrawAndTransferFees() external onlyAdmin {
+        _transferAllBalances(msg.sender);
     }
 
     /**
@@ -263,7 +258,7 @@ contract SubscriptionTokenV2 is
         Subscription storage sub = _getSub(account);
         uint256 tokensToSend = sub.refund(account, numTokens);
         if (tokensToSend > 0) {
-            _allocation.transferOut(account, tokensToSend);
+            _creatorPool.transferOut(account, tokensToSend);
         }
     }
 
@@ -402,7 +397,7 @@ contract SubscriptionTokenV2 is
         internal
     {
         require(account != address(0), "Account cannot be 0x0");
-        uint256 amount = _allocation.transferIn(msg.sender, numTokens);
+        uint256 amount = _creatorPool.transferIn(msg.sender, numTokens);
 
         // We need to make sure the price is right
         // If tier is 0, we need to check the current tier or last tier of sub
@@ -450,7 +445,7 @@ contract SubscriptionTokenV2 is
         if (referrer != address(0)) {
             uint256 payout = _referralAmount(remaining, referralCode);
             if (payout > 0) {
-                _allocation.transferOut(referrer, payout);
+                _creatorPool.transferOut(referrer, payout);
                 emit ReferralPayout(sub.tokenId, referrer, referralCode, payout);
                 remaining -= payout;
             }
@@ -465,7 +460,6 @@ contract SubscriptionTokenV2 is
      * @notice Transfer any available fees to the fee collector
      */
     function transferFees() external {
-        require(_feeBalance > 0, "No fees to collect");
         _transferFees();
     }
 
@@ -483,9 +477,7 @@ contract SubscriptionTokenV2 is
         if (_totalRewardPoints == 0) {
             revert RewardLib.RewardsDisabled();
         }
-        uint256 finalAmount = _allocation.transferIn(msg.sender, numTokens);
-        _rewardPoolBalance += finalAmount;
-        _rewardPoolTotal += finalAmount;
+        uint256 finalAmount = _rewardPool.transferIn(msg.sender, numTokens);
         emit RewardsAllocated(finalAmount);
     }
 
@@ -507,7 +499,7 @@ contract SubscriptionTokenV2 is
      * @return balance the accumulated fees which have not yet been transferred
      */
     function feeBalance() external view returns (uint256 balance) {
-        return _feeBalance;
+        return _feePool.balance();
     }
 
     /**
@@ -518,7 +510,7 @@ contract SubscriptionTokenV2 is
         require(msg.sender == _feeParams.collector, "Unauthorized");
         // Give tokens back to creator and set fee rate to 0
         if (newCollector == address(0)) {
-            _feeBalance = 0;
+            _feePool.liquidateTo(_creatorPool);
             _feeParams.bips = 0;
         }
         _feeParams.collector = newCollector;
@@ -612,7 +604,7 @@ contract SubscriptionTokenV2 is
             return amount;
         }
         uint256 fee = (amount * _feeParams.bips) / _MAX_BIPS;
-        _feeBalance += fee;
+        _creatorPool.transferTo(_feePool, fee);
         emit FeeAllocated(fee);
         return amount - fee;
     }
@@ -623,8 +615,7 @@ contract SubscriptionTokenV2 is
             return amount;
         }
         uint256 rewards = (amount * _rewardParams.bips) / _MAX_BIPS;
-        _rewardPoolBalance += rewards;
-        _rewardPoolTotal += rewards;
+        _creatorPool.transferTo(_rewardPool, rewards);
         emit RewardsAllocated(rewards);
         return amount - rewards;
     }
@@ -632,17 +623,13 @@ contract SubscriptionTokenV2 is
     /// @dev Transfer tokens to the creator, after allocating protocol fees and rewards
     function _transferToCreator(address to, uint256 amount) internal {
         emit Withdraw(to, amount);
-        _allocation.transferOut(to, amount);
+        _creatorPool.transferOut(to, amount);
     }
 
     /// @dev Transfer fees to the fee collector
     function _transferFees() internal {
-        if (_feeBalance == 0) {
-            return;
-        }
-        uint256 balance = _feeBalance;
-        _feeBalance = 0;
-        _allocation.transferOut(_feeParams.collector, balance);
+        uint256 balance = _feePool.balance();
+        _feePool.transferOut(_feeParams.collector, balance);
         emit FeeTransfer(msg.sender, _feeParams.collector, balance);
     }
 
@@ -654,7 +641,9 @@ contract SubscriptionTokenV2 is
         }
 
         // Transfer protocol fees
-        _transferFees();
+        if (_feePool.balance() > 0) {
+            _transferFees();
+        }
     }
 
     /// @dev Compute the reward amount for a given token amount and referral code
@@ -668,7 +657,7 @@ contract SubscriptionTokenV2 is
 
     /// @dev The reward balance for a given subscription
     function _rewardBalance(Subscription memory sub) internal view returns (uint256) {
-        uint256 userShare = (_rewardPoolTotal - _rewardPoolSlashed) * sub.rewardPoints / _totalRewardPoints;
+        uint256 userShare = (_rewardPool.total() - _rewardPoolSlashed) * sub.rewardPoints / _totalRewardPoints;
         if (userShare <= sub.rewardsWithdrawn) {
             return 0;
         }
@@ -705,7 +694,7 @@ contract SubscriptionTokenV2 is
      * @return balance the number of tokens available for withdraw
      */
     function creatorBalance() public view returns (uint256 balance) {
-        return _allocation.balance() - _feeBalance - _rewardPoolBalance;
+        return _creatorPool.balance();
     }
 
     /**
@@ -713,7 +702,7 @@ contract SubscriptionTokenV2 is
      * @return total the total number of tokens deposited
      */
     function totalCreatorEarnings() public view returns (uint256 total) {
-        return _allocation.total();
+        return _creatorPool.total();
     }
 
     /**
@@ -749,7 +738,7 @@ contract SubscriptionTokenV2 is
      * @return numPoints total number of reward points
      */
     function totalRewardPoints() external view returns (uint256 numPoints) {
-        return _totalRewardPoints;
+        return _totalRewardPoints; //_rewardPool.total();
     }
 
     /**
@@ -757,7 +746,7 @@ contract SubscriptionTokenV2 is
      * @return numTokens number of tokens in the reward pool
      */
     function rewardPoolBalance() external view returns (uint256 numTokens) {
-        return _rewardPoolBalance;
+        return _rewardPool.balance();
     }
 
     /**
@@ -775,7 +764,7 @@ contract SubscriptionTokenV2 is
      * @return erc20 address or 0x0 for native
      */
     function erc20Address() public view returns (address erc20) {
-        return _allocation.tokenAddress;
+        return _creatorPool.tokenAddress;
     }
 
     /**
@@ -934,14 +923,6 @@ contract SubscriptionTokenV2 is
     //////////////////////
 
     /**
-     * @notice Reconcile the ERC20 balance of the contract with the internal state
-     * @dev The prevents lost funds if ERC20 tokens are transferred to the contract directly
-     */
-    function reconcileERC20Balance() external onlyAdmin {
-        _allocation.reconcileBalance();
-    }
-
-    /**
      * @notice Recover ERC20 tokens which were accidentally sent to the contract
      * @param tokenAddress the address of the token to recover
      * @param recipientAddress the address to send the tokens to
@@ -957,7 +938,7 @@ contract SubscriptionTokenV2 is
      * @param recipient the address to send the tokens to
      */
     function recoverNativeTokens(address recipient) external onlyAdmin {
-        require(_allocation.isERC20(), "Not supported, use reconcileNativeBalance");
+        require(_creatorPool.isERC20(), "Not supported, use reconcileNativeBalance");
         uint256 balance = address(this).balance;
         require(balance > 0, "No balance to recover");
         (bool sent,) = payable(recipient).call{value: balance}("");
@@ -965,9 +946,9 @@ contract SubscriptionTokenV2 is
     }
 
     /**
-     * @notice Reconcile native tokens which bypassed receive/mint. Only callable for native denominated contracts.
+     * @notice Reconcile the token balance for native token contracts. This is used to reconcile the balance
      */
-    function reconcileNativeBalance() external onlyAdmin {
-        _allocation.reconcileBalance();
+    function reconcileBalance() external onlyAdmin {
+        _creatorPool.reconcileBalance(_creatorPool.balance() + _feePool.balance() + _rewardPool.balance());
     }
 }

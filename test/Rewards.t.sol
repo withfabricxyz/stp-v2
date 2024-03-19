@@ -46,7 +46,7 @@ contract RewardsTest is BaseTest {
         assertEq(stp.rewardMultiplier(), 0);
     }
 
-    function testRewardPointAllocation() public prank(alice) {
+    function testRewardPointPool() public prank(alice) {
         vm.expectEmit(true, true, false, true, address(stp));
         emit RewardsAllocated(1e18 * 500 / 10_000);
         stp.mint{value: 1e18}(1e18);
@@ -223,7 +223,7 @@ contract RewardsTest is BaseTest {
         vm.stopPrank();
     }
 
-    function testNoPointAllocation() public {
+    function testNoPointPool() public {
         vm.warp(365 days);
         // first mint is after reward points go to 0
         mint(alice, 1e18);

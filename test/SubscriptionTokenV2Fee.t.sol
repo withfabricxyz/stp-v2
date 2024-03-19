@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/Index.sol";
+import {PoolLib} from "src/libraries/PoolLib.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
@@ -19,7 +20,7 @@ contract SubscriptionTokenV2FeeTest is BaseTest {
         reinitStp();
     }
 
-    function testAllocation() public {
+    function testPool() public {
         (address recipient, uint16 bps) = stp.feeSchedule();
 
         assertEq(bps, 500);
@@ -53,7 +54,7 @@ contract SubscriptionTokenV2FeeTest is BaseTest {
         assertEq(fees.balance, balance + expectedFee);
         assertEq(stp.feeBalance(), 0);
 
-        vm.expectRevert("No fees to collect");
+        vm.expectRevert(abi.encodeWithSelector(PoolLib.InvalidZeroTransfer.selector));
         stp.transferFees();
     }
 

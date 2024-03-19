@@ -9,7 +9,7 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import {AllocationLib} from "src/libraries/AllocationLib.sol";
+import {PoolLib} from "src/libraries/PoolLib.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
 
 contract SubscriptionTokenV2Test is BaseTest {
@@ -45,7 +45,7 @@ contract SubscriptionTokenV2Test is BaseTest {
     }
 
     function testMintInvalid() public prank(alice) {
-        vm.expectRevert(abi.encodeWithSelector(AllocationLib.PurchaseAmountMustMatchValueSent.selector, 1e18, 1e17));
+        vm.expectRevert(abi.encodeWithSelector(PoolLib.PurchaseAmountMustMatchValueSent.selector, 1e18, 1e17));
         stp.mint{value: 1e17}(1e18);
     }
 
@@ -144,7 +144,7 @@ contract SubscriptionTokenV2Test is BaseTest {
         vm.expectRevert("Account cannot be 0x0");
         stp.withdrawTo(address(0));
 
-        vm.expectRevert(abi.encodeWithSelector(AllocationLib.FailedToTransferEther.selector, invalid, 1e18));
+        vm.expectRevert(abi.encodeWithSelector(PoolLib.FailedToTransferEther.selector, invalid, 1e18));
         stp.withdrawTo(invalid);
         stp.withdrawTo(alice);
         vm.stopPrank();
@@ -165,10 +165,10 @@ contract SubscriptionTokenV2Test is BaseTest {
     }
 
     function testMintInvalidERC20() public erc20 prank(alice) {
-        vm.expectRevert(abi.encodeWithSelector(AllocationLib.NativeTokensNotAcceptedForERC20Subscriptions.selector));
+        vm.expectRevert(abi.encodeWithSelector(PoolLib.NativeTokensNotAcceptedForERC20Subscriptions.selector));
         stp.mint{value: 1e17}(1e18);
         vm.expectRevert(
-            abi.encodeWithSelector(AllocationLib.InsufficientBalanceOrAllowance.selector, token().balanceOf(alice), 0)
+            abi.encodeWithSelector(PoolLib.InsufficientBalanceOrAllowance.selector, token().balanceOf(alice), 0)
         );
         stp.mint(1e18);
     }
@@ -294,10 +294,10 @@ contract SubscriptionTokenV2Test is BaseTest {
 
     function testReconcile() public erc20 prank(creator) {
         // No-op
-        stp.reconcileERC20Balance();
+        stp.reconcileBalance();
 
         token().transfer(address(stp), 1e17);
-        stp.reconcileERC20Balance();
+        stp.reconcileBalance();
         assertEq(stp.creatorBalance(), 1e17);
     }
 
@@ -318,18 +318,15 @@ contract SubscriptionTokenV2Test is BaseTest {
         SelfDestruct attack = new SelfDestruct();
 
         // no op
-        stp.reconcileNativeBalance();
+        stp.reconcileBalance();
 
         deal(address(attack), 1e18);
         attack.destroy(address(stp));
 
         assertEq(address(stp).balance, 1e18);
         assertEq(stp.creatorBalance(), 0);
-        stp.reconcileNativeBalance();
+        stp.reconcileBalance();
         assertEq(stp.creatorBalance(), 1e18);
-
-        vm.expectRevert("Not supported, use reconcileNativeBalance");
-        stp.recoverNativeTokens(bob);
     }
 
     function testRecoverNative() public erc20 prank(creator) {

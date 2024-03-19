@@ -127,7 +127,7 @@ struct Subscription {
 }
 // uint16 lastTierId; // track the last tier id for the subscription (for renewal from inactive)
 
-struct Allocation {
+struct Pool {
     uint256 tokensIn;
     uint256 tokensOut;
     address tokenAddress;

@@ -6,7 +6,7 @@ import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/Index.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {AllocationLib} from "src/libraries/AllocationLib.sol";
+import {PoolLib} from "src/libraries/PoolLib.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
 import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
 
@@ -63,7 +63,7 @@ contract RefundsTests is BaseTest {
         mint(alice, 1e18);
         withdraw();
         vm.startPrank(creator);
-        vm.expectRevert(abi.encodeWithSelector(AllocationLib.InsufficientBalance.selector, 1e18, 0));
+        vm.expectRevert(abi.encodeWithSelector(PoolLib.InsufficientBalance.selector, 1e18, 0));
         stp.refund(alice, 0);
     }
 
