@@ -5,6 +5,19 @@ import {Tier} from "src/types/Index.sol";
 
 interface ISubscriptionTokenV2 {
     //////////////////
+    // ERRORS
+    //////////////////
+
+    // TODO: Doc
+    error InvalidOwner();
+    error InvalidName();
+    error InvalidSymbol();
+    error InvalidContractUri();
+    error InvalidTokenUri();
+    error InvalidFeeBps();
+    error InvalidAccount();
+
+    //////////////////
     // EVENTS
     //////////////////
 
@@ -40,7 +53,7 @@ interface ISubscriptionTokenV2 {
     event Refund(address indexed account, uint256 indexed tokenId, uint256 tokensTransferred, uint256 timeReclaimed);
 
     /// @dev Emitted when the creator tops up the contract balance on refund
-    event RefundTopUp(uint256 tokensIn);
+    event TopUp(uint256 tokensIn);
 
     /// @dev Emitted when the fees are transferred to the collector
     event FeeTransfer(address indexed from, address indexed to, uint256 tokensTransferred);
@@ -139,11 +152,11 @@ interface ISubscriptionTokenV2 {
     // function mintPrice(address account, uint8 tierId, uint32 numPeriods) external view returns (uint256);
 
     /**
-     * @notice Mark subscriptions as inactive and move them to the inactive tier
-     * @dev This checks each subscription and moves it to the inactive tier (tierId = 0) if it has expired
-     * @param subscribers the list of subscriber addresses to mark as inactive
+     * @notice Mark subscription as inactive
+     * @dev This checks the subscription and moves it to the inactive tier (tierId = 0) if it has expired
+     * @param account the subscriber account to mark as inactive
      */
-    // function markInactive(address[] calldata subscribers) external;
+    function deactivateSubscription(address account) external;
 
     /**
      * @notice Get the balance of an account in a specific tier
@@ -162,4 +175,9 @@ interface ISubscriptionTokenV2 {
      * @param numTokens the amount of ERC20 or native tokens to add to the reward pool
      */
     function distributeRewards(uint256 numTokens) external payable;
+
+    /**
+     * @notice Transfer the reward balance for a specific account to that account
+     */
+    function transferRewardsFor(address account) external;
 }

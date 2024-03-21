@@ -118,9 +118,13 @@ contract SubscriptionTokenV2 is
     }
 
     function initFees(FeeParams memory fees) private {
-        require(fees.bips <= _MAX_FEE_BIPS, "Fee bps too high");
+        if (fees.bips > _MAX_FEE_BIPS) {
+            revert InvalidFeeBps();
+        }
         if (fees.collector != address(0)) {
-            require(fees.bips > 0, "Fees required when fee recipient is present");
+            if (fees.bips == 0) {
+                revert InvalidFeeBps();
+            }
         }
         _feeParams = fees;
     }
@@ -137,26 +141,38 @@ contract SubscriptionTokenV2 is
         public
         initializer
     {
-        _rewardParams = rewards.validate();
-        initFees(fees);
-        initializeTier(tier);
+        if (params.owner == address(0)) {
+            revert InvalidOwner();
+        }
 
-        require(bytes(params.name).length > 0, "Name cannot be empty");
-        require(bytes(params.symbol).length > 0, "Symbol cannot be empty");
-        require(bytes(params.contractUri).length > 0, "Contract URI cannot be empty");
-        require(bytes(params.tokenUri).length > 0, "Token URI cannot be empty");
-        require(params.owner != address(0), "Owner address cannot be 0x0");
+        if (bytes(params.name).length == 0) {
+            revert InvalidName();
+        }
 
-        __ERC721_init(params.name, params.symbol);
-        __AccessControlDefaultAdminRules_init(0, params.owner);
-        __ReentrancyGuard_init();
-        __AccessControl_init();
+        if (bytes(params.symbol).length == 0) {
+            revert InvalidSymbol();
+        }
+
+        if (bytes(params.contractUri).length == 0) {
+            revert InvalidContractUri();
+        }
+
+        if (bytes(params.tokenUri).length == 0) {
+            revert InvalidTokenUri();
+        }
 
         _creatorPool = Pool(0, 0, params.erc20TokenAddr);
         _rewardPool = Pool(0, 0, params.erc20TokenAddr);
         _feePool = Pool(0, 0, params.erc20TokenAddr);
         _contractURI = params.contractUri;
         _tokenURI = params.tokenUri;
+        _rewardParams = rewards.validate();
+        initFees(fees);
+        initializeTier(tier);
+
+        __ERC721_init(params.name, params.symbol);
+        __AccessControlDefaultAdminRules_init(0, params.owner);
+        __ReentrancyGuard_init();
     }
 
     /////////////////////////
@@ -263,13 +279,26 @@ contract SubscriptionTokenV2 is
     }
 
     /**
+     * @notice Top up the creator balance. Useful for refunds.
+     * @param numTokens the amount of tokens to transfer
+     */
+    function topUp(uint256 numTokens) external payable onlyManager {
+        emit TopUp(numTokens);
+        _creatorPool.transferIn(msg.sender, numTokens);
+    }
+
+    /**
      * @notice Update the contract metadata
      * @param contractUri the collection metadata URI
      * @param tokenUri the token metadata URI
      */
     function updateMetadata(string memory contractUri, string memory tokenUri) external onlyAdmin {
-        require(bytes(contractUri).length > 0, "Contract URI cannot be empty");
-        require(bytes(tokenUri).length > 0, "Token URI cannot be empty");
+        if (bytes(contractUri).length == 0) {
+            revert InvalidContractUri();
+        }
+        if (bytes(tokenUri).length == 0) {
+            revert InvalidTokenUri();
+        }
         _contractURI = contractUri;
         _tokenURI = tokenUri;
     }
@@ -312,31 +341,44 @@ contract SubscriptionTokenV2 is
     // Tier Management
     /////////////////////////
 
+    /**
+     * @notice Create a new tier
+     * @param params the tier parameters
+     */
     function createTier(Tier memory params) external onlyAdmin {
         initializeTier(params);
     }
 
+    /**
+     * @notice Update the supply cap for a given tier
+     * @param tierId the id of the tier to update
+     * @param supplyCap the new supply cap
+     */
     function setTierSupplyCap(uint16 tierId, uint32 supplyCap) public onlyAdmin {
         _getTier(tierId).updateSupplyCap(_tierSubCounts[tierId], supplyCap);
-        emit SupplyCapChange(supplyCap); // TODO
     }
 
+    /**
+     * @notice Update the price per period for a given tier
+     * @param tierId the id of the tier to update
+     * @param pricePerPeriod the new price per period
+     */
     function setTierPrice(uint16 tierId, uint256 pricePerPeriod) external onlyAdmin {
         _getTier(tierId).setPricePerPeriod(pricePerPeriod);
     }
 
     /**
-     * @notice Update the maximum number of tokens (subscriptions)
-     * @param supplyCap the new supply cap (must be greater than token count or 0 for unlimited)
+     * @notice Pause a tier, preventing new subscriptions and renewals
+     * @param tierId the id of the tier to pause
      */
-    function setSupplyCap(uint32 supplyCap) external {
-        setTierSupplyCap(1, supplyCap);
-    }
-
     function pauseTier(uint16 tierId) external onlyManager {
         _getTier(tierId).pause();
     }
 
+    /**
+     * @notice Unpause a tier, resuming new subscriptions and renewals
+     * @param tierId the id of the tier to unpause
+     */
     function unpauseTier(uint16 tierId) external onlyManager {
         _getTier(tierId).unpause();
     }
@@ -369,71 +411,69 @@ contract SubscriptionTokenV2 is
         _mintOrRenew(account, numTokens, 0, referralCode, referrer);
     }
 
-    // /**
-    //  * @dev Create a new subscription and NFT for the given account
-    //  */
-    // function _mint(Subscription storage sub, address account, uint256 numTokens, uint16 tierId) internal {
-    //     Tier memory tier = _getTier(tierId == 0 ? 1 : tierId);
-    //     tier.checkSupply(_tierSubCounts[tier.id]);
-    //     tier.checkMintPrice(numTokens);
+    /// @dev Associate the subscription with the tier, adjusting the cap, etc
+    function _joinTier(Subscription storage sub, Tier memory tier, address account, uint256 numTokens)
+        internal
+        returns (uint256)
+    {
+        uint32 subs = _tierSubCounts[tier.id];
 
-    //     // TODO paused?
+        tier.checkJoin(subs, account, numTokens);
+        // tier.checkSupply(subs);
+        // tier.checkMintPrice(numTokens);
+        // tier.checkGate(account);
 
-    //     // This may perform a call to another contract
-    //     tier.checkGate(account);
+        sub.tierId = tier.id;
+        _tierSubCounts[tier.id] = subs + 1;
+        // TODO: emit switch tier!
 
-    //     // Create the NFT token (and ensure receivable)
-    //     _safeMint(account, sub.tokenId);
-    // }
+        return numTokens - tier.initialMintPrice;
+    }
 
-    // function _renew(Subscription storage sub, uint256 numTokens, uint16 tierId) internal {
-    //     // TODO: renew the NFT
-    //     // Validate renewal price
-    //     // Ensure same tier
-    //     // TODO: Paused?
-    // }
+    /**
+     * @dev Create a new subscription and NFT for the given account
+     */
+    function _mint(Subscription storage sub, address account) internal {
+        // TODO: Verify global supply cap
+        _tokenCounter += 1;
+        sub.tokenId = _tokenCounter;
+        _maybeMint(account, sub.tokenId);
+    }
 
     function _mintOrRenew(address account, uint256 numTokens, uint16 tierId, uint256 referralCode, address referrer)
         internal
     {
-        require(account != address(0), "Account cannot be 0x0");
-        uint256 amount = _creatorPool.transferIn(msg.sender, numTokens);
-
-        // We need to make sure the price is right
-        // If tier is 0, we need to check the current tier or last tier of sub
-        // if tier is 0 and new sub, default to 0 tier
-
-        // TODO: Validate tier id
-
-        Tier memory tier;
-        Subscription storage sub = _subscriptions[account];
-        if (sub.tokenId == 0) {
-            // _mint()
-            sub.tierId = tierId == 0 ? 1 : tierId;
-
-            tier = _getTier(sub.tierId);
-            uint32 subs = _tierSubCounts[sub.tierId];
-
-            if (!tier.hasSupply(subs)) {
-                revert TierLib.TierHasNoSupply(tier.id);
-            }
-
-            _tierSubCounts[sub.tierId] = subs + 1;
-            _tokenCounter += 1;
-            sub.tokenId = _tokenCounter;
-
-            _safeMint(account, sub.tokenId);
-        } else {
-            tier = _tiers[sub.tierId];
+        if (account == address(0)) {
+            revert InvalidAccount();
         }
+
+        uint256 tokensIn = _creatorPool.transferIn(msg.sender, numTokens);
+        uint256 tokensForTime = tokensIn;
+
+        Subscription storage sub = _subscriptions[account];
+
+        // If the subscription does not exist, mint the token
+        if (sub.tokenId == 0) {
+            _mint(sub, account);
+        }
+
+        // Join or switch the tiers
+        if (sub.tierId == 0 || (tierId != 0 && sub.tierId != tierId)) {
+            tokensForTime = _joinTier(sub, _getTier(tierId == 0 ? 1 : tierId), account, tokensForTime);
+        }
+
+        // Renew the subscription (add time)
+
+        Tier memory tier = _getTier(sub.tierId);
+        tier.checkRenewal(sub, tokensForTime);
 
         if (block.timestamp > sub.purchaseOffset + sub.secondsPurchased) {
             sub.purchaseOffset = block.timestamp - sub.secondsPurchased;
         }
 
-        uint256 rp = amount * rewardMultiplier() * tier.rewardMultiplier;
-        uint256 tv = timeValue(amount); // Need to get this from the tier
-        sub.totalPurchased += amount;
+        uint256 rp = tokensForTime * rewardMultiplier() * tier.rewardMultiplier;
+        uint256 tv = timeValue(tokensForTime); // Need to get this from the tier
+        sub.totalPurchased += tokensForTime;
         sub.secondsPurchased += tv;
         sub.rewardPoints += rp;
         // _subscriptions[account] = sub; ???
@@ -441,7 +481,7 @@ contract SubscriptionTokenV2 is
         _totalRewardPoints += rp;
 
         // TODO sub.purchase(tier, tokensTransferred);
-        uint256 remaining = amount;
+        uint256 remaining = tokensForTime;
         if (referrer != address(0)) {
             uint256 payout = _referralAmount(remaining, referralCode);
             if (payout > 0) {
@@ -453,7 +493,7 @@ contract SubscriptionTokenV2 is
 
         _allocateFeesAndRewards(remaining);
 
-        emit Purchase(account, sub.tokenId, amount, tv, rp, sub.expiresAt());
+        emit Purchase(account, sub.tokenId, numTokens, tv, rp, sub.expiresAt());
     }
 
     /**
@@ -479,6 +519,22 @@ contract SubscriptionTokenV2 is
         }
         uint256 finalAmount = _rewardPool.transferIn(msg.sender, numTokens);
         emit RewardsAllocated(finalAmount);
+    }
+
+    // @inheritdoc ISubscriptionTokenV2
+    function transferRewardsFor(address account) external override {
+        Subscription storage sub = _subscriptions[account];
+        // require(sub.isActive(), "Subscription not active");
+        uint256 balance = _rewardBalance(sub);
+        // require(rewardAmount > 0, "No rewards to withdraw");
+        sub.rewardsWithdrawn += balance;
+        _rewardPool.transferOut(account, balance);
+        // emit RewardWithdraw(account, balance);
+    }
+
+    // @inheritdoc ISubscriptionTokenV2
+    function deactivateSubscription(address account) external {
+        _getSub(account).deactivate();
     }
 
     /////////////////////////
@@ -949,6 +1005,7 @@ contract SubscriptionTokenV2 is
      * @notice Reconcile the token balance for native token contracts. This is used to reconcile the balance
      */
     function reconcileBalance() external onlyAdmin {
+        // TODO: More tests
         _creatorPool.reconcileBalance(_creatorPool.balance() + _feePool.balance() + _rewardPool.balance());
     }
 }

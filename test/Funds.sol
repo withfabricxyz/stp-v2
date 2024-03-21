@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.20;
+
+import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
+import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {RewardLib} from "src/libraries/RewardLib.sol";
+
+contract FundsTest is BaseTest {
+    function setUp() public {
+        stp = reinitStp();
+        deal(creator, 5 ether);
+        deal(alice, 5 ether);
+        deal(charlie, 5 ether);
+    }
+
+    function testTopUp() public prank(creator) {
+        vm.expectEmit(true, true, false, true, address(stp));
+        emit ISubscriptionTokenV2.TopUp(1 ether);
+        stp.topUp{value: 1 ether}(1 ether);
+    }
+
+    function testDistribute() public prank(creator) {
+        vm.expectEmit(true, true, false, true, address(stp));
+        emit ISubscriptionTokenV2.TopUp(1 ether);
+        stp.topUp{value: 1 ether}(1 ether);
+    }
+
+    function testRewardDistribution() public {
+        mint(alice, 1e8);
+        mint(charlie, 1e8);
+
+        uint256 b1 = stp.rewardBalanceOf(alice);
+
+        vm.startPrank(creator);
+        stp.distributeRewards{value: 1e18}(1e18);
+        vm.stopPrank();
+
+        uint256 b2 = stp.rewardBalanceOf(alice);
+        assertEq(b1 + 0.5 ether, b2);
+    }
+
+    function testDistributeNoRewards() public prank(creator) {
+        vm.expectRevert(abi.encodeWithSelector(RewardLib.RewardsDisabled.selector));
+        stp.distributeRewards{value: 1e18}(1e18);
+    }
+}

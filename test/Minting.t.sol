@@ -34,19 +34,17 @@ contract MintingTest is BaseTest {
         // TODO: Expired At
     }
 
-    function testTieredMint() public {}
+    // Ensure we have the TierLib checks in the hot path
 
-    function testGatedMint() public {}
+    function testTierJoinChecks() public {}
 
-    function testPricedMint() public {}
+    function testNewMintChecks() public {}
 
-    function testFeeMint() public {}
-
-    function testMintTooLong() public {}
-
-    function testCappedMint() public {}
-
-    function testPausedMint() public {}
+    function testRenewalChecks() public prank(creator) {
+        stp.pauseTier(1);
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierRenewalsPaused.selector));
+        stp.mintFor{value: 1e18}(alice, 1e18);
+    }
 
     // Mint Params
 }

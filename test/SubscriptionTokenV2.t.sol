@@ -6,7 +6,6 @@ import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/Index.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {PoolLib} from "src/libraries/PoolLib.sol";
@@ -61,7 +60,7 @@ contract SubscriptionTokenV2Test is BaseTest {
     }
 
     function testMintFor() public prank(alice) {
-        vm.expectRevert("Account cannot be 0x0");
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidAccount.selector));
         stp.mintFor{value: 1e18}(address(0), 1e18);
 
         vm.expectEmit(true, true, false, true, address(stp));
@@ -249,10 +248,10 @@ contract SubscriptionTokenV2Test is BaseTest {
         stp.updateMetadata("x", "z");
         assertEq(stp.tokenURI(1), "z");
 
-        vm.expectRevert("Contract URI cannot be empty");
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidContractUri.selector));
         stp.updateMetadata("", "z");
 
-        vm.expectRevert("Token URI cannot be empty");
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidTokenUri.selector));
         stp.updateMetadata("be", "");
         vm.stopPrank();
 
@@ -346,34 +345,6 @@ contract SubscriptionTokenV2Test is BaseTest {
         stp.recoverNativeTokens(bob);
         assertEq(stp.creatorBalance(), 0);
         assertEq(bob.balance, 1e19 + 1e18);
-    }
-
-    /// Supply Cap
-    function testSupplyCap() public {
-        vm.startPrank(creator);
-        vm.expectEmit(true, true, false, true, address(stp));
-        emit SupplyCapChange(1);
-        stp.setSupplyCap(1);
-        (uint256 count, uint256 supply) = stp.supplyDetail();
-        assertEq(supply, 1);
-        assertEq(count, 0);
-        vm.stopPrank();
-        mint(alice, 1e18);
-
-        vm.startPrank(bob);
-        vm.expectRevert(abi.encodeWithSelector(TierLib.TierHasNoSupply.selector, 1));
-        stp.mint{value: 1e18}(1e18);
-        vm.stopPrank();
-
-        vm.startPrank(creator);
-        stp.setSupplyCap(0);
-        vm.stopPrank();
-
-        mint(bob, 1e18);
-        vm.startPrank(creator);
-        vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidSupplyCap.selector));
-        stp.setSupplyCap(1);
-        vm.stopPrank();
     }
 
     function testEIP165() public {

@@ -51,6 +51,9 @@ struct Tier {
     Gate gate;
 }
 
+// TODO: Start date for tier
+// TODO: End date for tier
+
 struct FeeParams {
     /// @dev the address which receives fees
     address collector;
@@ -109,6 +112,7 @@ struct DeployParams {
 struct Subscription {
     /// @dev The tokenId for the subscription
     uint256 tokenId;
+    /// @dev The number of tokens transferred
     uint256 totalPurchased;
     /// @dev The number of seconds purchased
     uint256 secondsPurchased;
@@ -125,10 +129,13 @@ struct Subscription {
     /// @dev The tier id of the subscription
     uint16 tierId;
 }
-// uint16 lastTierId; // track the last tier id for the subscription (for renewal from inactive)
 
+/// @dev The pool struct which holds the state of a given pool for a token
 struct Pool {
+    /// @dev The number of tokens that have come into the pool
     uint256 tokensIn;
+    /// @dev The number of tokens that have left the pool
     uint256 tokensOut;
+    /// @dev The ERC20 token address (or 0x0 for native)
     address tokenAddress;
 }

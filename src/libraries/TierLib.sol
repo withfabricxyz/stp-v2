@@ -31,6 +31,10 @@ library TierLib {
     /// @dev The tier price is invalid
     error TierInvalidMintPrice(uint256 mintPrice);
 
+    error TierRenewalsPaused();
+
+    error TierInvalidRenewalPrice(uint256 renewalPrice);
+
     /////////////////////
     // EVENTS
     /////////////////////
@@ -94,30 +98,44 @@ library TierLib {
         return tier;
     }
 
-    function checkMintPrice(Tier memory tier, uint256 tokensIn) internal pure {
-        uint256 minPrice = mintPrice(tier, 1, true);
-        if (tokensIn < minPrice) {
-            revert TierInvalidMintPrice(minPrice);
-        }
-    }
+    // function checkMintPrice(Tier memory tier, uint256 numTokens) internal pure {
+    //     uint256 minPrice = mintPrice(tier, 1, true);
+    //     if (numTokens < minPrice) {
+    //         revert TierInvalidMintPrice(minPrice);
+    //     }
+    // }
 
-    function checkSupply(Tier memory tier, uint32 subCount) internal pure {
+    function checkJoin(Tier memory tier, uint32 subCount, address account, uint256 numTokens) internal view {
         if (!hasSupply(tier, subCount)) {
             revert TierHasNoSupply(tier.id);
         }
-    }
 
-    function checkGate(Tier memory tier, address account) internal view {
+        if (numTokens < tier.initialMintPrice) {
+            revert TierInvalidMintPrice(tier.initialMintPrice);
+        }
+
         GateLib.checkAccount(tier.gate, account);
     }
 
-    // function checkRenewal(Tier memory tier, uint256 numTokens, bool firstMint) internal pure {
-    //     uint256 numPeriods = numTokens / tier.pricePerPeriod;
-    //     uint256 remainder = numTokens % tier.pricePerPeriod;
-    //     if (mintPrice(tier, numPeriods, firstMint) == 0) {
-    //         revert TierTransferDisabled();
-    //     }
-    // }
+    function checkRenewal(Tier memory tier, Subscription memory sub, uint256 numTokens) internal pure {
+        if (tier.paused) {
+            revert TierRenewalsPaused();
+        }
+
+        if (numTokens < tier.pricePerPeriod) {
+            revert TierInvalidRenewalPrice(tier.pricePerPeriod);
+        }
+
+        //
+        uint256 numSeconds = tokensToSeconds(tier, numTokens);
+        // check the max precommit periods
+        // uint256 numPeriods = numTokens / tier.pricePerPeriod;
+    }
+
+    function tokensToSeconds(Tier memory tier, uint256 numTokens) internal pure returns (uint256) {
+        // TODO: numPeriods + remainder
+        return numTokens / tokensPerSecond(tier);
+    }
 
     function mintPrice(Tier memory tier, uint256 numPeriods, bool firstMint) internal pure returns (uint256) {
         return tier.pricePerPeriod * numPeriods + (firstMint ? tier.initialMintPrice : 0);

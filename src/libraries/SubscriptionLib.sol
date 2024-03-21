@@ -9,6 +9,8 @@ library SubscriptionLib {
 
     error SubscriptionNotFound(address account);
 
+    error DeactivationFailure();
+
     /// @dev Emitted when the creator refunds a subscribers remaining time
     event Refund(address indexed account, uint256 indexed tokenId, uint256 tokensTransferred, uint256 timeReclaimed);
 
@@ -78,11 +80,15 @@ library SubscriptionLib {
     }
 
     function deactivate(Subscription storage sub) internal {
-        // assert no time remaining
-        // sub.secondsPurchased = 0;
-        // sub.secondsGranted = 0;
+        if (sub.tierId == 0) {
+            return;
+        }
+
+        if (remainingSeconds(sub) > 0) {
+            revert DeactivationFailure();
+        }
+
         sub.tierId = 0;
-        // sub.lastTierId = sub.tierId;
         // emit Deactivatation(account, sub.tokenId);
     }
 
