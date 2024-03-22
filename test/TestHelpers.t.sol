@@ -91,6 +91,8 @@ abstract contract BaseTest is Test {
         transferrable: true,
         initialMintPrice: 0,
         pricePerPeriod: 4,
+        startTimestamp: 0,
+        endTimestamp: 0,
         gate: Gate({gateType: GateType.NONE, contractAddress: address(0), componentId: 0, balanceMin: 0})
     });
 

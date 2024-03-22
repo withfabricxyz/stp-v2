@@ -869,19 +869,20 @@ contract SubscriptionTokenV2 is
         return _getTier(1).periodDurationSeconds;
     }
 
-    /**
-     * @notice Fetch the current supply cap (0 for unlimited)
-     * @return count the current number
-     * @return cap the max number of subscriptions
-     */
-    function supplyDetail() external view returns (uint256 count, uint256 cap) {
-        Tier memory tier = _getTier(1);
+    /// @inheritdoc ISubscriptionTokenV2
+    function tierSupply(uint16 tierId) external view override returns (uint32 currentSupply, uint32 maxSupply) {
+        Tier memory tier = _getTier(tierId);
         return (_tierSubCounts[tier.id], tier.maxSupply);
     }
 
     /// @inheritdoc ISubscriptionTokenV2
     function tierDetails(uint16 tierId) external view override returns (Tier memory tier) {
         return _getTier(tierId);
+    }
+
+    /// @inheritdoc ISubscriptionTokenV2
+    function tierCount() external view override returns (uint16 count) {
+        return _tierCount;
     }
 
     /**
@@ -943,7 +944,8 @@ contract SubscriptionTokenV2 is
      */
     function renounceOwnership() public onlyAdmin {
         _transferAllBalances(msg.sender);
-        // TODO: What?
+        // TODO: Need to understand this....
+        _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
         // _renounceRole(DEFAULT_ADMIN_ROLE, _msgSender());
         // _transferOwnership(address(0));
         // pause all tiers?

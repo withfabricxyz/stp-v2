@@ -34,8 +34,6 @@ contract MintingTest is BaseTest {
         // TODO: Expired At
     }
 
-    // Ensure we have the TierLib checks in the hot path
-
     function testTierJoinChecks() public {}
 
     function testNewMintChecks() public {}

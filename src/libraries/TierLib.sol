@@ -42,6 +42,12 @@ library TierLib {
     /// @dev The max commitment has been exceeded (0 = unlimited)
     error MaxCommitmentExceeded();
 
+    /// @dev The tier has not started yet
+    error TierNotStarted();
+
+    /// @dev The subscription length has exceeded the tier end time
+    error TierEndExceeded();
+
     /////////////////////
     // Checks
     /////////////////////
@@ -68,6 +74,10 @@ library TierLib {
     }
 
     function checkJoin(Tier memory tier, uint32 subCount, address account, uint256 numTokens) internal view {
+        if (block.timestamp < tier.startTimestamp) {
+            revert TierNotStarted();
+        }
+
         checkSupply(tier, subCount);
 
         if (numTokens < tier.initialMintPrice) {
@@ -91,6 +101,10 @@ library TierLib {
 
         if (tier.maxCommitmentSeconds > 0 && totalFutureSeconds > tier.maxCommitmentSeconds) {
             revert MaxCommitmentExceeded();
+        }
+
+        if (tier.endTimestamp > 0 && (block.timestamp + totalFutureSeconds) > tier.endTimestamp) {
+            revert TierEndExceeded();
         }
     }
 

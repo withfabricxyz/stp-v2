@@ -8,6 +8,10 @@ import {Tier, Gate, GateType, Subscription} from "src/types/Index.sol";
 import {TestERC20Token} from "../TestHelpers.t.sol";
 
 contract TierTestShim {
+    function validate(Tier memory tier) external view returns (Tier memory) {
+        return TierLib.validate(tier);
+    }
+
     function mintPrice(Tier memory tier, uint256 numPeriods, bool firstMint) external pure returns (uint256) {
         return TierLib.mintPrice(tier, numPeriods, firstMint);
     }
@@ -39,8 +43,29 @@ contract TierLibTest is Test {
             initialMintPrice: 0.01 ether,
             pricePerPeriod: 0.005 ether,
             maxCommitmentSeconds: 24 * 2592000,
+            startTimestamp: 0,
+            endTimestamp: 0,
             gate: gate
         });
+    }
+
+    function testValidation() public {
+        Tier memory tier = defaults();
+        shim.validate(tier);
+
+        tier.periodDurationSeconds = 0;
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidDuration.selector));
+        shim.validate(tier);
+
+        tier = defaults();
+        tier.gate.gateType = GateType.STPV2;
+        tier.gate.componentId = tier.id;
+        vm.expectRevert(abi.encodeWithSelector(GateLib.GateInvalid.selector));
+        shim.validate(tier);
+
+        tier.gate.contractAddress = address(shim);
+        vm.expectRevert(abi.encodeWithSelector(GateLib.GateInvalid.selector));
+        shim.validate(tier);
     }
 
     function testPrice() public {
@@ -77,6 +102,11 @@ contract TierLibTest is Test {
         tier.gate = Gate({gateType: GateType.ERC20, contractAddress: address(token), componentId: 0, balanceMin: 1});
         vm.expectRevert(abi.encodeWithSelector(GateLib.GateCheckFailure.selector));
         shim.checkJoin(tier, 1, alice, 0.01 ether);
+
+        tier = defaults();
+        tier.startTimestamp = uint48(block.timestamp + 100);
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierNotStarted.selector));
+        shim.checkJoin(tier, 0, alice, 1e18);
     }
 
     function testRenewChecks() public {
@@ -103,5 +133,15 @@ contract TierLibTest is Test {
         tier.paused = true;
         vm.expectRevert(abi.encodeWithSelector(TierLib.TierRenewalsPaused.selector));
         shim.checkRenewal(tier, sub, 0.05 ether);
+
+        tier = defaults();
+        tier.maxCommitmentSeconds = tier.periodDurationSeconds;
+        vm.expectRevert(abi.encodeWithSelector(TierLib.MaxCommitmentExceeded.selector));
+        shim.checkRenewal(tier, sub, tier.pricePerPeriod * 2);
+
+        tier = defaults();
+        tier.endTimestamp = uint48(block.timestamp + 2 * tier.periodDurationSeconds);
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierEndExceeded.selector));
+        shim.checkRenewal(tier, sub, tier.pricePerPeriod * 3);
     }
 }

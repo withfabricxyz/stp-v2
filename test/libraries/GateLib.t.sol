@@ -134,6 +134,8 @@ contract GateLibTest is BaseTest {
                 initialMintPrice: 0.01 ether,
                 pricePerPeriod: 0.005 ether,
                 maxCommitmentSeconds: 24 * 2592000,
+                startTimestamp: 0,
+                endTimestamp: 0,
                 gate: defaults()
             })
         );
