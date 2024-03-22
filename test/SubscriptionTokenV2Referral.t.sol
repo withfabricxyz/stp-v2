@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
+import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/Index.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
@@ -18,27 +19,27 @@ contract SubscriptionTokenV2ReferralTest is BaseTest {
 
     function testCreate() public prank(creator) {
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ReferralCreated(1, 500);
+        emit ISubscriptionTokenV2.ReferralCreated(1, 500);
         stp.createReferralCode(1, 500);
         uint16 bps = stp.referralCodeBps(1);
         assertEq(bps, 500);
 
-        vm.expectRevert("bps must be > 0");
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidBps.selector));
         stp.createReferralCode(2, 0);
     }
 
     function testCreateInvalid() public prank(creator) {
-        vm.expectRevert("bps too high");
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidBps.selector));
         stp.createReferralCode(1, 11000);
         stp.createReferralCode(1, 500);
-        vm.expectRevert("Referral code exists");
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.ReferralExists.selector, 1));
         stp.createReferralCode(1, 500);
     }
 
     function testDelete() public prank(creator) {
         stp.createReferralCode(1, 500);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ReferralDestroyed(1);
+        emit ISubscriptionTokenV2.ReferralDestroyed(1);
         stp.deleteReferralCode(1);
         uint16 bps = stp.referralCodeBps(1);
         assertEq(bps, 0);
@@ -60,11 +61,11 @@ contract SubscriptionTokenV2ReferralTest is BaseTest {
         uint256 balance = charlie.balance;
         vm.startPrank(alice);
 
-        vm.expectRevert("Referrer cannot be 0x0");
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidAccount.selector));
         stp.mintWithReferral{value: 1e17}(1e17, 1, address(0));
 
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ReferralPayout(1, charlie, 1, 5e15);
+        emit ISubscriptionTokenV2.ReferralPayout(1, charlie, 1, 5e15);
         stp.mintWithReferral{value: 1e17}(1e17, 1, charlie);
         vm.stopPrank();
         assertEq(charlie.balance, balance + 5e15);

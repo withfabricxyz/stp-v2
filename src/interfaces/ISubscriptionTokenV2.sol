@@ -14,12 +14,32 @@ interface ISubscriptionTokenV2 {
     error InvalidSymbol();
     error InvalidContractUri();
     error InvalidTokenUri();
-    error InvalidFeeBps();
+    error InvalidBps();
     error InvalidAccount();
+    error InvalidTransfer();
+    error Unauthorized();
+    error ReferralExists(uint256 code);
+    error InvalidRecovery();
+    error TransferFailed();
 
     //////////////////
     // EVENTS
     //////////////////
+
+    /// @dev A new tier has been created
+    event TierCreated(uint16 tierId);
+
+    /// @dev The tier is paused
+    event TierPaused(uint16 tierId);
+
+    /// @dev The tier is unpaused
+    event TierUnpaused(uint16 tierId);
+
+    /// @dev The tier price has changed
+    event TierPriceChange(uint16 tierId, uint256 pricePerPeriod);
+
+    /// @dev the supply cap has changed
+    event TierSupplyCapChange(uint16 tierId, uint32 newCap);
 
     /// @dev Emitted when the owner withdraws available funds
     event Withdraw(address indexed account, uint256 tokensTransferred);
@@ -59,7 +79,7 @@ interface ISubscriptionTokenV2 {
     event FeeTransfer(address indexed from, address indexed to, uint256 tokensTransferred);
 
     /// @dev Emitted when the fee collector is updated
-    event FeeCollectorChange(address indexed from, address indexed to);
+    event FeeCollectorChange(address indexed collector);
 
     /// @dev Emitted when tokens are allocated to the fee pool
     event FeeAllocated(uint256 tokens);
@@ -166,9 +186,24 @@ interface ISubscriptionTokenV2 {
      */
     function tierBalanceOf(uint16 tierId, address account) external view returns (uint256);
 
+    /**
+     * @notice Get the details of a specific tier
+     * @param tierId the tier id filter
+     * @return the tier
+     */
+    function tierDetails(uint16 tierId) external view returns (Tier memory);
+
+    // function tierCount() external view returns (uint16);
+    // function tierSupply(uint16 tierId) external view returns (uint256);
+    // function feeDetails() external view returns (FeeParams memory);
+    // function setDefaultTier(uint16 tierId) external; ???
+
     //////////////////
     // Rewards
     //////////////////
+
+    // function pools() external view returns (Pool memory creator, Pool memory rewards, Pool memory fees);
+    // function rewardDetails() external view returns (RewardParams memory);
 
     /**
      * @notice Distribute rewards to subscribers

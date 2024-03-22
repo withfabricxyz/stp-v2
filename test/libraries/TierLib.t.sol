@@ -16,7 +16,7 @@ contract TierTestShim {
         TierLib.checkJoin(tier, subCount, account, numTokens);
     }
 
-    function checkRenewal(Tier memory tier, Subscription memory sub, uint256 numTokens) external pure {
+    function checkRenewal(Tier memory tier, Subscription memory sub, uint256 numTokens) external view {
         TierLib.checkRenewal(tier, sub, numTokens);
     }
 }
@@ -38,7 +38,7 @@ contract TierLibTest is Test {
             rewardMultiplier: 0,
             initialMintPrice: 0.01 ether,
             pricePerPeriod: 0.005 ether,
-            maxMintablePeriods: 24,
+            maxCommitmentSeconds: 24 * 2592000,
             gate: gate
         });
     }

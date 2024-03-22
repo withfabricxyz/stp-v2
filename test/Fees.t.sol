@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
+import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/Index.sol";
 import {PoolLib} from "src/libraries/PoolLib.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
-contract SubscriptionTokenV2FeeTest is BaseTest {
+contract FeesTest is BaseTest {
     function setUp() public {
         deal(alice, 1e19);
         deal(bob, 1e19);
@@ -31,7 +32,7 @@ contract SubscriptionTokenV2FeeTest is BaseTest {
 
         vm.startPrank(alice);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit FeeAllocated(expectedFee);
+        emit ISubscriptionTokenV2.FeeAllocated(expectedFee);
         stp.mint{value: 1e18}(1e18);
         vm.stopPrank();
 
@@ -49,7 +50,7 @@ contract SubscriptionTokenV2FeeTest is BaseTest {
         uint256 balance = fees.balance;
 
         vm.expectEmit(true, true, false, true, address(stp));
-        emit FeeTransfer(address(this), fees, expectedFee);
+        emit ISubscriptionTokenV2.FeeTransfer(address(this), fees, expectedFee);
         stp.transferFees();
         assertEq(fees.balance, balance + expectedFee);
         assertEq(stp.feeBalance(), 0);
@@ -79,9 +80,9 @@ contract SubscriptionTokenV2FeeTest is BaseTest {
     function testFeeCollectorUpdate() public {
         vm.startPrank(fees);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit FeeCollectorChange(fees, charlie);
+        emit ISubscriptionTokenV2.FeeCollectorChange(charlie);
         stp.updateFeeRecipient(charlie);
-        vm.expectRevert("Unauthorized");
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.Unauthorized.selector));
         stp.updateFeeRecipient(charlie);
         vm.stopPrank();
     }

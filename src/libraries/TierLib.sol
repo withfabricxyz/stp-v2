@@ -3,9 +3,11 @@ pragma solidity ^0.8.20;
 
 import {Tier, Subscription} from "../types/Index.sol";
 import {GateLib} from "./GateLib.sol";
+import {SubscriptionLib} from "./SubscriptionLib.sol";
 
 /// @dev The initialization parameters for a subscription token
 library TierLib {
+    using SubscriptionLib for Subscription;
     /////////////////////
     // ERRORS
     /////////////////////
@@ -31,56 +33,17 @@ library TierLib {
     /// @dev The tier price is invalid
     error TierInvalidMintPrice(uint256 mintPrice);
 
+    /// @dev The tier renewals are paused
     error TierRenewalsPaused();
 
+    /// @dev The tier renewal price is invalid (too low)
     error TierInvalidRenewalPrice(uint256 renewalPrice);
 
-    /////////////////////
-    // EVENTS
-    /////////////////////
-
-    /// @dev The tier is paused
-    event TierPaused(uint16 tierId);
-
-    /// @dev The tier is unpaused
-    event TierUnpaused(uint16 tierId);
-
-    /// @dev The tier price has changed
-    event TierPriceChange(uint16 tierId, uint256 oldPricePerPeriod, uint256 pricePerPeriod);
-
-    /// @dev the supply cap has changed
-    event TierSupplyCapChange(uint16 tierId, uint32 newCap);
+    /// @dev The max commitment has been exceeded (0 = unlimited)
+    error MaxCommitmentExceeded();
 
     /////////////////////
-    // UPDATE FUNCTIONS
-    /////////////////////
-
-    function setPricePerPeriod(Tier storage tier, uint256 price) internal {
-        uint256 oldPrice = tier.pricePerPeriod;
-        tier.pricePerPeriod = price;
-        emit TierPriceChange(tier.id, oldPrice, tier.pricePerPeriod);
-    }
-
-    function updateSupplyCap(Tier storage tier, uint32 subCount, uint32 newCap) internal {
-        if (newCap != 0 && newCap < subCount) {
-            revert TierInvalidSupplyCap();
-        }
-        tier.maxSupply = newCap;
-        emit TierSupplyCapChange(tier.id, newCap);
-    }
-
-    function pause(Tier storage tier) internal {
-        tier.paused = true;
-        emit TierPaused(tier.id);
-    }
-
-    function unpause(Tier storage tier) internal {
-        tier.paused = false;
-        emit TierUnpaused(tier.id);
-    }
-
-    /////////////////////
-    // VIEW FUNCTIONS
+    // Checks
     /////////////////////
 
     function validate(Tier memory tier) internal view returns (Tier memory) {
@@ -98,17 +61,14 @@ library TierLib {
         return tier;
     }
 
-    // function checkMintPrice(Tier memory tier, uint256 numTokens) internal pure {
-    //     uint256 minPrice = mintPrice(tier, 1, true);
-    //     if (numTokens < minPrice) {
-    //         revert TierInvalidMintPrice(minPrice);
-    //     }
-    // }
-
-    function checkJoin(Tier memory tier, uint32 subCount, address account, uint256 numTokens) internal view {
-        if (!hasSupply(tier, subCount)) {
+    function checkSupply(Tier memory tier, uint32 subCount) internal pure {
+        if (tier.maxSupply != 0 && subCount >= tier.maxSupply) {
             revert TierHasNoSupply(tier.id);
         }
+    }
+
+    function checkJoin(Tier memory tier, uint32 subCount, address account, uint256 numTokens) internal view {
+        checkSupply(tier, subCount);
 
         if (numTokens < tier.initialMintPrice) {
             revert TierInvalidMintPrice(tier.initialMintPrice);
@@ -117,7 +77,7 @@ library TierLib {
         GateLib.checkAccount(tier.gate, account);
     }
 
-    function checkRenewal(Tier memory tier, Subscription memory sub, uint256 numTokens) internal pure {
+    function checkRenewal(Tier memory tier, Subscription memory sub, uint256 numTokens) internal view {
         if (tier.paused) {
             revert TierRenewalsPaused();
         }
@@ -126,10 +86,12 @@ library TierLib {
             revert TierInvalidRenewalPrice(tier.pricePerPeriod);
         }
 
-        //
         uint256 numSeconds = tokensToSeconds(tier, numTokens);
-        // check the max precommit periods
-        // uint256 numPeriods = numTokens / tier.pricePerPeriod;
+        uint256 totalFutureSeconds = sub.purchasedTimeRemaining() + numSeconds;
+
+        if (tier.maxCommitmentSeconds > 0 && totalFutureSeconds > tier.maxCommitmentSeconds) {
+            revert MaxCommitmentExceeded();
+        }
     }
 
     function tokensToSeconds(Tier memory tier, uint256 numTokens) internal pure returns (uint256) {
@@ -139,10 +101,6 @@ library TierLib {
 
     function mintPrice(Tier memory tier, uint256 numPeriods, bool firstMint) internal pure returns (uint256) {
         return tier.pricePerPeriod * numPeriods + (firstMint ? tier.initialMintPrice : 0);
-    }
-
-    function hasSupply(Tier memory tier, uint32 subCount) internal pure returns (bool) {
-        return tier.maxSupply == 0 || subCount < tier.maxSupply;
     }
 
     function tokensPerSecond(Tier memory tier) internal pure returns (uint256) {

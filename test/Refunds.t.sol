@@ -30,7 +30,7 @@ contract RefundsTests is BaseTest {
         assertEq(stp.estimatedRefund(alice), 1e18);
         vm.startPrank(creator);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit Refund(alice, tokenId, 1e18, 1e18 / 2);
+        emit ISubscriptionTokenV2.Refund(alice, tokenId, 1e18, 1e18 / 2);
         stp.refund(alice, 0);
         assertEq(address(stp).balance, 0);
         vm.stopPrank();
@@ -42,7 +42,7 @@ contract RefundsTests is BaseTest {
         assertEq(5e17 / 2, stp.refundableBalanceOf(alice));
         vm.startPrank(creator);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit Refund(alice, 1, 5e17, 5e17 / 2);
+        emit ISubscriptionTokenV2.Refund(alice, 1, 5e17, 5e17 / 2);
         stp.refund(alice, 0);
         vm.stopPrank();
     }

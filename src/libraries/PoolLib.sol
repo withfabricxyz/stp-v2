@@ -15,6 +15,7 @@ library PoolLib {
     error InsufficientBalanceOrAllowance(uint256 preBalance, uint256 allowance);
     error FailedToTransferEther(address to, uint256 amount);
     error InvalidZeroTransfer();
+    error InvalidRecipient();
 
     function total(Pool storage pool) internal view returns (uint256) {
         return pool.tokensIn;
@@ -78,6 +79,10 @@ library PoolLib {
 
     /// @dev Transfer tokens out of the contract, either native or ERC20
     function transferOut(Pool storage pool, address to, uint256 amount) internal {
+        if (to == address(0)) {
+            revert InvalidRecipient();
+        }
+
         if (amount == 0) {
             revert InvalidZeroTransfer();
         }

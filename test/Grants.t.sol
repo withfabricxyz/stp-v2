@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
+import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/Index.sol";
 import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
@@ -20,7 +21,7 @@ contract GrantsTest is BaseTest {
     function testGrant() public {
         vm.startPrank(creator);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit Grant(alice, 1, 1e15, block.timestamp + 1e15);
+        emit ISubscriptionTokenV2.Grant(alice, 1, 1e15, block.timestamp + 1e15);
         stp.grantTime(alice, 1e15, 1);
 
         vm.expectRevert(abi.encodeWithSelector(SubscriptionLib.SubscriptionGrantInvalidTime.selector));

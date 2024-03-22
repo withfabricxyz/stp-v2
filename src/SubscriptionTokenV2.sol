@@ -117,24 +117,25 @@ contract SubscriptionTokenV2 is
         mintFor(msg.sender, msg.value);
     }
 
-    function initFees(FeeParams memory fees) private {
+    function _initializeFees(FeeParams memory fees) private {
         if (fees.bips > _MAX_FEE_BIPS) {
-            revert InvalidFeeBps();
+            revert InvalidBps();
         }
         if (fees.collector != address(0)) {
             if (fees.bips == 0) {
-                revert InvalidFeeBps();
+                revert InvalidBps();
             }
         }
         _feeParams = fees;
     }
 
-    function initializeTier(Tier memory params) private {
+    function _initializeTier(Tier memory params) private {
         _tierCount += 1;
         if (params.id != _tierCount) {
             revert TierLib.TierInvalidId();
         }
         _tiers[params.id] = params.validate();
+        emit TierCreated(_tierCount);
     }
 
     function initialize(InitParams memory params, Tier memory tier, RewardParams memory rewards, FeeParams memory fees)
@@ -167,8 +168,8 @@ contract SubscriptionTokenV2 is
         _contractURI = params.contractUri;
         _tokenURI = params.tokenUri;
         _rewardParams = rewards.validate();
-        initFees(fees);
-        initializeTier(tier);
+        _initializeFees(fees);
+        _initializeTier(tier);
 
         __ERC721_init(params.name, params.symbol);
         __AccessControlDefaultAdminRules_init(0, params.owner);
@@ -201,15 +202,7 @@ contract SubscriptionTokenV2 is
      * @notice Withdraw available rewards. This is only possible if the subscription is active.
      */
     function withdrawRewards() external {
-        // TODO!
-        Subscription memory sub = _subscriptions[msg.sender];
-        require(sub.isActive(), "Subscription not active");
-        uint256 rewardAmount = _rewardBalance(sub);
-        require(rewardAmount > 0, "No rewards to withdraw");
-        sub.rewardsWithdrawn += rewardAmount;
-        _subscriptions[msg.sender] = sub;
-        _rewardPool.transferOut(msg.sender, rewardAmount);
-        emit RewardWithdraw(msg.sender, rewardAmount);
+        transferRewardsFor(msg.sender);
     }
 
     /**
@@ -219,7 +212,8 @@ contract SubscriptionTokenV2 is
      */
     function slashRewards(address account) external {
         Subscription memory slasher = _subscriptions[msg.sender];
-        require(slasher.isActive(), "Subscription not active");
+        slasher.checkActive();
+
         Subscription storage sub = _subscriptions[account];
 
         // Deflate the reward points pool and account for prior reward withdrawals
@@ -258,10 +252,7 @@ contract SubscriptionTokenV2 is
      * @param account the account to transfer funds to
      */
     function withdrawTo(address account) public onlyAdmin {
-        require(account != address(0), "Account cannot be 0x0");
-        uint256 balance = creatorBalance();
-        require(balance > 0, "No Balance");
-        _transferToCreator(account, balance);
+        _transferToCreator(account, creatorBalance());
     }
 
     /**
@@ -272,10 +263,9 @@ contract SubscriptionTokenV2 is
      */
     function refund(address account, uint256 numTokens) external onlyAdmin {
         Subscription storage sub = _getSub(account);
-        uint256 tokensToSend = sub.refund(account, numTokens);
-        if (tokensToSend > 0) {
-            _creatorPool.transferOut(account, tokensToSend);
-        }
+        (uint256 refundedTokens, uint256 refundedSeconds) = sub.refund(numTokens);
+        emit Refund(account, sub.tokenId, refundedTokens, refundedSeconds);
+        _creatorPool.transferOut(account, refundedTokens);
     }
 
     /**
@@ -346,7 +336,7 @@ contract SubscriptionTokenV2 is
      * @param params the tier parameters
      */
     function createTier(Tier memory params) external onlyAdmin {
-        initializeTier(params);
+        _initializeTier(params);
     }
 
     /**
@@ -355,7 +345,12 @@ contract SubscriptionTokenV2 is
      * @param supplyCap the new supply cap
      */
     function setTierSupplyCap(uint16 tierId, uint32 supplyCap) public onlyAdmin {
-        _getTier(tierId).updateSupplyCap(_tierSubCounts[tierId], supplyCap);
+        Tier storage tier = _getTier(tierId);
+        if (supplyCap != 0 && supplyCap < _tierSubCounts[tierId]) {
+            revert TierLib.TierInvalidSupplyCap();
+        }
+        tier.maxSupply = supplyCap;
+        emit TierSupplyCapChange(tierId, supplyCap);
     }
 
     /**
@@ -364,7 +359,8 @@ contract SubscriptionTokenV2 is
      * @param pricePerPeriod the new price per period
      */
     function setTierPrice(uint16 tierId, uint256 pricePerPeriod) external onlyAdmin {
-        _getTier(tierId).setPricePerPeriod(pricePerPeriod);
+        _getTier(tierId).pricePerPeriod = pricePerPeriod;
+        emit TierPriceChange(tierId, pricePerPeriod);
     }
 
     /**
@@ -372,7 +368,8 @@ contract SubscriptionTokenV2 is
      * @param tierId the id of the tier to pause
      */
     function pauseTier(uint16 tierId) external onlyManager {
-        _getTier(tierId).pause();
+        _getTier(tierId).paused = true;
+        emit TierPaused(tierId);
     }
 
     /**
@@ -380,7 +377,8 @@ contract SubscriptionTokenV2 is
      * @param tierId the id of the tier to unpause
      */
     function unpauseTier(uint16 tierId) external onlyManager {
-        _getTier(tierId).unpause();
+        _getTier(tierId).paused = false;
+        emit TierUnpaused(tierId);
     }
 
     /////////////////////////
@@ -407,7 +405,9 @@ contract SubscriptionTokenV2 is
         public
         payable
     {
-        require(referrer != address(0), "Referrer cannot be 0x0");
+        if (referrer == address(0)) {
+            revert InvalidAccount();
+        }
         _mintOrRenew(account, numTokens, 0, referralCode, referrer);
     }
 
@@ -419,14 +419,12 @@ contract SubscriptionTokenV2 is
         uint32 subs = _tierSubCounts[tier.id];
 
         tier.checkJoin(subs, account, numTokens);
-        // tier.checkSupply(subs);
-        // tier.checkMintPrice(numTokens);
-        // tier.checkGate(account);
 
         sub.tierId = tier.id;
         _tierSubCounts[tier.id] = subs + 1;
         // TODO: emit switch tier!
 
+        // Return the remaining balance
         return numTokens - tier.initialMintPrice;
     }
 
@@ -508,7 +506,6 @@ contract SubscriptionTokenV2 is
      * @dev This is a way for EOAs to pay gas fees on behalf of the creator (automation, etc)
      */
     function transferAllBalances() external {
-        require(_transferRecipient != address(0), "Transfer recipient not set");
         _transferAllBalances(_transferRecipient);
     }
 
@@ -522,19 +519,20 @@ contract SubscriptionTokenV2 is
     }
 
     // @inheritdoc ISubscriptionTokenV2
-    function transferRewardsFor(address account) external override {
-        Subscription storage sub = _subscriptions[account];
-        // require(sub.isActive(), "Subscription not active");
-        uint256 balance = _rewardBalance(sub);
-        // require(rewardAmount > 0, "No rewards to withdraw");
-        sub.rewardsWithdrawn += balance;
-        _rewardPool.transferOut(account, balance);
-        // emit RewardWithdraw(account, balance);
+    function transferRewardsFor(address account) public override {
+        Subscription storage sub = _getSub(account);
+        sub.checkActive();
+        uint256 amount = _rewardBalance(sub);
+        sub.rewardsWithdrawn += amount;
+        emit RewardWithdraw(account, amount);
+        _rewardPool.transferOut(account, amount);
     }
 
     // @inheritdoc ISubscriptionTokenV2
     function deactivateSubscription(address account) external {
-        _getSub(account).deactivate();
+        Subscription storage sub = _getSub(account);
+        _tierSubCounts[sub.tierId] -= 1;
+        sub.deactivate();
     }
 
     /////////////////////////
@@ -563,14 +561,17 @@ contract SubscriptionTokenV2 is
      * @param newCollector the new fee collector address
      */
     function updateFeeRecipient(address newCollector) external {
-        require(msg.sender == _feeParams.collector, "Unauthorized");
+        if (msg.sender != _feeParams.collector) {
+            revert Unauthorized();
+        }
+
         // Give tokens back to creator and set fee rate to 0
         if (newCollector == address(0)) {
             _feePool.liquidateTo(_creatorPool);
             _feeParams.bips = 0;
         }
         _feeParams.collector = newCollector;
-        emit FeeCollectorChange(msg.sender, newCollector);
+        emit FeeCollectorChange(newCollector);
     }
 
     /////////////////////////
@@ -583,10 +584,14 @@ contract SubscriptionTokenV2 is
      * @param bps the reward basis points
      */
     function createReferralCode(uint256 code, uint16 bps) external onlyAdmin {
-        require(bps <= _MAX_BIPS, "bps too high");
-        require(bps > 0, "bps must be > 0");
-        uint16 existing = _referralCodes[code];
-        require(existing == 0, "Referral code exists");
+        if (bps == 0 || bps > _MAX_BIPS) {
+            revert InvalidBps();
+        }
+
+        if (_referralCodes[code] != 0) {
+            revert ReferralExists(code);
+        }
+
         _referralCodes[code] = bps;
         emit ReferralCreated(code, bps);
     }
@@ -874,6 +879,11 @@ contract SubscriptionTokenV2 is
         return (_tierSubCounts[tier.id], tier.maxSupply);
     }
 
+    /// @inheritdoc ISubscriptionTokenV2
+    function tierDetails(uint16 tierId) external view override returns (Tier memory tier) {
+        return _getTier(tierId);
+    }
+
     /**
      * @notice Fetch the current transfer recipient address
      * @return recipient the address or 0x0 address for none
@@ -946,7 +956,6 @@ contract SubscriptionTokenV2 is
             return from;
         }
 
-        // TODO: test
         Subscription memory sub = _subscriptions[from];
         if (sub.tierId != 0) {
             Tier memory tier = _tiers[sub.tierId];
@@ -955,7 +964,10 @@ contract SubscriptionTokenV2 is
             }
         }
 
-        require(_subscriptions[to].tokenId == 0, "Cannot transfer to existing subscribers");
+        if (_subscriptions[to].tokenId != 0) {
+            revert InvalidTransfer();
+        }
+
         if (to != address(0)) {
             _subscriptions[to] = _subscriptions[from];
         }
@@ -985,7 +997,9 @@ contract SubscriptionTokenV2 is
      * @param tokenAmount the amount of tokens to send
      */
     function recoverERC20(address tokenAddress, address recipientAddress, uint256 tokenAmount) external onlyAdmin {
-        require(tokenAddress != erc20Address(), "Cannot recover subscription token");
+        if (tokenAddress == erc20Address()) {
+            revert InvalidRecovery();
+        }
         IERC20(tokenAddress).safeTransfer(recipientAddress, tokenAmount);
     }
 
@@ -994,11 +1008,19 @@ contract SubscriptionTokenV2 is
      * @param recipient the address to send the tokens to
      */
     function recoverNativeTokens(address recipient) external onlyAdmin {
-        require(_creatorPool.isERC20(), "Not supported, use reconcileNativeBalance");
+        if (erc20Address() == address(0)) {
+            revert InvalidRecovery();
+        }
+
         uint256 balance = address(this).balance;
-        require(balance > 0, "No balance to recover");
+        if (balance == 0) {
+            revert InvalidRecovery();
+        }
+
         (bool sent,) = payable(recipient).call{value: balance}("");
-        require(sent, "Failed to transfer Ether");
+        if (!sent) {
+            revert TransferFailed();
+        }
     }
 
     /**

@@ -37,23 +37,23 @@ contract TierManagementTest is BaseTest {
 
     function testTierPausing() public prank(creator) {
         vm.expectEmit(true, true, false, true, address(stp));
-        emit TierLib.TierPaused(1);
+        emit ISubscriptionTokenV2.TierPaused(1);
         stp.pauseTier(1);
 
         vm.expectEmit(true, true, false, true, address(stp));
-        emit TierLib.TierUnpaused(1);
+        emit ISubscriptionTokenV2.TierUnpaused(1);
         stp.unpauseTier(1);
     }
 
     function testTierPriceUpdate() public prank(creator) {
         vm.expectEmit(true, true, false, true, address(stp));
-        emit TierLib.TierPriceChange(1, 4, 100);
+        emit ISubscriptionTokenV2.TierPriceChange(1, 100);
         stp.setTierPrice(1, 100);
     }
 
     function testTierUpdateSupplyCap() public prank(creator) {
         vm.expectEmit(true, true, false, true, address(stp));
-        emit TierLib.TierSupplyCapChange(1, 5);
+        emit ISubscriptionTokenV2.TierSupplyCapChange(1, 5);
         stp.setTierSupplyCap(1, 5);
     }
 

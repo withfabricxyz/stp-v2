@@ -35,8 +35,8 @@ struct Tier {
     uint32 periodDurationSeconds;
     /// @dev The maximum number of subscribers the tier can have (0 = unlimited)
     uint32 maxSupply;
-    /// @dev The maximum number of future periods a subscriber can subscribe for
-    uint32 maxMintablePeriods;
+    /// @dev The maximum number of future seconds a subscriber can hold (0 = unlimited)
+    uint48 maxCommitmentSeconds;
     /// @dev The secondary reward multiplier for the tier (0 to disable rewards for the tier)
     uint8 rewardMultiplier;
     /// @dev Whether the tier is paused (can subs mint or renew?)

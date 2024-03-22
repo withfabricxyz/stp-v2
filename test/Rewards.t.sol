@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
+import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/Index.sol";
 import {RewardLib} from "src/libraries/RewardLib.sol";
+import {PoolLib} from "src/libraries/PoolLib.sol";
+import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 
 contract RewardsTest is BaseTest {
@@ -48,7 +51,7 @@ contract RewardsTest is BaseTest {
 
     function testRewardPointPool() public prank(alice) {
         vm.expectEmit(true, true, false, true, address(stp));
-        emit RewardsAllocated(1e18 * 500 / 10_000);
+        emit ISubscriptionTokenV2.RewardsAllocated(1e18 * 500 / 10_000);
         stp.mint{value: 1e18}(1e18);
         (,, uint256 points,) = stp.subscriptionOf(alice);
         assertEq(stp.rewardMultiplier(), 64);
@@ -68,7 +71,7 @@ contract RewardsTest is BaseTest {
         withdraw();
         assertEq(0, stp.rewardBalanceOf(alice));
         vm.startPrank(alice);
-        vm.expectRevert("No rewards to withdraw");
+        vm.expectRevert(abi.encodeWithSelector(PoolLib.InvalidZeroTransfer.selector));
         stp.withdrawRewards();
         vm.stopPrank();
     }
@@ -82,11 +85,11 @@ contract RewardsTest is BaseTest {
         preBalance = alice.balance;
         assertEq((1e18 * 500) / 10_000, stp.rewardBalanceOf(alice));
         vm.expectEmit(true, true, false, true, address(stp));
-        emit RewardWithdraw(alice, (1e18 * 500) / 10_000);
+        emit ISubscriptionTokenV2.RewardWithdraw(alice, (1e18 * 500) / 10_000);
         stp.withdrawRewards();
         assertEq(preBalance + (1e18 * 500) / 10_000, alice.balance);
         assertEq(0, stp.rewardBalanceOf(alice));
-        vm.expectRevert("No rewards to withdraw");
+        vm.expectRevert(abi.encodeWithSelector(PoolLib.InvalidZeroTransfer.selector));
         stp.withdrawRewards();
         vm.stopPrank();
 
@@ -141,7 +144,7 @@ contract RewardsTest is BaseTest {
         vm.warp(60 days);
         withdraw();
         vm.startPrank(alice);
-        vm.expectRevert("Subscription not active");
+        vm.expectRevert(abi.encodeWithSelector(SubscriptionLib.SubscriptionNotActive.selector));
         stp.withdrawRewards();
         vm.stopPrank();
     }
@@ -171,7 +174,7 @@ contract RewardsTest is BaseTest {
         vm.warp(2592000 * 3);
         vm.startPrank(bob);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit RewardPointsSlashed(alice, bob, alicePoints);
+        emit ISubscriptionTokenV2.RewardPointsSlashed(alice, bob, alicePoints);
         stp.slashRewards(alice);
         vm.stopPrank();
 
@@ -218,7 +221,7 @@ contract RewardsTest is BaseTest {
         vm.expectRevert(abi.encodeWithSelector(RewardLib.RewardSlashingNotReady.selector, expiresAt));
         stp.slashRewards(alice);
         vm.warp(60 days);
-        vm.expectRevert("Subscription not active");
+        vm.expectRevert(abi.encodeWithSelector(SubscriptionLib.SubscriptionNotActive.selector));
         stp.slashRewards(alice);
         vm.stopPrank();
     }

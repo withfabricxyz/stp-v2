@@ -38,14 +38,14 @@ contract InitializationTest is BaseTest {
     function testFeeBps() public {
         feeParams.bips = 1500;
 
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidFeeBps.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidBps.selector));
         stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 
     function testFeeRequirement() public {
         feeParams.collector = fees;
 
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidFeeBps.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidBps.selector));
         stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 
