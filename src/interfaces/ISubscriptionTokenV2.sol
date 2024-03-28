@@ -21,6 +21,7 @@ interface ISubscriptionTokenV2 {
     error ReferralExists(uint256 code);
     error InvalidRecovery();
     error TransferFailed();
+    error GlobalSupplyLimitExceeded();
 
     //////////////////
     // EVENTS
@@ -96,7 +97,7 @@ interface ISubscriptionTokenV2 {
     event ReferralDestroyed(uint256 id);
 
     /// @dev Emitted when the supply cap is updated
-    event SupplyCapChange(uint256 supplyCap);
+    event GlobalSupplyCapChange(uint256 supplyCap);
 
     /// @dev Emitted when the transfer recipient is updated
     event TransferRecipientChange(address indexed recipient);

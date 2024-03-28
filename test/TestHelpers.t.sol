@@ -115,7 +115,8 @@ abstract contract BaseTest is Test {
         contractUri: "curi",
         tokenUri: "turi",
         owner: creator,
-        erc20TokenAddr: address(0)
+        erc20TokenAddr: address(0),
+        globalSupplyCap: 0
     });
 
     SubscriptionTokenV2 internal stp;

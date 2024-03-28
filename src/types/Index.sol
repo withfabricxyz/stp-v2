@@ -99,6 +99,8 @@ struct InitParams {
     address owner;
     /// @dev the address of the ERC20 token used for purchases, or the 0x0 for native
     address erc20TokenAddr;
+    /// @dev The initial global supply cap
+    uint64 globalSupplyCap;
 }
 
 struct DeployParams {

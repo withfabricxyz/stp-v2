@@ -34,6 +34,23 @@ contract MintingTest is BaseTest {
         // TODO: Expired At
     }
 
+    function testGlobalSupplyCap() public {
+        mint(alice, 1e18);
+        mint(bob, 1e18);
+        vm.startPrank(creator);
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.GlobalSupplyLimitExceeded.selector));
+        stp.setGlobalSupplyCap(1);
+
+        vm.expectEmit(true, true, false, true, address(stp));
+        emit ISubscriptionTokenV2.GlobalSupplyCapChange(2);
+        stp.setGlobalSupplyCap(2);
+        vm.stopPrank();
+
+        vm.startPrank(charlie);
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.GlobalSupplyLimitExceeded.selector));
+        stp.mint{value: 1e18}(1e18);
+    }
+
     function testTierJoinChecks() public {}
 
     function testNewMintChecks() public {}

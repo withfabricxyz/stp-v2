@@ -48,6 +48,9 @@ library TierLib {
     /// @dev The subscription length has exceeded the tier end time
     error TierEndExceeded();
 
+    /// @dev The tier timing is invalid
+    error TierTimingInvalid();
+
     /////////////////////
     // Checks
     /////////////////////
@@ -55,6 +58,13 @@ library TierLib {
     function validate(Tier memory tier) internal view returns (Tier memory) {
         if (tier.periodDurationSeconds == 0) {
             revert TierInvalidDuration();
+        }
+
+        // We don't really care about the start timestamp, but it must be less than the end timestamp
+        if (tier.endTimestamp != 0) {
+            if (tier.endTimestamp <= block.timestamp || tier.endTimestamp <= tier.startTimestamp) {
+                revert TierTimingInvalid();
+            }
         }
 
         tier.gate = GateLib.validate(tier.gate);

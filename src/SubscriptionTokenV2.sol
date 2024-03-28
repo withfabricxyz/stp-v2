@@ -64,6 +64,9 @@ contract SubscriptionTokenV2 is
     /// @dev The token counter for mint id generation and enforcing supply caps
     uint256 private _tokenCounter;
 
+    /// @dev The top level supply cap for all tiers (this include inactive subscriptions)
+    uint64 private _globalSupplyCap;
+
     FeeParams private _feeParams;
 
     /// @dev The reward pool size (used to calculate reward withdraws accurately)
@@ -94,7 +97,7 @@ contract SubscriptionTokenV2 is
 
     ////////////////////////////////////
 
-    modifier onlyManager() {
+    modifier onlyManagement() {
         address account = _msgSender();
         if (!hasRole(DEFAULT_ADMIN_ROLE, account) && !hasRole(MANAGER_ROLE, account)) {
             revert AccessControlUnauthorizedAccount(account, MANAGER_ROLE);
@@ -167,6 +170,7 @@ contract SubscriptionTokenV2 is
         _feePool = Pool(0, 0, params.erc20TokenAddr);
         _contractURI = params.contractUri;
         _tokenURI = params.tokenUri;
+        _globalSupplyCap = params.globalSupplyCap;
         _rewardParams = rewards.validate();
         _initializeFees(fees);
         _initializeTier(tier);
@@ -272,7 +276,7 @@ contract SubscriptionTokenV2 is
      * @notice Top up the creator balance. Useful for refunds.
      * @param numTokens the amount of tokens to transfer
      */
-    function topUp(uint256 numTokens) external payable onlyManager {
+    function topUp(uint256 numTokens) external payable onlyManagement {
         emit TopUp(numTokens);
         _creatorPool.transferIn(msg.sender, numTokens);
     }
@@ -282,7 +286,7 @@ contract SubscriptionTokenV2 is
      * @param contractUri the collection metadata URI
      * @param tokenUri the token metadata URI
      */
-    function updateMetadata(string memory contractUri, string memory tokenUri) external onlyAdmin {
+    function updateMetadata(string memory contractUri, string memory tokenUri) external onlyManagement {
         if (bytes(contractUri).length == 0) {
             revert InvalidContractUri();
         }
@@ -299,7 +303,7 @@ contract SubscriptionTokenV2 is
      * @param numSeconds the number of seconds to grant
      * @param tierId the tier id to grant time to (0 to match current tier, or default for new)
      */
-    function grantTime(address account, uint256 numSeconds, uint16 tierId) external onlyManager {
+    function grantTime(address account, uint256 numSeconds, uint16 tierId) external onlyManagement {
         Subscription storage sub = _fetchSubscription(account, tierId);
         sub.grantTime(numSeconds);
         // Mint the NFT if it does not exist before grant event for indexers
@@ -312,7 +316,7 @@ contract SubscriptionTokenV2 is
      * @notice Revoke time from a given account
      * @param account the account to revoke time from
      */
-    function revokeTime(address account) external onlyManager {
+    function revokeTime(address account) external onlyManagement {
         Subscription storage sub = _getSub(account);
         uint256 time = sub.revokeTime();
         emit GrantRevoke(account, sub.tokenId, time, sub.expiresAt());
@@ -325,6 +329,18 @@ contract SubscriptionTokenV2 is
     function setTransferRecipient(address recipient) external onlyAdmin {
         _transferRecipient = recipient;
         emit TransferRecipientChange(recipient);
+    }
+
+    /**
+     * @notice Set the global supply cap for all tiers
+     * @param supplyCap the new supply cap
+     */
+    function setGlobalSupplyCap(uint64 supplyCap) external onlyManagement {
+        if (_tokenCounter > supplyCap) {
+            revert GlobalSupplyLimitExceeded();
+        }
+        _globalSupplyCap = supplyCap;
+        emit GlobalSupplyCapChange(supplyCap);
     }
 
     /////////////////////////
@@ -367,7 +383,7 @@ contract SubscriptionTokenV2 is
      * @notice Pause a tier, preventing new subscriptions and renewals
      * @param tierId the id of the tier to pause
      */
-    function pauseTier(uint16 tierId) external onlyManager {
+    function pauseTier(uint16 tierId) external onlyManagement {
         _getTier(tierId).paused = true;
         emit TierPaused(tierId);
     }
@@ -376,7 +392,7 @@ contract SubscriptionTokenV2 is
      * @notice Unpause a tier, resuming new subscriptions and renewals
      * @param tierId the id of the tier to unpause
      */
-    function unpauseTier(uint16 tierId) external onlyManager {
+    function unpauseTier(uint16 tierId) external onlyManagement {
         _getTier(tierId).paused = false;
         emit TierUnpaused(tierId);
     }
@@ -416,6 +432,7 @@ contract SubscriptionTokenV2 is
         internal
         returns (uint256)
     {
+        // TODO: What do we do for existing time?
         uint32 subs = _tierSubCounts[tier.id];
 
         tier.checkJoin(subs, account, numTokens);
@@ -432,7 +449,10 @@ contract SubscriptionTokenV2 is
      * @dev Create a new subscription and NFT for the given account
      */
     function _mint(Subscription storage sub, address account) internal {
-        // TODO: Verify global supply cap
+        if (_globalSupplyCap != 0 && _tokenCounter >= _globalSupplyCap) {
+            revert GlobalSupplyLimitExceeded();
+        }
+
         _tokenCounter += 1;
         sub.tokenId = _tokenCounter;
         _maybeMint(account, sub.tokenId);
@@ -455,7 +475,7 @@ contract SubscriptionTokenV2 is
             _mint(sub, account);
         }
 
-        // Join or switch the tiers
+        // Switch tiers if necessary (checking join logic and pricing)
         if (sub.tierId == 0 || (tierId != 0 && sub.tierId != tierId)) {
             tokensForTime = _joinTier(sub, _getTier(tierId == 0 ? 1 : tierId), account, tokensForTime);
         }
@@ -465,12 +485,14 @@ contract SubscriptionTokenV2 is
         Tier memory tier = _getTier(sub.tierId);
         tier.checkRenewal(sub, tokensForTime);
 
+        // (uint256 ) sub.update(tier, tokensIn, tokensForTime, rewardMultiplier())
+
         if (block.timestamp > sub.purchaseOffset + sub.secondsPurchased) {
             sub.purchaseOffset = block.timestamp - sub.secondsPurchased;
         }
 
-        uint256 rp = tokensForTime * rewardMultiplier() * tier.rewardMultiplier;
-        uint256 tv = timeValue(tokensForTime); // Need to get this from the tier
+        uint256 rp = tokensIn * rewardMultiplier() * tier.rewardMultiplier;
+        uint256 tv = tier.tokensToSeconds(tokensForTime);
         sub.totalPurchased += tokensForTime;
         sub.secondsPurchased += tv;
         sub.rewardPoints += rp;
@@ -479,7 +501,7 @@ contract SubscriptionTokenV2 is
         _totalRewardPoints += rp;
 
         // TODO sub.purchase(tier, tokensTransferred);
-        uint256 remaining = tokensForTime;
+        uint256 remaining = tokensIn;
         if (referrer != address(0)) {
             uint256 payout = _referralAmount(remaining, referralCode);
             if (payout > 0) {
@@ -533,6 +555,7 @@ contract SubscriptionTokenV2 is
         Subscription storage sub = _getSub(account);
         _tierSubCounts[sub.tierId] -= 1;
         sub.deactivate();
+        // emit Deactivatation(account, sub.tokenId);
     }
 
     /////////////////////////
@@ -742,15 +765,6 @@ contract SubscriptionTokenV2 is
     }
 
     /**
-     * @notice The amount of time exchanged for the given number of tokens
-     * @param numTokens the number of tokens to exchange for time
-     * @return numSeconds the number of seconds purchased
-     */
-    function timeValue(uint256 numTokens) public view returns (uint256 numSeconds) {
-        return numTokens / tps();
-    }
-
-    /**
      * @notice The creators withdrawable balance
      * @return balance the number of tokens available for withdraw
      */
@@ -851,14 +865,6 @@ contract SubscriptionTokenV2 is
      */
     function baseTokenURI() public view returns (string memory uri) {
         return _tokenURI;
-    }
-
-    /**
-     * @notice The number of tokens required for a single second of time
-     * @return numTokens per second
-     */
-    function tps() public view returns (uint256 numTokens) {
-        return _getTier(1).tokensPerSecond();
     }
 
     /**

@@ -11,6 +11,8 @@ import {TierLib} from "src/libraries/TierLib.sol";
 contract TierManagementTest is BaseTest {
     function setUp() public {
         reinitStp();
+        deal(alice, 1e19);
+        deal(bob, 1e19);
     }
 
     function testValidTier() public prank(creator) {
@@ -55,6 +57,15 @@ contract TierManagementTest is BaseTest {
         vm.expectEmit(true, true, false, true, address(stp));
         emit ISubscriptionTokenV2.TierSupplyCapChange(1, 5);
         stp.setTierSupplyCap(1, 5);
+    }
+
+    function testInvalidTierCap() public {
+        mint(alice, 1e18);
+        mint(bob, 1e18);
+        vm.startPrank(creator);
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidSupplyCap.selector));
+        stp.setTierSupplyCap(1, 1);
+        vm.stopPrank();
     }
 
     function testAccessControl() public {

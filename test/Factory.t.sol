@@ -50,7 +50,6 @@ contract FactoryTest is BaseTest {
         assertEq(nft.name(), "Meow Sub");
         assertEq(nft.symbol(), "MEOW");
         assertEq(nft.contractURI(), "curi");
-        assertEq(nft.timeValue(2), 1);
         assertEq(nft.erc20Address(), address(0));
         assertEq(nft.bips(), 0);
     }

@@ -66,6 +66,19 @@ contract TierLibTest is Test {
         tier.gate.contractAddress = address(shim);
         vm.expectRevert(abi.encodeWithSelector(GateLib.GateInvalid.selector));
         shim.validate(tier);
+
+        tier = defaults();
+        tier.endTimestamp = uint48(block.timestamp + 1);
+        shim.validate(tier);
+
+        vm.warp(block.timestamp + 2);
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierTimingInvalid.selector));
+        shim.validate(tier);
+
+        tier.startTimestamp = uint48(block.timestamp + 5);
+        vm.warp(block.timestamp + 100);
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierTimingInvalid.selector));
+        shim.validate(tier);
     }
 
     function testPrice() public {

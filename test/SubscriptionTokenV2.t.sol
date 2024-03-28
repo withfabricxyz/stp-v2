@@ -255,7 +255,11 @@ contract SubscriptionTokenV2Test is BaseTest {
         stp.updateMetadata("be", "");
         vm.stopPrank();
 
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, this, 0x00));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, this, keccak256("MANAGER_ROLE")
+            )
+        );
         stp.updateMetadata("x", "z");
     }
 
