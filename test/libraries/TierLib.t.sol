@@ -8,8 +8,8 @@ import {Tier, Gate, GateType, Subscription} from "src/types/Index.sol";
 import {TestERC20Token} from "../TestHelpers.t.sol";
 
 contract TierTestShim {
-    function validate(Tier memory tier) external view returns (Tier memory) {
-        return TierLib.validate(tier);
+    function validate(Tier memory tier) external view {
+        TierLib.validate(tier);
     }
 
     function mintPrice(Tier memory tier, uint256 numPeriods, bool firstMint) external pure returns (uint256) {

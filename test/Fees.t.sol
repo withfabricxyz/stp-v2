@@ -6,7 +6,7 @@ import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/Index.sol";
 import {PoolLib} from "src/libraries/PoolLib.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {AccessControlled} from "src/abstracts/AccessControlled.sol";
 
 contract FeesTest is BaseTest {
     function setUp() public {
@@ -67,7 +67,7 @@ contract FeesTest is BaseTest {
         uint256 feeBalance = fees.balance;
         uint256 expectedFee = (2e18 * 500) / 10000;
 
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, this, 0x00));
+        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
         stp.withdrawAndTransferFees();
 
         vm.startPrank(creator);

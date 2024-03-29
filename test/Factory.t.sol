@@ -51,7 +51,7 @@ contract FactoryTest is BaseTest {
         assertEq(nft.symbol(), "MEOW");
         assertEq(nft.contractURI(), "curi");
         assertEq(nft.erc20Address(), address(0));
-        assertEq(nft.bips(), 0);
+        // assertEq(nft.bips(), 0);
     }
 
     function testDeployZeroAddr() public {
@@ -63,7 +63,7 @@ contract FactoryTest is BaseTest {
         address deployment = factory.deploySubscription(params);
 
         SubscriptionTokenV2 nft = SubscriptionTokenV2(payable(deployment));
-        assertTrue(nft.hasRole(0x00, alice));
+        assertEq(nft.owner(), alice);
     }
 
     function testDeploymentWithReferral() public {

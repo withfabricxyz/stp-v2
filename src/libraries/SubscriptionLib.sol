@@ -13,9 +13,6 @@ library SubscriptionLib {
 
     error DeactivationFailure();
 
-    /// @dev Transfer tokens into the contract, either native or ERC20
-    function initialize(Subscription storage sub, address from) internal returns (uint256) {}
-
     function expiresAt(Subscription memory sub) internal pure returns (uint256) {
         uint256 purchase = sub.purchaseOffset + sub.secondsPurchased;
         uint256 grant = sub.grantOffset + sub.secondsGranted;

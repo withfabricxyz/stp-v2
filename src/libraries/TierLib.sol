@@ -55,7 +55,7 @@ library TierLib {
     // Checks
     /////////////////////
 
-    function validate(Tier memory tier) internal view returns (Tier memory) {
+    function validate(Tier memory tier) internal view{
         if (tier.periodDurationSeconds == 0) {
             revert TierInvalidDuration();
         }
@@ -67,14 +67,12 @@ library TierLib {
             }
         }
 
-        tier.gate = GateLib.validate(tier.gate);
+        GateLib.validate(tier.gate);
 
         // Gates can refer to other tiers, but not self
         if (tier.gate.contractAddress == address(this) && tier.gate.componentId == tier.id) {
             revert GateLib.GateInvalid();
         }
-
-        return tier;
     }
 
     function checkSupply(Tier memory tier, uint32 subCount) internal pure {

@@ -113,7 +113,6 @@ abstract contract BaseTest is Test {
         name: "Meow Sub",
         symbol: "MEOW",
         contractUri: "curi",
-        tokenUri: "turi",
         owner: creator,
         erc20TokenAddr: address(0),
         globalSupplyCap: 0

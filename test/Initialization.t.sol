@@ -23,7 +23,6 @@ contract InitializationTest is BaseTest {
 
     function testDefaults() public {
         stp = reinitStp();
-        assertEq(initParams.tokenUri, stp.baseTokenURI());
         assertEq(initParams.contractUri, stp.contractURI());
         assertEq(initParams.erc20TokenAddr, stp.erc20Address());
     }
@@ -80,13 +79,6 @@ contract InitializationTest is BaseTest {
         initParams.contractUri = "";
 
         vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidContractUri.selector));
-        stp.initialize(initParams, tierParams, rewardParams, feeParams);
-    }
-
-    function testEmptyTokenURI() public {
-        initParams.tokenUri = "";
-
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidTokenUri.selector));
         stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 }

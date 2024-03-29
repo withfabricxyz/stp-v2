@@ -27,7 +27,7 @@ library GateLib {
     /////////////////////
 
     /// @dev Validate the gate configuration
-    function validate(Gate memory gate) internal pure returns (Gate memory) {
+    function validate(Gate memory gate) internal pure {
         if (gate.gateType != GateType.NONE) {
             if (gate.contractAddress == address(0)) {
                 revert GateInvalid();
@@ -44,8 +44,6 @@ library GateLib {
         if (gate.gateType == GateType.ERC1155 && gate.componentId == 0) {
             revert GateInvalid();
         }
-
-        return gate;
     }
 
     /// @dev Check if the account meets the gate requirements and revert if not

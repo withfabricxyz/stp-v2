@@ -5,7 +5,7 @@ import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/Index.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {AccessControlled} from "src/abstracts/AccessControlled.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
 
 contract TierManagementTest is BaseTest {
@@ -69,27 +69,19 @@ contract TierManagementTest is BaseTest {
     }
 
     function testAccessControl() public {
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, this, 0x00));
+        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
         stp.setTierPrice(1, 100);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, this, keccak256("MANAGER_ROLE")
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
         stp.pauseTier(1);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, this, keccak256("MANAGER_ROLE")
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
         stp.unpauseTier(1);
 
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, this, 0x00));
+        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
         stp.setTierSupplyCap(1, 5);
 
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, this, 0x00));
+        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
         stp.createTier(tierParams);
     }
 }

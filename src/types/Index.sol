@@ -93,8 +93,6 @@ struct InitParams {
     string symbol;
     /// @dev the metadata URI for the collection
     string contractUri;
-    /// @dev the metadata URI for the tokens
-    string tokenUri;
     /// @dev the address of the owner of the contract (default admin)
     address owner;
     /// @dev the address of the ERC20 token used for purchases, or the 0x0 for native

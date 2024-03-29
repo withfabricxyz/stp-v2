@@ -4,12 +4,13 @@ pragma solidity ^0.8.20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {PausableUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
+// import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
+
 import {ERC721Upgradeable} from "@openzeppelin-upgradeable/contracts/token/ERC721/ERC721Upgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/ReentrancyGuardUpgradeable.sol";
-import {AccessControlDefaultAdminRulesUpgradeable} from
-    "@openzeppelin-upgradeable/contracts/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import {MulticallUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/MulticallUpgradeable.sol";
+
+import {AccessControlled} from "./abstracts/AccessControlled.sol";
 
 import {InitParams, Tier, FeeParams, RewardParams, Tier, Pool, Subscription} from "./types/Index.sol";
 import {PoolLib} from "./libraries/PoolLib.sol";
@@ -31,7 +32,7 @@ import {RewardLib} from "./libraries/RewardLib.sol";
 contract SubscriptionTokenV2 is
     ERC721Upgradeable,
     ReentrancyGuardUpgradeable,
-    AccessControlDefaultAdminRulesUpgradeable,
+    AccessControlled,
     MulticallUpgradeable,
     ISubscriptionTokenV2
 {
@@ -42,19 +43,14 @@ contract SubscriptionTokenV2 is
     using SubscriptionLib for Subscription;
     using RewardLib for RewardParams;
 
-    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
-
     /// @dev Maximum protocol fee basis points (12.5%)
     uint16 private constant _MAX_FEE_BIPS = 1250;
 
     /// @dev Maximum basis points (100%)
     uint16 private constant _MAX_BIPS = 10000;
 
-    /// @dev The metadata URI for the contract
+    /// @dev The metadata URI for the contract (tokenUri is derived from this)
     string private _contractURI;
-
-    /// @dev The metadata URI for the tokens. Note: if it ends with /, then we append the tokenId
-    string private _tokenURI;
 
     Pool private _creatorPool;
     Pool private _rewardPool;
@@ -97,19 +93,6 @@ contract SubscriptionTokenV2 is
 
     ////////////////////////////////////
 
-    modifier onlyManagement() {
-        address account = _msgSender();
-        if (!hasRole(DEFAULT_ADMIN_ROLE, account) && !hasRole(MANAGER_ROLE, account)) {
-            revert AccessControlUnauthorizedAccount(account, MANAGER_ROLE);
-        }
-        _;
-    }
-
-    modifier onlyAdmin() {
-        _checkRole(DEFAULT_ADMIN_ROLE);
-        _;
-    }
-
     /// @dev Disable initializers on the logic contract
     constructor() {
         _disableInitializers();
@@ -137,7 +120,8 @@ contract SubscriptionTokenV2 is
         if (params.id != _tierCount) {
             revert TierLib.TierInvalidId();
         }
-        _tiers[params.id] = params.validate();
+        params.validate();
+        _tiers[params.id] = params;
         emit TierCreated(_tierCount);
     }
 
@@ -145,6 +129,7 @@ contract SubscriptionTokenV2 is
         public
         initializer
     {
+
         if (params.owner == address(0)) {
             revert InvalidOwner();
         }
@@ -161,22 +146,17 @@ contract SubscriptionTokenV2 is
             revert InvalidContractUri();
         }
 
-        if (bytes(params.tokenUri).length == 0) {
-            revert InvalidTokenUri();
-        }
-
+        setOwner(params.owner);
         _creatorPool = Pool(0, 0, params.erc20TokenAddr);
         _rewardPool = Pool(0, 0, params.erc20TokenAddr);
         _feePool = Pool(0, 0, params.erc20TokenAddr);
         _contractURI = params.contractUri;
-        _tokenURI = params.tokenUri;
         _globalSupplyCap = params.globalSupplyCap;
         _rewardParams = rewards.validate();
         _initializeFees(fees);
         _initializeTier(tier);
 
         __ERC721_init(params.name, params.symbol);
-        __AccessControlDefaultAdminRules_init(0, params.owner);
         __ReentrancyGuard_init();
     }
 
@@ -200,13 +180,6 @@ contract SubscriptionTokenV2 is
      */
     function mintWithReferral(uint256 numTokens, uint256 referralCode, address referrer) external payable {
         mintWithReferralFor(msg.sender, numTokens, referralCode, referrer);
-    }
-
-    /**
-     * @notice Withdraw available rewards. This is only possible if the subscription is active.
-     */
-    function withdrawRewards() external {
-        transferRewardsFor(msg.sender);
     }
 
     /**
@@ -247,7 +220,8 @@ contract SubscriptionTokenV2 is
     /**
      * @notice Withdraw available funds and transfer fees as the owner
      */
-    function withdrawAndTransferFees() external onlyAdmin {
+    function withdrawAndTransferFees() external {
+        checkOwner();
         _transferAllBalances(msg.sender);
     }
 
@@ -255,7 +229,8 @@ contract SubscriptionTokenV2 is
      * @notice Withdraw available funds as the owner to a specific account
      * @param account the account to transfer funds to
      */
-    function withdrawTo(address account) public onlyAdmin {
+    function withdrawTo(address account) public {
+        checkOwner();
         _transferToCreator(account, creatorBalance());
     }
 
@@ -265,7 +240,8 @@ contract SubscriptionTokenV2 is
      * @param account the account to refund
      * @param numTokens the amount of tokens to refund
      */
-    function refund(address account, uint256 numTokens) external onlyAdmin {
+    function refund(address account, uint256 numTokens) external {
+        checkOwner();
         Subscription storage sub = _getSub(account);
         (uint256 refundedTokens, uint256 refundedSeconds) = sub.refund(numTokens);
         emit Refund(account, sub.tokenId, refundedTokens, refundedSeconds);
@@ -276,7 +252,8 @@ contract SubscriptionTokenV2 is
      * @notice Top up the creator balance. Useful for refunds.
      * @param numTokens the amount of tokens to transfer
      */
-    function topUp(uint256 numTokens) external payable onlyManagement {
+    function topUp(uint256 numTokens) external payable {
+        checkRole(ROLE_MANAGER);
         emit TopUp(numTokens);
         _creatorPool.transferIn(msg.sender, numTokens);
     }
@@ -284,17 +261,13 @@ contract SubscriptionTokenV2 is
     /**
      * @notice Update the contract metadata
      * @param contractUri the collection metadata URI
-     * @param tokenUri the token metadata URI
      */
-    function updateMetadata(string memory contractUri, string memory tokenUri) external onlyManagement {
+    function updateMetadata(string memory contractUri) external {
+        checkRole(ROLE_MANAGER);
         if (bytes(contractUri).length == 0) {
             revert InvalidContractUri();
         }
-        if (bytes(tokenUri).length == 0) {
-            revert InvalidTokenUri();
-        }
         _contractURI = contractUri;
-        _tokenURI = tokenUri;
     }
 
     /**
@@ -303,7 +276,8 @@ contract SubscriptionTokenV2 is
      * @param numSeconds the number of seconds to grant
      * @param tierId the tier id to grant time to (0 to match current tier, or default for new)
      */
-    function grantTime(address account, uint256 numSeconds, uint16 tierId) external onlyManagement {
+    function grantTime(address account, uint256 numSeconds, uint16 tierId) external {
+        checkRole(ROLE_MANAGER);
         Subscription storage sub = _fetchSubscription(account, tierId);
         sub.grantTime(numSeconds);
         // Mint the NFT if it does not exist before grant event for indexers
@@ -316,7 +290,8 @@ contract SubscriptionTokenV2 is
      * @notice Revoke time from a given account
      * @param account the account to revoke time from
      */
-    function revokeTime(address account) external onlyManagement {
+    function revokeTime(address account) external {
+        checkRole(ROLE_MANAGER);
         Subscription storage sub = _getSub(account);
         uint256 time = sub.revokeTime();
         emit GrantRevoke(account, sub.tokenId, time, sub.expiresAt());
@@ -326,7 +301,8 @@ contract SubscriptionTokenV2 is
      * @notice Set a transfer recipient for automated/sponsored transfers
      * @param recipient the recipient address
      */
-    function setTransferRecipient(address recipient) external onlyAdmin {
+    function setTransferRecipient(address recipient) external {
+        checkOwner();
         _transferRecipient = recipient;
         emit TransferRecipientChange(recipient);
     }
@@ -335,7 +311,8 @@ contract SubscriptionTokenV2 is
      * @notice Set the global supply cap for all tiers
      * @param supplyCap the new supply cap
      */
-    function setGlobalSupplyCap(uint64 supplyCap) external onlyManagement {
+    function setGlobalSupplyCap(uint64 supplyCap) external {
+        checkRole(ROLE_MANAGER);
         if (_tokenCounter > supplyCap) {
             revert GlobalSupplyLimitExceeded();
         }
@@ -351,7 +328,8 @@ contract SubscriptionTokenV2 is
      * @notice Create a new tier
      * @param params the tier parameters
      */
-    function createTier(Tier memory params) external onlyAdmin {
+    function createTier(Tier memory params) external {
+        checkRole(ROLE_MANAGER);
         _initializeTier(params);
     }
 
@@ -360,7 +338,8 @@ contract SubscriptionTokenV2 is
      * @param tierId the id of the tier to update
      * @param supplyCap the new supply cap
      */
-    function setTierSupplyCap(uint16 tierId, uint32 supplyCap) public onlyAdmin {
+    function setTierSupplyCap(uint16 tierId, uint32 supplyCap) public {
+        checkRole(ROLE_MANAGER);
         Tier storage tier = _getTier(tierId);
         if (supplyCap != 0 && supplyCap < _tierSubCounts[tierId]) {
             revert TierLib.TierInvalidSupplyCap();
@@ -369,12 +348,15 @@ contract SubscriptionTokenV2 is
         emit TierSupplyCapChange(tierId, supplyCap);
     }
 
+    // WE NEED AN UPDATE TIER?
+
     /**
      * @notice Update the price per period for a given tier
      * @param tierId the id of the tier to update
      * @param pricePerPeriod the new price per period
      */
-    function setTierPrice(uint16 tierId, uint256 pricePerPeriod) external onlyAdmin {
+    function setTierPrice(uint16 tierId, uint256 pricePerPeriod) external {
+        checkRole(ROLE_MANAGER | ROLE_AGENT);
         _getTier(tierId).pricePerPeriod = pricePerPeriod;
         emit TierPriceChange(tierId, pricePerPeriod);
     }
@@ -383,7 +365,8 @@ contract SubscriptionTokenV2 is
      * @notice Pause a tier, preventing new subscriptions and renewals
      * @param tierId the id of the tier to pause
      */
-    function pauseTier(uint16 tierId) external onlyManagement {
+    function pauseTier(uint16 tierId) external {
+        checkRole(ROLE_MANAGER | ROLE_AGENT);
         _getTier(tierId).paused = true;
         emit TierPaused(tierId);
     }
@@ -392,7 +375,8 @@ contract SubscriptionTokenV2 is
      * @notice Unpause a tier, resuming new subscriptions and renewals
      * @param tierId the id of the tier to unpause
      */
-    function unpauseTier(uint16 tierId) external onlyManagement {
+    function unpauseTier(uint16 tierId) external {
+        checkRole(ROLE_MANAGER | ROLE_AGENT);
         _getTier(tierId).paused = false;
         emit TierUnpaused(tierId);
     }
@@ -606,7 +590,8 @@ contract SubscriptionTokenV2 is
      * @param code the unique integer code for the referral
      * @param bps the reward basis points
      */
-    function createReferralCode(uint256 code, uint16 bps) external onlyAdmin {
+    function createReferralCode(uint256 code, uint16 bps) external {
+        checkRole(ROLE_MANAGER);
         if (bps == 0 || bps > _MAX_BIPS) {
             revert InvalidBps();
         }
@@ -623,7 +608,8 @@ contract SubscriptionTokenV2 is
      * @notice Delete a referral code
      * @param code the unique integer code for the referral
      */
-    function deleteReferralCode(uint256 code) external onlyAdmin {
+    function deleteReferralCode(uint256 code) external {
+        checkRole(ROLE_MANAGER);
         delete _referralCodes[code];
         emit ReferralDestroyed(code);
     }
@@ -780,32 +766,8 @@ contract SubscriptionTokenV2 is
         return _creatorPool.total();
     }
 
-    /**
-     * @notice Relevant subscription information for a given account
-     * @return tokenId the tokenId for the account
-     * @return refundableAmount the number of seconds which can be refunded
-     * @return rewardPoints the number of reward points earned
-     * @return expiresAt the timestamp when the subscription expires
-     */
-    function subscriptionOf(address account)
-        external
-        view
-        returns (uint256 tokenId, uint256 refundableAmount, uint256 rewardPoints, uint256 expiresAt)
-    {
-        Subscription memory sub = _subscriptions[account];
-        return (sub.tokenId, sub.secondsPurchased, sub.rewardPoints, sub.expiresAt());
-    }
-
-    function subscriptionDetail(address account) external view returns (Subscription memory subscription) {
+    function subscriptionOf(address account) external view returns (Subscription memory subscription) {
         return _subscriptions[account];
-    }
-
-    /**
-     * @notice The percentage (as basis points) of creator earnings which are rewarded to subscribers
-     * @return bps reward basis points
-     */
-    function bips() external view returns (uint16 bps) {
-        return _rewardParams.bips;
     }
 
     /**
@@ -847,7 +809,7 @@ contract SubscriptionTokenV2 is
      * @param account the account to check
      * @return numSeconds the number of seconds which can be refunded
      */
-    function refundableBalanceOf(address account) public view returns (uint256 numSeconds) {
+    function refundableBalanceOf(address account) external view returns (uint256 numSeconds) {
         return _subscriptions[account].purchasedTimeRemaining();
     }
 
@@ -855,16 +817,8 @@ contract SubscriptionTokenV2 is
      * @notice The contract metadata URI for accessing collection metadata
      * @return uri the collection URI
      */
-    function contractURI() public view returns (string memory uri) {
+    function contractURI() external view returns (string memory uri) {
         return _contractURI;
-    }
-
-    /**
-     * @notice The base token URI for accessing token metadata
-     * @return uri the base token URI
-     */
-    function baseTokenURI() public view returns (string memory uri) {
-        return _tokenURI;
     }
 
     /**
@@ -907,14 +861,7 @@ contract SubscriptionTokenV2 is
      */
     function tokenURI(uint256 tokenId) public view override returns (string memory uri) {
         _requireOwned(tokenId);
-
-        bytes memory str = bytes(_tokenURI);
-        uint256 len = str.length;
-        if (str[len - 1] == "/") {
-            return string(abi.encodePacked(_tokenURI, tokenId.toString()));
-        }
-
-        return _tokenURI;
+        return string(abi.encodePacked(_contractURI, '/', tokenId.toString()));
     }
 
     /// @inheritdoc ISubscriptionTokenV2
@@ -948,12 +895,9 @@ contract SubscriptionTokenV2 is
      * @notice Renounce ownership of the contract, transferring all remaining funds to the creator and fee collector
      *         and pausing the contract to prevent further inflows.
      */
-    function renounceOwnership() public onlyAdmin {
+    function renounceOwnership() public {
+        checkOwner();
         _transferAllBalances(msg.sender);
-        // TODO: Need to understand this....
-        _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        // _renounceRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        // _transferOwnership(address(0));
         // pause all tiers?
     }
 
@@ -984,16 +928,6 @@ contract SubscriptionTokenV2 is
         return from;
     }
 
-    /// @inheritdoc ERC721Upgradeable
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(AccessControlDefaultAdminRulesUpgradeable, ERC721Upgradeable)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
-    }
-
     //////////////////////
     // Recovery Functions
     //////////////////////
@@ -1004,7 +938,8 @@ contract SubscriptionTokenV2 is
      * @param recipientAddress the address to send the tokens to
      * @param tokenAmount the amount of tokens to send
      */
-    function recoverERC20(address tokenAddress, address recipientAddress, uint256 tokenAmount) external onlyAdmin {
+    function recoverERC20(address tokenAddress, address recipientAddress, uint256 tokenAmount) external {
+        checkOwner();
         if (tokenAddress == erc20Address()) {
             revert InvalidRecovery();
         }
@@ -1015,7 +950,9 @@ contract SubscriptionTokenV2 is
      * @notice Recover native tokens which bypassed receive. Only callable for erc20 denominated contracts.
      * @param recipient the address to send the tokens to
      */
-    function recoverNativeTokens(address recipient) external onlyAdmin {
+    function recoverNativeTokens(address recipient) external {
+        checkOwner();
+
         if (erc20Address() == address(0)) {
             revert InvalidRecovery();
         }
@@ -1034,7 +971,8 @@ contract SubscriptionTokenV2 is
     /**
      * @notice Reconcile the token balance for native token contracts. This is used to reconcile the balance
      */
-    function reconcileBalance() external onlyAdmin {
+    function reconcileBalance() external {
+        checkOwner();
         // TODO: More tests
         _creatorPool.reconcileBalance(_creatorPool.balance() + _feePool.balance() + _rewardPool.balance());
     }

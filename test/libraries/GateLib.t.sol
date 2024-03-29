@@ -6,8 +6,8 @@ import {GateLib} from "src/libraries/GateLib.sol";
 import {Gate, GateType, Tier} from "src/types/Index.sol";
 
 contract GateTestShim {
-    function validate(Gate memory gate) external pure returns (Gate memory) {
-        return GateLib.validate(gate);
+    function validate(Gate memory gate) external pure {
+        GateLib.validate(gate);
     }
 
     function checkAccount(Gate memory gate, address account) external view {

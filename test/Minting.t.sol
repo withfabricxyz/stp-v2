@@ -24,7 +24,7 @@ contract MintingTest is BaseTest {
         assertEq(stp.balanceOf(alice), 0);
         mint(alice, 1e18);
         assertTrue(stp.balanceOf(alice) > 0);
-        Subscription memory sub = stp.subscriptionDetail(alice);
+        Subscription memory sub = stp.subscriptionOf(alice);
         assertEq(sub.tokenId, 1);
         assertEq(sub.tierId, 1);
         assertEq(sub.secondsPurchased, 5e17);

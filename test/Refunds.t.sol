@@ -3,9 +3,9 @@ pragma solidity ^0.8.20;
 
 import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {InitParams} from "src/types/Index.sol";
+import {InitParams, Subscription} from "src/types/Index.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {AccessControlled} from "src/abstracts/AccessControlled.sol";
 import {PoolLib} from "src/libraries/PoolLib.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
 import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
@@ -26,11 +26,11 @@ contract RefundsTests is BaseTest {
 
     function testRefund() public {
         mint(alice, 1e18);
-        (uint256 tokenId,,,) = stp.subscriptionOf(alice);
+        Subscription memory sub = stp.subscriptionOf(alice);
         assertEq(stp.estimatedRefund(alice), 1e18);
         vm.startPrank(creator);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.Refund(alice, tokenId, 1e18, 1e18 / 2);
+        emit ISubscriptionTokenV2.Refund(alice, sub.tokenId, 1e18, 1e18 / 2);
         stp.refund(alice, 0);
         assertEq(address(stp).balance, 0);
         vm.stopPrank();
@@ -87,7 +87,7 @@ contract RefundsTests is BaseTest {
     }
 
     function testAuth() public {
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, this, 0x00));
+        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
         stp.refund(alice, 0);
     }
 }

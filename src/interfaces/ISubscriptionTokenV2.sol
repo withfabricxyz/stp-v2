@@ -13,7 +13,6 @@ interface ISubscriptionTokenV2 {
     error InvalidName();
     error InvalidSymbol();
     error InvalidContractUri();
-    error InvalidTokenUri();
     error InvalidBps();
     error InvalidAccount();
     error InvalidTransfer();
