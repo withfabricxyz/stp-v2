@@ -5,7 +5,6 @@ import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams} from "src/types/Index.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
-import {PoolLib} from "src/libraries/PoolLib.sol";
 import {RewardLib} from "src/libraries/RewardLib.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {RewardParams, Subscription} from "src/types/Index.sol";
+import {RewardPoolParams, Subscription} from "src/types/Index.sol";
 import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
 
 library RewardLib {
@@ -27,7 +27,7 @@ library RewardLib {
 
     error RewardSlashingNotReady(uint256 readyAt);
 
-    function validate(RewardParams memory self) internal view returns (RewardParams memory) {
+    function validate(RewardPoolParams memory self) internal view returns (RewardPoolParams memory) {
         if (self.bips > MAX_BIPS) {
             revert RewardBipsTooHigh(self.bips);
         }
@@ -49,7 +49,7 @@ library RewardLib {
         return self;
     }
 
-    function currentMultiplier(RewardParams memory self) internal view returns (uint256 multiplier) {
+    function currentMultiplier(RewardPoolParams memory self) internal view returns (uint256 multiplier) {
         if (self.numPeriods == 0) {
             return self.minMultiplier;
         }
@@ -60,33 +60,33 @@ library RewardLib {
         return (uint256(self.formulaBase) ** self.numPeriods) / (uint256(self.formulaBase) ** periods);
     }
 
-    function rewardValue(RewardParams memory self, uint256 numTokens) internal pure returns (uint256 tokens) {
+    function rewardValue(RewardPoolParams memory self, uint256 numTokens) internal pure returns (uint256 tokens) {
         return (numTokens * self.bips) / MAX_BIPS;
     }
 
-    function slash(RewardParams memory self, Subscription storage subscription) internal {
-        if (self.bips == 0) {
-            revert RewardsDisabled();
-        }
+    // function slash(RewardPoolParams memory self, Subscription storage subscription) internal {
+    //     if (self.bips == 0) {
+    //         revert RewardsDisabled();
+    //     }
 
-        if (!self.slashable) {
-            revert RewardSlashingDisabled();
-        }
+    //     if (!self.slashable) {
+    //         revert RewardSlashingDisabled();
+    //     }
 
-        if (subscription.rewardPoints == 0) {
-            revert RewardSlashingNotPossible();
-        }
+    //     if (subscription.rewardPoints == 0) {
+    //         revert RewardSlashingNotPossible();
+    //     }
 
-        uint256 slashPoint = SubscriptionLib.expiresAt(subscription) + self.slashGracePeriod;
-        if (block.timestamp <= slashPoint) {
-            revert RewardSlashingNotReady(slashPoint);
-        }
+    //     uint256 slashPoint = SubscriptionLib.expiresAt(subscription) + self.slashGracePeriod;
+    //     if (block.timestamp <= slashPoint) {
+    //         revert RewardSlashingNotReady(slashPoint);
+    //     }
 
-        subscription.rewardPoints = 0;
-        subscription.rewardsWithdrawn = 0;
-    }
+    //     subscription.rewardPoints = 0;
+    //     subscription.rewardsWithdrawn = 0;
+    // }
 
-    function surpassedPeriods(RewardParams memory self) private view returns (uint256) {
+    function surpassedPeriods(RewardPoolParams memory self) private view returns (uint256) {
         return (block.timestamp - self.startTimestamp) / self.periodSeconds;
     }
 }

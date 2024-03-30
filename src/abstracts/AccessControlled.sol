@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.20;
 
 abstract contract AccessControlled {
-
     /// @dev Triggered when the owner is changed
     event OwnerChanged(address indexed owner);
 
@@ -48,8 +48,8 @@ abstract contract AccessControlled {
     }
 
     /**
-      * @notice Set the pending owner of the contract
-      * @param account the account to set as pending owner
+     * @notice Set the pending owner of the contract
+     * @param account the account to set as pending owner
      */
     function setPendingOwner(address account) external {
         checkOwner();
@@ -61,16 +61,16 @@ abstract contract AccessControlled {
      * @notice Accept the ownership of the contract as proposed owner
      */
     function acceptOwnership() external {
-        if(msg.sender != _pendingOwner) {
-          revert NotAuthorized();
+        if (msg.sender != _pendingOwner) {
+            revert NotAuthorized();
         }
-       setOwner(_pendingOwner);
+        setOwner(_pendingOwner);
     }
 
     /**
      * @notice Set the roles for an account
-      * @param account the account to grant the role to
-      * @param roles the role to grant (bitmask)
+     * @param account the account to grant the role to
+     * @param roles the role to grant (bitmask)
      */
     function setRoles(address account, uint8 roles) external {
         checkOwner();

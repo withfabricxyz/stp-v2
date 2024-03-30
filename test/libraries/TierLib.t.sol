@@ -132,9 +132,7 @@ contract TierLibTest is Test {
             secondsPurchased: 0,
             totalPurchased: 0,
             grantOffset: 0,
-            secondsGranted: 0,
-            rewardPoints: 0,
-            rewardsWithdrawn: 0
+            secondsGranted: 0
         });
 
         // All good

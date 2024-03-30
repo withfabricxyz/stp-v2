@@ -66,7 +66,7 @@ struct FeeParams {
 }
 
 /// @dev The initialization/config parameters for rewards
-struct RewardParams {
+struct RewardPoolParams {
     /// @dev the reward amount in basis points
     uint16 bips;
     /// @dev the number of periods for which rewards are paid (acts as the exponent)
@@ -83,6 +83,13 @@ struct RewardParams {
     bool slashable;
     /// @dev the grace period of inactivity before a sub is slashable
     uint32 slashGracePeriod;
+}
+
+struct RewardParams {
+    /// @dev The address of the pool
+    address poolAddress;
+    /// @dev The number of tokens in the pool
+    uint16 bips;
 }
 
 /// @dev The initialization parameters for a subscription token
@@ -109,37 +116,23 @@ struct DeployParams {
     /// @dev the init parameters for the default tier (tier 1)
     Tier tierParams;
     /// @dev the reward parameters for the collection
-    RewardParams rewardParams;
+    RewardPoolParams poolParams;
 }
 
 /// @dev The subscription struct which holds the state of a subscription for an account
 struct Subscription {
+    /// @dev The tier id of the subscription
+    uint16 tierId;
+    /// @dev The number of seconds purchased
+    uint48 secondsPurchased;
+    /// @dev The number of seconds granted by the creator
+    uint48 secondsGranted;
+    /// @dev A time offset used to adjust expiration for grants
+    uint48 grantOffset;
+    /// @dev A time offset used to adjust expiration for purchases
+    uint48 purchaseOffset;
     /// @dev The tokenId for the subscription
     uint256 tokenId;
     /// @dev The number of tokens transferred
     uint256 totalPurchased;
-    /// @dev The number of seconds purchased
-    uint256 secondsPurchased;
-    /// @dev The number of seconds granted by the creator
-    uint256 secondsGranted;
-    /// @dev A time offset used to adjust expiration for grants
-    uint256 grantOffset;
-    /// @dev A time offset used to adjust expiration for purchases
-    uint256 purchaseOffset;
-    /// @dev The number of reward points earned
-    uint256 rewardPoints;
-    /// @dev The number of rewards withdrawn
-    uint256 rewardsWithdrawn;
-    /// @dev The tier id of the subscription
-    uint16 tierId;
-}
-
-/// @dev The pool struct which holds the state of a given pool for a token
-struct Pool {
-    /// @dev The number of tokens that have come into the pool
-    uint256 tokensIn;
-    /// @dev The number of tokens that have left the pool
-    uint256 tokensOut;
-    /// @dev The ERC20 token address (or 0x0 for native)
-    address tokenAddress;
 }

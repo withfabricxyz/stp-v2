@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {InitParams, DeployParams, Tier, RewardParams} from "src/types/Index.sol";
+import {InitParams, DeployParams, Tier, RewardPoolParams} from "src/types/Index.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
 import {SubscriptionTokenV2Factory} from "src/SubscriptionTokenV2Factory.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
@@ -33,8 +33,7 @@ contract FactoryTest is BaseTest {
     }
 
     function defaultParams() internal view returns (DeployParams memory) {
-        return
-            DeployParams({feeConfigId: 0, initParams: initParams, tierParams: tierParams, rewardParams: rewardParams});
+        return DeployParams({feeConfigId: 0, initParams: initParams, tierParams: tierParams, poolParams: poolParams});
     }
 
     function testDeployment() public {
@@ -76,7 +75,7 @@ contract FactoryTest is BaseTest {
         emit Deployment(address(1), 1);
         address deployment = factory.deploySubscription(params);
         SubscriptionTokenV2 nft = SubscriptionTokenV2(payable(deployment));
-        (address recipient, uint16 bps) = nft.feeSchedule();
+        (address recipient, uint16 bps) = nft.feeParams();
         assertEq(recipient, bob);
         assertEq(bps, 100);
     }
@@ -91,7 +90,7 @@ contract FactoryTest is BaseTest {
         emit Deployment(address(1), 1);
         address deployment = factory.deploySubscription(params);
         SubscriptionTokenV2 nft = SubscriptionTokenV2(payable(deployment));
-        (address recipient, uint16 bps) = nft.feeSchedule();
+        (address recipient, uint16 bps) = nft.feeParams();
         assertEq(recipient, bob);
         assertEq(bps, 100);
     }

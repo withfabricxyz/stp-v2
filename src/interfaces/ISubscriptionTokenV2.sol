@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.20;
 
-import {Tier} from "src/types/Index.sol";
+import {Tier, Subscription} from "src/types/Index.sol";
 
 interface ISubscriptionTokenV2 {
     //////////////////
@@ -76,13 +77,10 @@ interface ISubscriptionTokenV2 {
     event TopUp(uint256 tokensIn);
 
     /// @dev Emitted when the fees are transferred to the collector
-    event FeeTransfer(address indexed from, address indexed to, uint256 tokensTransferred);
+    event FeeTransfer(address indexed to, uint256 tokensTransferred);
 
     /// @dev Emitted when the fee collector is updated
     event FeeCollectorChange(address indexed collector);
-
-    /// @dev Emitted when tokens are allocated to the fee pool
-    event FeeAllocated(uint256 tokens);
 
     /// @dev Emitted when a referral fee is paid out
     event ReferralPayout(
@@ -161,7 +159,7 @@ interface ISubscriptionTokenV2 {
      * @param numSeconds the number of seconds to grant
      * @param tierId the id of the tier to assign them to if they are not on a tier
      */
-    function grantTime(address account, uint256 numSeconds, uint16 tierId) external;
+    function grantTime(address account, uint48 numSeconds, uint16 tierId) external;
 
     /**
      * @notice Revoke time from an account
@@ -207,6 +205,8 @@ interface ISubscriptionTokenV2 {
      */
     function tierSupply(uint16 tierId) external view returns (uint32 currentSupply, uint32 maxSupply);
 
+    function subscriptionOf(address account) external view returns (Subscription memory subscription);
+
     // function feeDetails() external view returns (FeeParams memory);
     // function setDefaultTier(uint16 tierId) external; ???
 
@@ -215,16 +215,16 @@ interface ISubscriptionTokenV2 {
     //////////////////
 
     // function pools() external view returns (Pool memory creator, Pool memory rewards, Pool memory fees);
-    // function rewardDetails() external view returns (RewardParams memory);
+    // function rewardDetails() external view returns (RewardPoolParams memory);
 
     /**
      * @notice Distribute rewards to subscribers
      * @param numTokens the amount of ERC20 or native tokens to add to the reward pool
      */
-    function distributeRewards(uint256 numTokens) external payable;
+    // function distributeRewards(uint256 numTokens) external payable;
 
     /**
      * @notice Transfer the reward balance for a specific account to that account
      */
-    function transferRewardsFor(address account) external;
+    // function transferRewardsFor(address account) external;
 }

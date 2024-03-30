@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {SubscriptionTokenV2} from "./SubscriptionTokenV2.sol";
-import {InitParams, Tier, DeployParams, FeeParams} from "./types/Index.sol";
+import {InitParams, Tier, DeployParams, FeeParams, RewardParams, RewardPoolParams} from "./types/Index.sol";
 
 /**
  *
@@ -110,9 +110,15 @@ contract SubscriptionTokenV2Factory is Ownable2Step {
             params.initParams.owner = msg.sender;
         }
 
-        SubscriptionTokenV2(payable(deployment)).initialize(
-            params.initParams, params.tierParams, params.rewardParams, fees
-        );
+        RewardParams memory rewardParams = RewardParams({poolAddress: address(0), bips: params.poolParams.bips});
+
+        // TODO: Clone and build a thing
+        // RewardParams memory rewardParams = RewardParams({
+        //     rewardPool: params.rewardPool
+        //     rewardBips: params.rewardBips
+        // });
+
+        SubscriptionTokenV2(payable(deployment)).initialize(params.initParams, params.tierParams, rewardParams, fees);
         emit Deployment(deployment, params.feeConfigId);
 
         return deployment;

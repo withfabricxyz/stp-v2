@@ -55,7 +55,7 @@ library TierLib {
     // Checks
     /////////////////////
 
-    function validate(Tier memory tier) internal view{
+    function validate(Tier memory tier) internal view {
         if (tier.periodDurationSeconds == 0) {
             revert TierInvalidDuration();
         }
@@ -116,9 +116,9 @@ library TierLib {
         }
     }
 
-    function tokensToSeconds(Tier memory tier, uint256 numTokens) internal pure returns (uint256) {
+    function tokensToSeconds(Tier memory tier, uint256 numTokens) internal pure returns (uint48) {
         // TODO: numPeriods + remainder
-        return numTokens / tokensPerSecond(tier);
+        return uint48(numTokens / tokensPerSecond(tier));
     }
 
     function mintPrice(Tier memory tier, uint256 numPeriods, bool firstMint) internal pure returns (uint256) {

@@ -5,7 +5,7 @@ import {Test} from "@forge/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {InitParams, Tier, FeeParams, RewardParams, Gate, GateType} from "src/types/Index.sol";
+import {InitParams, Tier, FeeParams, RewardPoolParams, Gate, GateType, RewardParams} from "src/types/Index.sol";
 
 contract TestERC1155Token is ERC1155 {
     constructor() ERC1155("test") {
@@ -98,7 +98,9 @@ abstract contract BaseTest is Test {
 
     FeeParams internal feeParams = FeeParams({collector: address(0), bips: 0});
 
-    RewardParams internal rewardParams = RewardParams({
+    RewardParams internal rewardParams = RewardParams({bips: 0, poolAddress: address(0)});
+
+    RewardPoolParams internal poolParams = RewardPoolParams({
         bips: 0,
         numPeriods: 6,
         periodSeconds: 2,
@@ -154,7 +156,7 @@ abstract contract BaseTest is Test {
     }
 
     function withdraw() internal prank(creator) {
-        stp.withdraw();
+        stp.transferFunds(creator, stp.creatorBalance());
     }
 
     function token() internal view returns (TestERC20Token) {
@@ -180,8 +182,8 @@ abstract contract BaseTest is Test {
         tierParams.pricePerPeriod = minPurchase * 2;
         feeParams.bips = feeBps;
         feeParams.collector = feeBps > 0 ? fees : address(0);
-        rewardParams.bips = bips;
-        rewardParams.numPeriods = 6;
+        poolParams.bips = bips;
+        poolParams.numPeriods = 6;
         return reinitStp();
     }
 

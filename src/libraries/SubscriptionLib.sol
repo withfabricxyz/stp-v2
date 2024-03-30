@@ -27,12 +27,12 @@ library SubscriptionLib {
     }
 
     /// @dev The amount of purchased time remaining for a given subscription
-    function purchasedTimeRemaining(Subscription memory sub) internal view returns (uint256) {
+    function purchasedTimeRemaining(Subscription memory sub) internal view returns (uint48) {
         uint256 _expiresAt = sub.purchaseOffset + sub.secondsPurchased;
         if (_expiresAt <= block.timestamp) {
             return 0;
         }
-        return _expiresAt - block.timestamp;
+        return uint48(_expiresAt - block.timestamp);
     }
 
     /// @dev The amount of granted time remaining for a given subscription
@@ -48,17 +48,26 @@ library SubscriptionLib {
         return purchasedTimeRemaining(sub) + grantedTimeRemaining(sub);
     }
 
-    function grantTime(Subscription storage sub, uint256 secondsToGrant) internal {
+    function grantTime(Subscription storage sub, uint48 secondsToGrant) internal {
         if (secondsToGrant == 0) {
             revert SubscriptionGrantInvalidTime();
         }
 
         // Adjust offset to account for existing time
         if (block.timestamp > sub.grantOffset + sub.secondsGranted) {
-            sub.grantOffset = block.timestamp - sub.secondsGranted;
+            sub.grantOffset = uint48(block.timestamp - sub.secondsGranted);
         }
 
         sub.secondsGranted += secondsToGrant;
+    }
+
+    function renew(Subscription storage sub, uint256 numTokens, uint48 numSeconds) internal {
+        if (block.timestamp > sub.purchaseOffset + sub.secondsPurchased) {
+            sub.purchaseOffset = uint48(block.timestamp - sub.secondsPurchased);
+        }
+
+        sub.totalPurchased += numTokens;
+        sub.secondsPurchased += numSeconds;
     }
 
     function revokeTime(Subscription storage sub) internal returns (uint256) {
@@ -67,10 +76,17 @@ library SubscriptionLib {
         return remaining;
     }
 
+    // TODO: Lot's of testing?
     function estimatedRefund(Subscription memory sub) internal view returns (uint256) {
-        uint256 divisor = sub.secondsPurchased / purchasedTimeRemaining(sub);
-        return divisor > 0 ? sub.totalPurchased / divisor : 0;
-        // return purchasedTimeRemaining(sub); // TODO: We need to store the purchase price so we can compute the average (weak)
+        uint48 secondsLeft = purchasedTimeRemaining(sub);
+        if (secondsLeft == 0) {
+            return 0;
+        }
+        uint256 divisor = uint256(sub.secondsPurchased / secondsLeft);
+        if (divisor == 0) {
+            return 0;
+        }
+        return sub.totalPurchased / divisor;
     }
 
     function deactivate(Subscription storage sub) internal {
@@ -88,7 +104,7 @@ library SubscriptionLib {
 
     function refund(Subscription storage sub, uint256 numTokens)
         internal
-        returns (uint256 refundedTokens, uint256 refundedTime)
+        returns (uint256 refundedTokens, uint48 refundedTime)
     {
         refundedTime = purchasedTimeRemaining(sub);
         refundedTokens = numTokens > 0 ? numTokens : estimatedRefund(sub);
