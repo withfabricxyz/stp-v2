@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
-import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {InitParams} from "src/types/Index.sol";
-import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
-import {AccessControlled} from "src/abstracts/AccessControlled.sol";
+import "./TestImports.t.sol";
 
 contract FeesTest is BaseTest {
     function setUp() public {

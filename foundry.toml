@@ -9,7 +9,8 @@ optimizer_runs = 600
 ignored_warnings_from = ["test/TestHelpers.t.sol"]
 
 remappings = [
-  '@openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/',
+  # '@openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/',
+  '@solady/=lib/solady/src/',
   '@openzeppelin/=lib/openzeppelin-contracts/',
   '@forge/=lib/forge-std/src/',
 ]

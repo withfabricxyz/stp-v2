@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {BaseTest} from "./TestHelpers.t.sol";
-import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import "./TestImports.t.sol";
 
 contract SubscriptionTokenV2RolesTest is BaseTest {
     address internal agent = 0xb4c79DAb8F259C7aEe6E5B2aA729821864227e7C;

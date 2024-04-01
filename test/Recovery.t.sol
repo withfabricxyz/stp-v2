@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
-import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
-import {CurrencyLib} from "src/libraries/CurrencyLib.sol";
+import "./TestImports.t.sol";
 
 contract RecoveryTests is BaseTest {
     function setUp() public {
@@ -39,10 +37,11 @@ contract RecoveryTests is BaseTest {
 
         assertEq(address(stp).balance, 1e18);
 
-        vm.expectRevert(abi.encodeWithSelector(CurrencyLib.NativeTransferFailed.selector));
+        vm.expectRevert(abi.encodeWithSelector(SafeTransferLib.ETHTransferFailed.selector));
         stp.recoverCurrency(address(0), address(this), 1e18);
 
+        assertEq(bob.balance, 0);
         stp.recoverCurrency(address(0), bob, 1e18);
-        assertEq(bob.balance, 1e19 + 1e18);
+        assertEq(bob.balance, 1e18);
     }
 }

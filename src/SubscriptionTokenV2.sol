@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.20;
 
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {AccessControlled} from "./abstracts/AccessControlled.sol";
-
+import {LibString} from "@solady/utils/LibString.sol";
+import {Multicallable} from "@solady/utils/Multicallable.sol";
+import {Initializable} from "@solady/utils/Initializable.sol";
+import {ERC721} from "@solady/tokens/ERC721.sol";
 import {InitParams, Tier, FeeParams, RewardParams, Tier, Subscription} from "./types/Index.sol";
 import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
 import {TierLib} from "./libraries/TierLib.sol";
 import {ISubscriptionTokenV2} from "./interfaces/ISubscriptionTokenV2.sol";
-import {ReentrancyGuard} from "./abstracts/ReentrancyGuard.sol";
-import {ERC721} from "./abstracts/ERC721.sol";
-import {Proxied} from "./abstracts/Proxied.sol";
+// import {ERC721} from "./abstracts/ERC721.sol";
+// import {Proxied} from "./abstracts/Proxied.sol";
 import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
+import {IRewardPool} from "./interfaces/IRewardPool.sol";
 
 /**
  * @title Subscription Token Protocol Version 2
@@ -24,8 +25,8 @@ import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
  *      additional functionalities for granting time, refunding accounts, fees, rewards, etc. This contract is designed to be used with
  *      Clones, but is not designed to be upgradeable. Added functionality will come with new versions.
  */
-contract SubscriptionTokenV2 is ERC721, ReentrancyGuard, AccessControlled, Multicall, Proxied, ISubscriptionTokenV2 {
-    using Strings for uint256;
+contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initializable, ISubscriptionTokenV2 {
+    using LibString for uint256;
     using TierLib for Tier;
     using SubscriptionLib for Subscription;
     using CurrencyLib for Currency;
@@ -38,6 +39,10 @@ contract SubscriptionTokenV2 is ERC721, ReentrancyGuard, AccessControlled, Multi
 
     /// @dev The metadata URI for the contract (tokenUri is derived from this)
     string public contractURI;
+
+    string private _name;
+
+    string private _symbol;
 
     /// @dev The token counter for mint id generation and enforcing supply caps
     uint256 private _tokenCounter;
@@ -74,7 +79,8 @@ contract SubscriptionTokenV2 is ERC721, ReentrancyGuard, AccessControlled, Multi
 
     /// @dev Disable initializers on the logic contract
     constructor() {
-        _initialize();
+        // _initialize();
+        _disableInitializers();
     }
 
     /// @dev Fallback function to mint time for native token contracts
@@ -129,8 +135,8 @@ contract SubscriptionTokenV2 is ERC721, ReentrancyGuard, AccessControlled, Multi
         }
 
         setOwner(params.owner);
-        name = params.name;
-        symbol = params.symbol;
+        _name = params.name;
+        _symbol = params.symbol;
         contractURI = params.contractUri;
         _globalSupplyCap = params.globalSupplyCap;
 
@@ -139,8 +145,8 @@ contract SubscriptionTokenV2 is ERC721, ReentrancyGuard, AccessControlled, Multi
 
     function initialize(InitParams memory params, Tier memory tier, RewardParams memory rewards, FeeParams memory fees)
         public
+        initializer
     {
-        checkInit();
         // TODO: If we inline all this, it will be smaller
         _initializeCore(params);
         _initializeFees(fees);
@@ -443,7 +449,8 @@ contract SubscriptionTokenV2 is ERC721, ReentrancyGuard, AccessControlled, Multi
             }
         }
 
-        _allocateFeesAndRewards(remaining);
+        remaining = _transferFees(remaining);
+        remaining = _transferRewards(account, remaining, tier.rewardMultiplier);
 
         emit Purchase(account, sub.tokenId, numTokens, numSeconds, 0, sub.expiresAt());
     }
@@ -523,7 +530,7 @@ contract SubscriptionTokenV2 is ERC721, ReentrancyGuard, AccessControlled, Multi
     // Core Internal Logic
     ////////////////////////
 
-    function _getTier(uint16 tierId) internal view returns (Tier storage) {
+    function _getTier(uint16 tierId) private view returns (Tier storage) {
         Tier storage tier = _tiers[tierId];
         if (tier.id == 0) {
             revert TierLib.TierNotFound(tierId);
@@ -531,7 +538,7 @@ contract SubscriptionTokenV2 is ERC721, ReentrancyGuard, AccessControlled, Multi
         return tier;
     }
 
-    function _getSub(address account) internal view returns (Subscription storage) {
+    function _getSub(address account) private view returns (Subscription storage) {
         Subscription storage sub = _subscriptions[account];
         if (sub.tokenId == 0) {
             revert SubscriptionLib.SubscriptionNotFound(account);
@@ -539,13 +546,8 @@ contract SubscriptionTokenV2 is ERC721, ReentrancyGuard, AccessControlled, Multi
         return sub;
     }
 
-    /// @dev If fees or rewards are present, allocate a portion of the amount to the relevant pools
-    function _allocateFeesAndRewards(uint256 amount) private {
-        _allocateRewards(_allocateFees(amount));
-    }
-
     /// @dev Allocate tokens to the fee collector
-    function _allocateFees(uint256 amount) internal returns (uint256) {
+    function _transferFees(uint256 amount) private returns (uint256) {
         if (feeParams.bips == 0) {
             return amount;
         }
@@ -559,17 +561,24 @@ contract SubscriptionTokenV2 is ERC721, ReentrancyGuard, AccessControlled, Multi
         return amount - fee;
     }
 
-    /// @dev Allocate tokens to the reward pool
-    function _allocateRewards(uint256 amount) internal returns (uint256) {
+    function _transferRewards(address account, uint256 amount, uint8 multiplier) private returns (uint256) {
         if (_rewardParams.poolAddress == address(0)) {
             return amount;
         }
-        uint256 rewards = (amount * _rewardParams.bips) / _MAX_BIPS;
 
-        // IRewardPool(_rewardParams.poolAddress).issue(rewards);
-        // _rewardPool.tokensIn += rewards;
-        // TODO reward pool
-        // emit RewardsAllocated(rewards);
+        uint256 rewards = (amount * _rewardParams.bips) / _MAX_BIPS;
+        if (rewards == 0) {
+            return amount;
+        }
+
+        if (_currency.isNative()) {
+            // need to perform the call with value, or approve
+            IRewardPool(_rewardParams.poolAddress).mint{value: rewards}(account, amount * multiplier, rewards);
+        } else {
+            // need to perform the call with value, or approve
+            _currency.approve(_rewardParams.poolAddress, rewards);
+            IRewardPool(_rewardParams.poolAddress).mint(account, amount * multiplier, rewards);
+        }
         return amount - rewards;
     }
 
@@ -645,6 +654,14 @@ contract SubscriptionTokenV2 is ERC721, ReentrancyGuard, AccessControlled, Multi
         return string(abi.encodePacked(contractURI, "/", tokenId.toString()));
     }
 
+    function symbol() public view override returns (string memory) {
+        return _symbol;
+    }
+
+    function name() public view override returns (string memory) {
+        return _name;
+    }
+
     /// @inheritdoc ISubscriptionTokenV2
     function stpVersion() external pure returns (uint8 version) {
         return 2;
@@ -669,6 +686,7 @@ contract SubscriptionTokenV2 is ERC721, ReentrancyGuard, AccessControlled, Multi
      * @return numSeconds the number of seconds remaining in the subscription
      */
     function balanceOf(address account) public view override returns (uint256 numSeconds) {
+        // TODO: 0 or 1 depending on state
         return _subscriptions[account].remainingSeconds();
     }
 
@@ -692,6 +710,7 @@ contract SubscriptionTokenV2 is ERC721, ReentrancyGuard, AccessControlled, Multi
             _subscriptions[to] = _subscriptions[from];
         } else {
             // TODO
+            // At a minimum decrement the tier count, and increase burn count?
         }
         delete _subscriptions[from];
     }

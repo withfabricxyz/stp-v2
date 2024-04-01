@@ -6,19 +6,21 @@ import {RewardPoolParams} from "./types/Index.sol";
 import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
 import {RewardLib} from "./libraries/RewardLib.sol";
 import {IRewardPool} from "./interfaces/IRewardPool.sol";
+import {ERC20} from "@solady/tokens/ERC20.sol";
+import {Initializable} from "@solady/utils/Initializable.sol";
 
-contract RewardPool is IRewardPool, AccessControlled {
+contract RewardPool is IRewardPool, AccessControlled, ERC20, Initializable {
     using CurrencyLib for Currency;
     using RewardLib for RewardPoolParams;
-
-    /// @dev The total number of reward tokens minted
-    uint256 private _totalSupply;
 
     /// @dev The total number of denominated tokens in the reward pool
     uint256 private _totalTokensIn;
 
     /// @dev The reward pool tokens slashed (used to calculate reward withdraws accurately)
     uint256 private _rewardPoolSlashed;
+
+    string private _name;
+    string private _symbol;
 
     RewardPoolParams private _params;
 
@@ -34,8 +36,40 @@ contract RewardPool is IRewardPool, AccessControlled {
     mapping(address => Holdings) private _holders;
 
     constructor() {
-        // _params = params;
-        // _currency = currency;
+        _disableInitializers();
+    }
+
+    function initialize(string memory name_, string memory symbol_, RewardPoolParams memory params_, address currency)
+        external
+        initializer
+    {
+        _name = name_;
+        _symbol = symbol_;
+        _params = params_;
+        _currency = Currency.wrap(currency);
+    }
+
+    function name() public view override returns (string memory) {
+        return _name;
+    }
+
+    function symbol() public view override returns (string memory) {
+        return _symbol;
+    }
+
+    function mint(address account, uint256 amount, uint256 currencyIn) external payable {
+        // need to check the sender is allowed
+        _currency.capture(msg.sender, currencyIn);
+        _mint(account, amount);
+    }
+
+    function stake() external {
+        // _holders[msg.sender].stakedAt = uint48(block.timestamp);
+    }
+
+    function unstake() external {
+        // set holdings to staked
+        // set the withdrawn amount to the percentage
     }
 
     /**
@@ -110,9 +144,9 @@ contract RewardPool is IRewardPool, AccessControlled {
     //  * @notice The number of reward points allocated to all subscribers (used to calculate rewards)
     //  * @return numPoints total number of reward points
     //  */
-    function totalSupply() external view returns (uint256 numPoints) {
-        return _totalSupply;
-    }
+    // function totalSupply() external view returns (uint256 numPoints) {
+    //     return _totalSupply;
+    // }
 
     // /**
     //  * @notice The balance of the reward pool (for reward withdraws)
@@ -120,6 +154,14 @@ contract RewardPool is IRewardPool, AccessControlled {
     //  */
     function yieldBalance() external view returns (uint256 numTokens) {
         return _currency.balance();
+    }
+
+    function denomination() external view returns (address) {
+        return Currency.unwrap(_currency);
+    }
+
+    function params() external view returns (RewardPoolParams memory) {
+        return _params;
     }
 
     // /**

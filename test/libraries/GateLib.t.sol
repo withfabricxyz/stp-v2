@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {BaseTest, TestERC20Token, TestERC1155Token} from "../TestHelpers.t.sol";
-import {GateLib} from "src/libraries/GateLib.sol";
-import {Gate, GateType, Tier} from "src/types/Index.sol";
+import "../TestImports.t.sol";
 
 contract GateTestShim {
     function validate(Gate memory gate) external pure {

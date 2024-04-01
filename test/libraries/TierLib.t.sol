@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {Test} from "@forge/Test.sol";
-import {TierLib} from "src/libraries/TierLib.sol";
-import {GateLib} from "src/libraries/GateLib.sol";
-import {Tier, Gate, GateType, Subscription} from "src/types/Index.sol";
-import {TestERC20Token} from "../TestHelpers.t.sol";
+import "../TestImports.t.sol";
 
 contract TierTestShim {
     function validate(Tier memory tier) external view {

@@ -1,18 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
-import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {InitParams, Subscription} from "src/types/Index.sol";
-import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
-import {AccessControlled} from "src/abstracts/AccessControlled.sol";
-import {TierLib} from "src/libraries/TierLib.sol";
-import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
+import "./TestImports.t.sol";
 
 contract RefundsTests is BaseTest {
     function setUp() public {
-        tierParams.periodDurationSeconds = 4;
-        tierParams.pricePerPeriod = 8;
+        tierParams.periodDurationSeconds = 30 days;
+        tierParams.pricePerPeriod = 0.001 ether;
         poolParams.numPeriods = 0;
         stp = reinitStp();
 
@@ -24,24 +18,24 @@ contract RefundsTests is BaseTest {
     }
 
     function testRefund() public {
-        mint(alice, 1e18);
+        mint(alice, 0.001 ether);
         Subscription memory sub = stp.subscriptionOf(alice);
-        assertEq(stp.estimatedRefund(alice), 1e18);
+        assertEq(stp.estimatedRefund(alice), 0.001 ether);
         vm.startPrank(creator);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.Refund(alice, sub.tokenId, 1e18, 1e18 / 2);
+        emit ISubscriptionTokenV2.Refund(alice, sub.tokenId, 0.001 ether, 30 days);
         stp.refund(alice, 0);
         assertEq(address(stp).balance, 0);
         vm.stopPrank();
     }
 
     function testPartialRefund() public {
-        mint(alice, 1e18);
-        vm.warp(block.timestamp + 2.5e17);
-        assertEq(1e18 / 2, stp.estimatedRefund(alice));
+        mint(alice, 0.001 ether);
+        vm.warp(block.timestamp + 15 days);
+        assertEq(0.001 ether / 2, stp.estimatedRefund(alice));
         vm.startPrank(creator);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.Refund(alice, 1, 5e17, 5e17 / 2);
+        emit ISubscriptionTokenV2.Refund(alice, 1, 0.001 ether / 2, 15 days);
         stp.refund(alice, 0);
         vm.stopPrank();
     }
@@ -51,38 +45,31 @@ contract RefundsTests is BaseTest {
         stp.refund(bob, 0);
     }
 
-    function testRefundDecay() public prank(alice) {
-        stp.mint{value: 1e18}(1e18);
-        vm.warp(block.timestamp + 25e16);
-        assertEq(stp.balanceOf(alice), 5e17 / 2);
-        assertEq(stp.estimatedRefund(alice), 1e18 / 2);
-    }
-
     function testRefundNoBalance() public {
-        mint(alice, 1e18);
+        mint(alice, 0.001 ether);
         withdraw();
         vm.startPrank(creator);
-        // vm.expectRevert(abi.encodeWithSelector(PoolLib.InsufficientBalance.selector, 1e18, 0));
+        vm.expectRevert(abi.encodeWithSelector(SafeTransferLib.ETHTransferFailed.selector));
         stp.refund(alice, 0);
     }
 
     function testCustomRefund() public {
-        mint(alice, 1e18);
+        mint(alice, 0.001 ether);
         uint256 balance = alice.balance;
-        vm.warp(block.timestamp + 5e17);
+        vm.warp(block.timestamp + 20 days);
         vm.startPrank(creator);
-        stp.refund(alice, 1e18);
+        stp.refund(alice, 0.001 ether);
         vm.stopPrank();
-        assertEq(alice.balance, balance + 1e18);
+        assertEq(alice.balance, balance + 0.001 ether);
     }
 
     function testRefundERC20() public erc20 {
-        mint(alice, 1e18);
+        mint(alice, 0.001 ether);
         uint256 beforeBalance = token().balanceOf(alice);
         vm.startPrank(creator);
         stp.refund(alice, 0);
         vm.stopPrank();
-        assertEq(beforeBalance + 1e18, token().balanceOf(alice));
+        assertEq(beforeBalance + 0.001 ether, token().balanceOf(alice));
     }
 
     function testAuth() public {

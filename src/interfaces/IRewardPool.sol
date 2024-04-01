@@ -12,6 +12,10 @@ interface IRewardPool {
     function distributeRewards(uint256 numTokens) external payable;
 
     function transferRewards(address account) external;
+
+    // Requires authentication
+    function mint(address account, uint256 amount, uint256 currencyIn) external payable;
+
     // function allocate(address account, uint256 amount, uint256 tokensIn) external;
 
     // function transferRewards(address account, uint256 amount) external;

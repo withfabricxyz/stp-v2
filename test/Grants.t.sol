@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
-import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {InitParams} from "src/types/Index.sol";
-import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
-import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
+import "./TestImports.t.sol";
 
 contract GrantsTest is BaseTest {
     function setUp() public {
@@ -35,7 +31,7 @@ contract GrantsTest is BaseTest {
     function testGrantDouble() public {
         vm.startPrank(creator);
         stp.grantTime(alice, 90 days, 1);
-        vm.warp(block.timestamp + 1e16);
+        vm.warp(block.timestamp + 91 days);
         stp.grantTime(alice, 90 days, 1);
         vm.stopPrank();
         assertEq(stp.balanceOf(alice), 90 days);
@@ -46,9 +42,9 @@ contract GrantsTest is BaseTest {
         vm.startPrank(creator);
         stp.grantTime(alice, 90 days, 1);
         vm.stopPrank();
-        mint(alice, 1e18);
-        assertEq(stp.balanceOf(alice), 90 days + 1e18 / 4);
-        assertEq(stp.estimatedRefund(alice), 1e18);
+        mint(alice, 1e5);
+        assertEq(stp.balanceOf(alice), 90 days + 1e5 / 4);
+        assertEq(stp.estimatedRefund(alice), 1e5);
     }
 
     function testGrantRevoke() public {
@@ -65,12 +61,12 @@ contract GrantsTest is BaseTest {
     }
 
     function testGrantRevokeWithPayment() public {
-        mint(alice, 1e18);
+        mint(alice, 1e5);
         vm.startPrank(creator);
         stp.grantTime(alice, 90 days, 1);
         stp.revokeTime(alice);
         vm.stopPrank();
-        assertEq(stp.balanceOf(alice), 1e18 / 4);
+        assertEq(stp.balanceOf(alice), 1e5 / 4);
     }
 
     function multicall() public prank(creator) {

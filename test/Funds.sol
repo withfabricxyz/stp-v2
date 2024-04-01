@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
-import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {RewardLib} from "src/libraries/RewardLib.sol";
+import "./TestImports.t.sol";
 
 contract FundsTest is BaseTest {
     function setUp() public {

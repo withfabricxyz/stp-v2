@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {Test} from "@forge/Test.sol";
-import {RewardLib} from "src/libraries/RewardLib.sol";
-import {RewardPoolParams} from "src/types/Index.sol";
+import "../TestImports.t.sol";
 
 // We need to create a shim contract to call the internal functions of RewardLib in order to get
 // foundry to generate the coverage report correctly

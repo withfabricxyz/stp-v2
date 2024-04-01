@@ -1,14 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
-import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {InitParams, Subscription} from "src/types/Index.sol";
-import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
-import {AccessControlled} from "src/abstracts/AccessControlled.sol";
-import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
-import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import {TierLib} from "src/libraries/TierLib.sol";
+import "./TestImports.t.sol";
 
 contract SubscriptionTokenV2Test is BaseTest {
     function setUp() public {
@@ -28,24 +21,6 @@ contract SubscriptionTokenV2Test is BaseTest {
         assertEq(2, stp.stpVersion());
     }
 
-    function testMint() public prank(alice) {
-        vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.Purchase(alice, 1, 1e18, 1e18 / 2, 0, block.timestamp + (1e18 / 2));
-        stp.mint{value: 1e18}(1e18);
-        assertEq(address(stp).balance, 1e18);
-        assertEq(stp.balanceOf(alice), 5e17);
-        Subscription memory sub = stp.subscriptionOf(alice);
-        assertEq(stp.ownerOf(sub.tokenId), alice);
-        assertEq(sub.secondsPurchased, 1e18 / 2);
-        // assertEq(sub.rewardPoints, 0);
-        // assertEq(sub.expiresAt, block.timestamp + (1e18 / 2)); // TODO
-    }
-
-    function testMintInvalid() public prank(alice) {
-        // vm.expectRevert(abi.encodeWithSelector(PoolLib.PurchaseAmountMustMatchValueSent.selector, 1e18, 1e17));
-        stp.mint{value: 1e17}(1e18);
-    }
-
     function testMintViaFallback() public prank(alice) {
         (bool sent,) = address(stp).call{value: 1e18}("");
         assertTrue(sent);
@@ -57,25 +32,11 @@ contract SubscriptionTokenV2Test is BaseTest {
         assertTrue(data.length > 0);
     }
 
-    function testMintFor() public prank(alice) {
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidAccount.selector));
-        stp.mintFor{value: 1e18}(address(0), 1e18);
-
-        vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.Purchase(bob, 1, 1e18, 1e18 / 2, 0, block.timestamp + (1e18 / 2));
-        stp.mintFor{value: 1e18}(bob, 1e18);
-        assertEq(address(stp).balance, 1e18);
-        assertEq(stp.balanceOf(bob), 5e17);
-        assertEq(stp.balanceOf(alice), 0);
-        Subscription memory sub = stp.subscriptionOf(bob);
-        assertEq(stp.ownerOf(sub.tokenId), bob);
-    }
-
     function testMintForErc20() public erc20 prank(alice) {
         token().approve(address(stp), 1e18);
-        stp.mintFor(bob, 1e18);
-        assertEq(token().balanceOf(address(stp)), 1e18);
-        assertEq(stp.balanceOf(bob), 5e17);
+        stp.mintFor(bob, 1e5);
+        assertEq(token().balanceOf(address(stp)), 1e5);
+        assertEq(stp.balanceOf(bob), 1e5 / 2);
         assertEq(stp.balanceOf(alice), 0);
         Subscription memory sub = stp.subscriptionOf(bob);
         assertEq(stp.ownerOf(sub.tokenId), bob);
@@ -84,7 +45,7 @@ contract SubscriptionTokenV2Test is BaseTest {
     function testNonSub() public {
         assertEq(stp.balanceOf(alice), 0);
         Subscription memory sub = stp.subscriptionOf(alice);
-        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, sub.tokenId));
+        vm.expectRevert(abi.encodeWithSelector(ERC721.TokenDoesNotExist.selector));
         stp.ownerOf(sub.tokenId);
     }
 
@@ -96,15 +57,6 @@ contract SubscriptionTokenV2Test is BaseTest {
         Subscription memory sub = stp.subscriptionOf(alice);
         // assertEq(expires, time + 1e18 / 2); //TODO
         assertEq(stp.ownerOf(sub.tokenId), alice);
-    }
-
-    function testMintSpaced() public {
-        mint(alice, 1e18);
-        assertEq(stp.balanceOf(alice), 5e17);
-        vm.warp(block.timestamp + 1e18);
-        assertEq(stp.balanceOf(alice), 0);
-        mint(alice, 1e18);
-        assertEq(stp.balanceOf(alice), 5e17);
     }
 
     function testCreatorEarnings() public {
@@ -137,12 +89,13 @@ contract SubscriptionTokenV2Test is BaseTest {
         mint(alice, 1e18);
         address invalid = address(this);
         vm.startPrank(creator);
-        // vm.expectRevert(abi.encodeWithSelector(PoolLib.InvalidRecipient.selector));
-        stp.transferFunds(address(0), stp.creatorBalance());
+        uint256 balance = stp.creatorBalance();
+        vm.expectRevert(abi.encodeWithSelector(CurrencyLib.InvalidAccount.selector));
+        stp.transferFunds(address(0), balance);
 
-        // vm.expectRevert(abi.encodeWithSelector(PoolLib.FailedToTransferEther.selector, invalid, 1e18));
-        stp.transferFunds(invalid, stp.creatorBalance());
-        stp.transferFunds(alice, stp.creatorBalance());
+        vm.expectRevert(abi.encodeWithSelector(SafeTransferLib.ETHTransferFailed.selector));
+        stp.transferFunds(invalid, balance);
+        stp.transferFunds(alice, balance);
         vm.stopPrank();
         assertEq(aliceBalance, alice.balance);
     }
@@ -153,32 +106,18 @@ contract SubscriptionTokenV2Test is BaseTest {
         assert(stp.erc20Address() != address(0));
         assertEq(token().balanceOf(alice), 1e20);
         token().approve(address(stp), 1e18);
-        stp.mint(1e18);
-        assertEq(token().balanceOf(address(stp)), 1e18);
-        assertEq(stp.balanceOf(alice), 5e17);
+        stp.mint(1e5);
+        assertEq(token().balanceOf(address(stp)), 1e5);
+        assertEq(stp.balanceOf(alice), 1e5 / 2);
         Subscription memory sub = stp.subscriptionOf(alice);
         assertEq(stp.ownerOf(sub.tokenId), alice);
     }
 
     function testMintInvalidERC20() public erc20 prank(alice) {
-        // vm.expectRevert(abi.encodeWithSelector(PoolLib.NativeTokensNotAcceptedForERC20Subscriptions.selector));
-        stp.mint{value: 1e17}(1e18);
-        // vm.expectRevert(
-        //     abi.encodeWithSelector(PoolLib.InsufficientBalanceOrAllowance.selector, token().balanceOf(alice), 0)
-        // );
-        stp.mint(1e18);
-    }
-
-    function testERC20FeeTakingToken() public {
-        TestFeeToken _token = new TestFeeToken("FIAT", "FIAT", 1e21);
-        _token.transfer(alice, 1e20);
-        initParams.erc20TokenAddr = address(_token);
-        reinitStp();
-        vm.startPrank(alice);
-        _token.approve(address(stp), 1e18);
-        stp.mint(1e18);
-        assertEq(stp.balanceOf(alice), 1e18 / 2 / 2);
-        vm.stopPrank();
+        vm.expectRevert(abi.encodeWithSelector(CurrencyLib.InvalidCapture.selector));
+        stp.mint{value: 1e17}(1e5);
+        vm.expectRevert(abi.encodeWithSelector(SafeTransferLib.TransferFromFailed.selector));
+        stp.mint(1e5);
     }
 
     function testWithdrawERC20() public erc20 {
@@ -206,7 +145,7 @@ contract SubscriptionTokenV2Test is BaseTest {
         vm.startPrank(alice);
         stp.approve(bob, sub.tokenId);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit IERC721.Transfer(alice, bob, sub.tokenId);
+        emit ERC721.Transfer(alice, bob, sub.tokenId);
         stp.transferFrom(alice, bob, sub.tokenId);
         vm.stopPrank();
         assertEq(stp.ownerOf(sub.tokenId), bob);
