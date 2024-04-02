@@ -1,4 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: BUSL-1.1
+
 pragma solidity ^0.8.20;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
@@ -95,6 +96,10 @@ contract SubscriptionTokenV2Factory is Ownable2Step {
         _feeDeployMin = 0;
     }
 
+    // deployRewardPool
+    // deploySubscription
+    // deploySubscriptionWithRewardPool
+
     /**
      * @notice Deploy a new Clone of a SubscriptionTokenV2 contract
      *
@@ -110,6 +115,7 @@ contract SubscriptionTokenV2Factory is Ownable2Step {
             params.initParams.owner = msg.sender;
         }
 
+        // TODO
         RewardParams memory rewardParams = RewardParams({poolAddress: address(0), bips: params.poolParams.bips});
 
         // TODO: Clone and build a thing

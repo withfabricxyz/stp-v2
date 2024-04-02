@@ -1,8 +1,16 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: BUSL-1.1
+
 pragma solidity ^0.8.20;
 
 import {RewardPoolParams, Subscription} from "src/types/Index.sol";
 import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
+
+// struct RewardCurveParams {
+// }
+
+struct TmpRewardPoolParams {
+    uint48 adminControlEndDate;
+}
 
 library RewardLib {
     /// @dev The maximum reward factor (limiting this prevents overflow)

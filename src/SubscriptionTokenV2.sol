@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
+
 pragma solidity ^0.8.20;
 
 import {AccessControlled} from "./abstracts/AccessControlled.sol";
@@ -30,6 +31,9 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     using TierLib for Tier;
     using SubscriptionLib for Subscription;
     using CurrencyLib for Currency;
+
+    uint16 private constant ROLE_MANAGER = 1;
+    uint16 private constant ROLE_AGENT = 2;
 
     /// @dev Maximum protocol fee basis points (12.5%)
     uint16 private constant _MAX_FEE_BIPS = 1250;
@@ -79,7 +83,6 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
 
     /// @dev Disable initializers on the logic contract
     constructor() {
-        // _initialize();
         _disableInitializers();
     }
 
@@ -134,7 +137,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
             revert InvalidContractUri();
         }
 
-        setOwner(params.owner);
+        _setOwner(params.owner);
         _name = params.name;
         _symbol = params.symbol;
         contractURI = params.contractUri;
@@ -186,7 +189,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         }
 
         if (to != _transferRecipient) {
-            checkOwner();
+            _checkOwner();
         }
 
         emit Withdraw(to, amount);
@@ -200,7 +203,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param numTokens the amount of tokens to refund
      */
     function refund(address account, uint256 numTokens) external {
-        checkOwner();
+        _checkOwner();
         Subscription storage sub = _getSub(account);
         (uint256 refundedTokens, uint256 refundedSeconds) = sub.refund(numTokens);
         emit Refund(account, sub.tokenId, refundedTokens, refundedSeconds);
@@ -212,7 +215,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param numTokens the amount of tokens to transfer
      */
     function topUp(uint256 numTokens) external payable {
-        checkRole(ROLE_MANAGER);
+        _checkOwnerOrRoles(ROLE_MANAGER);
         emit TopUp(numTokens);
         _currency.capture(msg.sender, numTokens);
     }
@@ -222,7 +225,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param uri the collection metadata URI
      */
     function updateMetadata(string memory uri) external {
-        checkRole(ROLE_MANAGER);
+        _checkOwnerOrRoles(ROLE_MANAGER);
         if (bytes(uri).length == 0) {
             revert InvalidContractUri();
         }
@@ -236,7 +239,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param tierId the tier id to grant time to (0 to match current tier, or default for new)
      */
     function grantTime(address account, uint48 numSeconds, uint16 tierId) external {
-        checkRole(ROLE_MANAGER | ROLE_AGENT);
+        _checkOwnerOrRoles(ROLE_MANAGER | ROLE_AGENT);
 
         Subscription storage sub = _subscriptions[account];
         // If the subscription does not exist, mint the token
@@ -255,7 +258,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param account the account to revoke time from
      */
     function revokeTime(address account) external {
-        checkRole(ROLE_MANAGER | ROLE_AGENT);
+        _checkOwnerOrRoles(ROLE_MANAGER | ROLE_AGENT);
         Subscription storage sub = _getSub(account);
         uint256 time = sub.revokeTime();
         emit GrantRevoke(account, sub.tokenId, time, sub.expiresAt());
@@ -266,7 +269,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param recipient the recipient address
      */
     function setTransferRecipient(address recipient) external {
-        checkOwner();
+        _checkOwner();
         _transferRecipient = recipient;
         emit TransferRecipientChange(recipient);
     }
@@ -276,7 +279,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param supplyCap the new supply cap
      */
     function setGlobalSupplyCap(uint64 supplyCap) external {
-        checkRole(ROLE_MANAGER);
+        _checkOwnerOrRoles(ROLE_MANAGER);
         if (_tokenCounter > supplyCap) {
             revert GlobalSupplyLimitExceeded();
         }
@@ -293,7 +296,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param params the tier parameters
      */
     function createTier(Tier memory params) external {
-        checkRole(ROLE_MANAGER);
+        _checkOwnerOrRoles(ROLE_MANAGER);
         _initializeTier(params);
     }
 
@@ -303,7 +306,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param supplyCap the new supply cap
      */
     function setTierSupplyCap(uint16 tierId, uint32 supplyCap) public {
-        checkRole(ROLE_MANAGER);
+        _checkOwnerOrRoles(ROLE_MANAGER);
         Tier storage tier = _getTier(tierId);
         if (supplyCap != 0 && supplyCap < _tierSubCounts[tierId]) {
             revert TierLib.TierInvalidSupplyCap();
@@ -312,15 +315,13 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         emit TierSupplyCapChange(tierId, supplyCap);
     }
 
-    // WE NEED AN UPDATE TIER?
-
     /**
      * @notice Update the price per period for a given tier
      * @param tierId the id of the tier to update
      * @param pricePerPeriod the new price per period
      */
     function setTierPrice(uint16 tierId, uint256 pricePerPeriod) external {
-        checkRole(ROLE_MANAGER | ROLE_AGENT);
+        _checkOwnerOrRoles(ROLE_MANAGER | ROLE_AGENT);
         _getTier(tierId).pricePerPeriod = pricePerPeriod;
         emit TierPriceChange(tierId, pricePerPeriod);
     }
@@ -330,7 +331,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param tierId the id of the tier to pause
      */
     function pauseTier(uint16 tierId) external {
-        checkRole(ROLE_MANAGER | ROLE_AGENT);
+        _checkOwnerOrRoles(ROLE_MANAGER | ROLE_AGENT);
         _getTier(tierId).paused = true;
         emit TierPaused(tierId);
     }
@@ -340,7 +341,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param tierId the id of the tier to unpause
      */
     function unpauseTier(uint16 tierId) external {
-        checkRole(ROLE_MANAGER | ROLE_AGENT);
+        _checkOwnerOrRoles(ROLE_MANAGER | ROLE_AGENT);
         _getTier(tierId).paused = false;
         emit TierUnpaused(tierId);
     }
@@ -494,7 +495,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param bps the reward basis points
      */
     function createReferralCode(uint256 code, uint16 bps) external {
-        checkRole(ROLE_MANAGER);
+        _checkOwnerOrRoles(ROLE_MANAGER);
         if (bps == 0 || bps > _MAX_BIPS) {
             revert InvalidBps();
         }
@@ -512,7 +513,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param code the unique integer code for the referral
      */
     function deleteReferralCode(uint256 code) external {
-        checkRole(ROLE_MANAGER);
+        _checkOwnerOrRoles(ROLE_MANAGER);
         delete _referralCodes[code];
         emit ReferralDestroyed(code);
     }
@@ -712,6 +713,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
             // TODO
             // At a minimum decrement the tier count, and increase burn count?
         }
+
         delete _subscriptions[from];
     }
 
@@ -726,7 +728,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param tokenAmount the amount of tokens to send
      */
     function recoverCurrency(address tokenAddress, address recipientAddress, uint256 tokenAmount) external {
-        checkOwner();
+        _checkOwner();
         Currency target = Currency.wrap(tokenAddress);
         if (target == _currency) {
             revert InvalidRecovery();

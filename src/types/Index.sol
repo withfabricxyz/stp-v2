@@ -55,9 +55,6 @@ struct Tier {
     Gate gate;
 }
 
-// TODO: Start date for tier
-// TODO: End date for tier
-
 struct FeeParams {
     /// @dev the address which receives fees
     address collector;

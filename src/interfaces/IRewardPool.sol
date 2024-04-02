@@ -6,15 +6,23 @@ interface IRewardPool {
     event RewardsAllocated(uint256 finalAmount);
     event RewardTransfer(address indexed account, uint256 amount);
 
-    error UnstakedAccess();
+    error AccountNotStaked();
     error InsufficientRewards();
 
+    /**
+     * @notice Distribute rewards to all holders
+     * @param numTokens The number of tokens to distribute (must match msg.value or have an approval for the token transfer)
+     */
     function distributeRewards(uint256 numTokens) external payable;
 
-    function transferRewards(address account) external;
+    /**
+     * @notice Transfer reward balance for a given account. Requires the account to have all funds staked.
+     * @param account The account to transfer rewards to
+     */
+    function transferRewardsFor(address account) external;
 
     // Requires authentication
-    function mint(address account, uint256 amount, uint256 currencyIn) external payable;
+    function mint(address account, uint256 amount, uint256 payment) external payable;
 
     // function allocate(address account, uint256 amount, uint256 tokensIn) external;
 

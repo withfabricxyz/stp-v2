@@ -6,7 +6,18 @@ import "./TestImports.t.sol";
 contract RewardPoolTests is BaseTest {
     RewardPool internal pool;
 
-    function reinitPool(RewardPoolParams memory params, address currency) internal returns (RewardPool pool) {
+    RewardPoolParams internal params = RewardPoolParams({
+        bips: 0,
+        numPeriods: 6,
+        periodSeconds: 2,
+        startTimestamp: 0,
+        minMultiplier: 0,
+        slashable: true,
+        formulaBase: 2,
+        slashGracePeriod: 0
+    });
+
+    function reinitPool(address currency) internal returns (RewardPool pool) {
         pool = new RewardPool();
         vm.store(
             address(pool),
@@ -14,19 +25,57 @@ contract RewardPoolTests is BaseTest {
             bytes32(0)
         );
         pool.initialize("Rewards", "rSUB", params, currency);
+        pool.setRoles(address(this), 0xff); // allow admin mint
         return pool;
     }
 
     function setUp() public {
-        pool = reinitPool(poolParams, address(0));
+        pool = reinitPool(address(0));
     }
 
-    function testSetup() public {
+    function testConfig() public {
         assertEq(pool.name(), "Rewards");
         assertEq(pool.symbol(), "rSUB");
-        assertEq(pool.denomination(), address(0));
+        assertEq(pool.currency(), address(0));
+        assertEq(pool.balance(), 0);
         assertEq(pool.totalSupply(), 0);
         assertEq(pool.rewardMultiplier(), 64);
+    }
+
+    function testAdminMint() public {
+        pool.adminMint(alice, 1e18);
+        assertEq(pool.balanceOf(alice), 1e18);
+        assertEq(pool.totalSupply(), 1e18);
+    }
+
+    function testAllocation() public {
+        pool.distributeRewards{value: 1e18}(1e18);
+        assertEq(pool.balance(), 1e18);
+        assertEq(address(pool).balance, 1e18);
+        (bool sent,) = address(pool).call{value: 1e18}("");
+        assertEq(pool.balance(), 2e18);
+    }
+
+    function testRewardBalance() public {
+        pool.adminMint(alice, 1e18);
+        assertEq(pool.rewardBalanceOf(alice), 0);
+        pool.distributeRewards{value: 1e18}(1e18);
+        assertEq(pool.rewardBalanceOf(alice), 1e18);
+    }
+
+    function testRewardBalanceOverTime() public {
+        pool.adminMint(alice, 1e18);
+        pool.distributeRewards{value: 1e18}(1e18);
+        pool.transferRewardsFor(alice);
+        assertEq(pool.rewardBalanceOf(alice), 0);
+        pool.distributeRewards{value: 1e17}(1e17);
+        assertEq(pool.rewardBalanceOf(alice), 1e17);
+
+        // TODO
+        // vm.startPrank(alice);
+        // pool.unstake();
+        // vm.stopPrank();
+        // assertEq(pool.rewardBalanceOf(alice), 0);
     }
 
     // function testSingleHalving() public {

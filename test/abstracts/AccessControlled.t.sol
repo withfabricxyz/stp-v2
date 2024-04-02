@@ -6,15 +6,19 @@ import {AccessControlled} from "src/abstracts/AccessControlled.sol";
 
 contract TestSubject is AccessControlled, Test {
     constructor(address account) {
-        setOwner(account);
+        _setOwner(account);
     }
 
     function checkManager() external view {
-        checkRole(2);
+        _checkRoles(2);
+    }
+
+    function checkOwnerOrManager() external view {
+        _checkOwnerOrRoles(2);
     }
 
     function checkOwnerCall() external view {
-        checkOwner();
+        _checkOwner();
     }
 }
 
@@ -29,17 +33,16 @@ contract AccessControlledTest is Test {
 
     function testRoleSetting() public {
         vm.expectEmit(true, true, false, true, address(subject));
-        emit AccessControlled.RoleChanged(alice, 1);
-        subject.setRoles(alice, 1);
-        subject.setRoles(alice, 2);
-        subject.setRoles(alice, 3);
-        vm.expectRevert(abi.encodeWithSelector(AccessControlled.InvalidRoleMask.selector, 4));
+        emit AccessControlled.RoleChanged(alice, 4);
         subject.setRoles(alice, 4);
     }
 
     function testAdmin() public {
-        subject.checkManager();
+        subject.checkOwnerOrManager();
         subject.checkOwnerCall();
+
+        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
+        subject.checkManager();
 
         vm.expectEmit(true, true, false, true, address(subject));
         emit AccessControlled.OwnerProposed(alice);

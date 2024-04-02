@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
+
 pragma solidity ^0.8.20;
 
 import {AccessControlled} from "./abstracts/AccessControlled.sol";
@@ -13,28 +14,34 @@ contract RewardPool is IRewardPool, AccessControlled, ERC20, Initializable {
     using CurrencyLib for Currency;
     using RewardLib for RewardPoolParams;
 
-    /// @dev The total number of denominated tokens in the reward pool
-    uint256 private _totalTokensIn;
+    /// @dev The minter role is granted to contracts which are allowed to mint tokens with funds
+    uint16 private constant ROLE_MINTER = 1;
 
-    /// @dev The reward pool tokens slashed (used to calculate reward withdraws accurately)
-    uint256 private _rewardPoolSlashed;
+    /// @dev The creator role is granted by the factory to the creator of the pool .... TODO: what does this mean?
+    uint16 private constant ROLE_CREATOR = 2;
 
+    /// uint16 private constant ROLE_PARTNER = 2;
+
+    uint256 private _currencyCaptured;
+
+    /// @dev The ERC20 token name
     string private _name;
+
+    /// @dev The ERC20 token symbol
     string private _symbol;
 
     RewardPoolParams private _params;
 
+    /// @dev The base currency for the reward pool (what staked withdraws receive)
     Currency private _currency;
 
-    struct Holdings {
-        uint48 stakedAt;
-        uint48 slashableAt;
-        uint256 shares;
-        uint256 totalWithdrawn;
-    }
+    /// @dev The number of base tokens withdrawn by an account (used to calculate reward withdraws accurately)
+    mapping(address => uint256) private _withdraws;
 
-    mapping(address => Holdings) private _holders;
+    /// @dev Staking status for accounts (staked = withdraws are possible and transfers are not)
+    mapping(address => bool) private _staked;
 
+    /// @dev RewardPools are cloned, so the constructor is disabled
     constructor() {
         _disableInitializers();
     }
@@ -47,116 +54,127 @@ contract RewardPool is IRewardPool, AccessControlled, ERC20, Initializable {
         _symbol = symbol_;
         _params = params_;
         _currency = Currency.wrap(currency);
+        _setOwner(msg.sender); // Factory is the owner
+            // set the role for the creator
     }
 
-    function name() public view override returns (string memory) {
-        return _name;
-    }
+    //////////////////////////////
+    // External actions
+    //////////////////////////////
 
-    function symbol() public view override returns (string memory) {
-        return _symbol;
-    }
-
-    function mint(address account, uint256 amount, uint256 currencyIn) external payable {
-        // need to check the sender is allowed
-        _currency.capture(msg.sender, currencyIn);
-        _mint(account, amount);
-    }
-
-    function stake() external {
-        // _holders[msg.sender].stakedAt = uint48(block.timestamp);
-    }
-
-    function unstake() external {
-        // set holdings to staked
-        // set the withdrawn amount to the percentage
+    /**
+     * @notice Fallback function to allocate rewards for stakers
+     */
+    receive() external payable {
+        distributeRewards(msg.value);
     }
 
     /**
-     * @notice Slash the reward points for an expired subscription after a grace period which is 50% of the purchased time
-     *         Any slashable points are burned, increasing the value of remaining points.
-     * @param account the account of the subscription to slash
+     * @notice Mint tokens to an account without payment (used for migrations, etc)
      */
-    function slashRewards(address account) external {
-        // Subscription memory slasher = _subscriptions[msg.sender];
-        // slasher.checkActive();
-
-        // Subscription storage sub = _subscriptions[account];
-
-        // // Deflate the reward points pool and account for prior reward withdrawals
-        // _totalRewardPoints -= sub.rewardPoints;
-        // _rewardPoolSlashed += sub.rewardsWithdrawn;
-
-        // // If all points are slashed, move left-over funds to creator
-        // if (_totalRewardPoints == 0) {
-        //     _rewardPool.liquidateTo(_creatorPool);
-        // }
-
-        // emit RewardPointsSlashed(account, msg.sender, sub.rewardPoints);
-        // RewardLib.slash(_RewardPoolParams, sub);
+    function adminMint(address account, uint256 amount) external {
+        // _checkAdmin();
+        _checkRoles(ROLE_CREATOR);
+        _mint(account, amount);
     }
 
-    function distributeRewards(uint256 numTokens) external payable override {
-        uint256 finalAmount = _currency.capture(msg.sender, numTokens);
+    function mint(address account, uint256 amount, uint256 payment) external payable {
+        _checkRoles(ROLE_MINTER);
+
+        // if secondary multiplier are not allowed, set to 1
+        // if (!_params.secondaryMultiplierAllowed() && multiplier > 1) {
+        //   multiplier = 1;
+        // }
+
+        _capture(payment);
+        _mint(account, amount * rewardMultiplier());
+    }
+
+    // allocateRewards?
+    function distributeRewards(uint256 numTokens) public payable override {
+        uint256 finalAmount = _capture(numTokens);
         emit RewardsAllocated(finalAmount);
     }
 
     // @inheritdoc IRewardPool
-    function transferRewards(address account) external override {
-        Holdings storage holdings = _getHoldings(account);
-        uint256 amount = _rewardBalance(holdings);
+    // transferRewardsFor?
+    function transferRewardsFor(address account) public override {
+        uint256 amount = rewardBalanceOf(account);
         if (amount == 0) {
             revert InsufficientRewards();
         }
-        holdings.totalWithdrawn += amount;
+        if (!_staked[account]) {
+            revert AccountNotStaked();
+        }
+
+        _withdraws[account] += amount;
+
         emit RewardTransfer(account, amount);
         _currency.transfer(account, amount);
     }
 
-    function _getHoldings(address account) internal view returns (Holdings storage) {
-        // TODO: Revert
-        return _holders[account];
-    }
+    function stake() external {
+        address account = msg.sender;
 
-    //     /// @dev The reward balance for a given subscription
-    function _rewardBalance(Holdings memory holding) internal view returns (uint256) {
-        if (holding.stakedAt == 0) {
-            return 0;
+        if (_staked[account]) {
+            revert("Account already staked");
         }
+        if (balanceOf(account) == 0) {
+            revert("Cannot stake with balance");
+        }
+        _staked[account] = true;
 
-        // uint256 userShare = (_rewardPool.total() - _rewardPoolSlashed) * holding.shares / _totalSupply;
-        // if (userShare <= sub.rewardsWithdrawn) {
-        //     return 0;
-        // }
-        // return userShare - sub.rewardsWithdrawn;
-        return 0;
+        // Prevent immediate withdraws
+        _withdraws[account] = rewardBalanceOf(account);
+        // emit TokensStaked(account, amount);
     }
 
-    //     /**
-    //  * @notice The current reward multiplier used to calculate reward points on mint. This is halved every _minPurchaseSeconds and goes to 0 after N halvings.
-    //  * @return multiplier the current value
-    //  */
+    function unstake() external {
+        address account = msg.sender;
+        if (!_staked[account]) {
+            revert AccountNotStaked();
+        }
+        if (balanceOf(account) == 0) {
+            revert("Cannot unstake with balance");
+        }
+        _staked[account] = false;
+
+        // Update counters?
+        // Transfer rewards?
+        // if(rewardBalanceOf(account) > 0) {
+        //     transferRewardsFor(account);
+        // }
+
+        // emit TokensUnstaked(account, amount);
+    }
+
+    //////////////////////////////
+    // View functions
+    //////////////////////////////
+
+    /// @inheritdoc ERC20
+    function name() public view override returns (string memory) {
+        return _name;
+    }
+
+    /// @inheritdoc ERC20
+    function symbol() public view override returns (string memory) {
+        return _symbol;
+    }
+
+    /**
+     * @notice The current reward multiplier used to calculate reward points on mint. This may decay based on the curve configuration.
+     * @return multiplier the current value
+     */
     function rewardMultiplier() public view returns (uint256 multiplier) {
         return _params.currentMultiplier();
     }
 
-    //     /**
-    //  * @notice The number of reward points allocated to all subscribers (used to calculate rewards)
-    //  * @return numPoints total number of reward points
-    //  */
-    // function totalSupply() external view returns (uint256 numPoints) {
-    //     return _totalSupply;
-    // }
-
-    // /**
-    //  * @notice The balance of the reward pool (for reward withdraws)
-    //  * @return numTokens number of tokens in the reward pool
-    //  */
-    function yieldBalance() external view returns (uint256 numTokens) {
+    function balance() external view returns (uint256 numTokens) {
         return _currency.balance();
     }
 
-    function denomination() external view returns (address) {
+    function currency() external view returns (address) {
         return Currency.unwrap(_currency);
     }
 
@@ -164,12 +182,35 @@ contract RewardPool is IRewardPool, AccessControlled, ERC20, Initializable {
         return _params;
     }
 
-    // /**
-    //  * @notice The number of tokens available to withdraw from the reward pool, for a given account
-    //  * @param account the account to check
-    //  * @return numTokens number of tokens available to withdraw
-    //  */
-    function rewardBalanceOf(address account) external view returns (uint256 numTokens) {
-        return _rewardBalance(_getHoldings(account));
+    /**
+     * @notice Fetch the base token balance for an account (0 if not staked)
+     * @param account the account to check
+     * @return numTokens number of tokens available to withdraw
+     */
+    function rewardBalanceOf(address account) public view returns (uint256 numTokens) {
+        // - 0 -> deals with burned tokens
+        uint256 burnedWithdrawTotals = 0;
+        uint256 userShare = ((_currencyCaptured - burnedWithdrawTotals) * balanceOf(account)) / totalSupply();
+        if (userShare <= _withdraws[account]) {
+            return 0;
+        }
+        return userShare - _withdraws[account];
+    }
+
+    //////////////////////////////
+    // Internal logic
+    //////////////////////////////
+
+    function _capture(uint256 tokens) private returns (uint256 finalAmount) {
+        finalAmount = _currency.capture(msg.sender, tokens);
+        _currencyCaptured += finalAmount;
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override {
+        if (balanceOf(to) == 0) {
+            _staked[to] = true;
+        }
+        // prevent transfers if staked
+        // if a new account, immediately stake and give them access to all liquidity
     }
 }
