@@ -13,7 +13,8 @@ contract RewardsTest is BaseTest {
             bytes32(uint256(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffbf601132)),
             bytes32(0)
         );
-        pool.initialize("Rewards", "rSUB", poolParams, address(0));
+
+        pool.initialize("Rewards", "rSUB", defaultPoolParams(), address(0));
         pool.setRoles(address(this), 0xff); // allow admin mint
 
         rewardParams.poolAddress = address(pool);

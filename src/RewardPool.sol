@@ -15,10 +15,10 @@ contract RewardPool is IRewardPool, AccessControlled, ERC20, Initializable {
     using RewardLib for RewardPoolParams;
 
     /// @dev The minter role is granted to contracts which are allowed to mint tokens with funds
-    uint16 private constant ROLE_MINTER = 1;
+    uint16 public constant ROLE_MINTER = 1;
 
     /// @dev The creator role is granted by the factory to the creator of the pool .... TODO: what does this mean?
-    uint16 private constant ROLE_CREATOR = 2;
+    uint16 public constant ROLE_CREATOR = 2;
 
     /// uint16 private constant ROLE_PARTNER = 2;
 

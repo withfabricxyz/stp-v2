@@ -7,7 +7,6 @@ contract RecoveryTests is BaseTest {
     function setUp() public {
         tierParams.periodDurationSeconds = 4;
         tierParams.pricePerPeriod = 8;
-        poolParams.numPeriods = 0;
         stp = reinitStp();
         stp = reinitStp();
     }

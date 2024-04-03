@@ -7,7 +7,6 @@ contract RefundsTests is BaseTest {
     function setUp() public {
         tierParams.periodDurationSeconds = 30 days;
         tierParams.pricePerPeriod = 0.001 ether;
-        poolParams.numPeriods = 0;
         stp = reinitStp();
 
         deal(alice, 1e19);

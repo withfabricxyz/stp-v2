@@ -100,17 +100,6 @@ abstract contract BaseTest is Test {
 
     RewardParams internal rewardParams = RewardParams({bips: 0, poolAddress: address(0)});
 
-    RewardPoolParams internal poolParams = RewardPoolParams({
-        bips: 0,
-        numPeriods: 6,
-        periodSeconds: 2,
-        startTimestamp: 0,
-        minMultiplier: 0,
-        slashable: true,
-        formulaBase: 2,
-        slashGracePeriod: 0
-    });
-
     InitParams internal initParams = InitParams({
         name: "Meow Sub",
         symbol: "MEOW",
@@ -182,9 +171,22 @@ abstract contract BaseTest is Test {
         tierParams.pricePerPeriod = minPurchase * 2;
         feeParams.bips = feeBps;
         feeParams.collector = feeBps > 0 ? fees : address(0);
-        poolParams.bips = bips;
-        poolParams.numPeriods = 6;
+        // poolParams.bips = bips;
+        // poolParams.numPeriods = 6;
         return reinitStp();
+    }
+
+    function defaultPoolParams() internal view returns (RewardPoolParams memory) {
+        return RewardPoolParams({
+            bips: 0,
+            numPeriods: 6,
+            periodSeconds: 2,
+            startTimestamp: 0,
+            minMultiplier: 0,
+            slashable: true,
+            formulaBase: 2,
+            slashGracePeriod: 0
+        });
     }
 
     function testIgnore() internal {}

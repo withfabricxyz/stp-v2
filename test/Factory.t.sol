@@ -1,39 +1,58 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {InitParams, DeployParams, Tier, RewardPoolParams} from "src/types/Index.sol";
-import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct} from "./TestHelpers.t.sol";
-import {SubscriptionTokenV2Factory} from "src/SubscriptionTokenV2Factory.sol";
+import "./TestImports.t.sol";
+import {Factory} from "src/Factory.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 contract FactoryTest is BaseTest {
-    /// @dev Emitted upon a successful contract deployment
-    event Deployment(address indexed deployment, uint256 feeId);
-
-    /// @dev Emitted when a new fee is created
-    event FeeCreated(uint256 indexed id, address collector, uint16 bips);
-
-    /// @dev Emitted when a fee is destroyed
-    event FeeDestroyed(uint256 indexed id);
-
-    /// @dev Emitted when the deployment fee changes
-    event DeployFeeChange(uint256 amount);
-
-    /// @dev Emitted when the deploy fees are collected by the owner
-    event DeployFeeTransfer(address indexed recipient, uint256 amount);
-
     SubscriptionTokenV2 internal impl;
-    SubscriptionTokenV2Factory internal factory;
+    RewardPool internal rpImpl;
+    Factory internal factory;
+    FactoryFeeConfig internal fee;
 
     function setUp() public {
         impl = new SubscriptionTokenV2();
-        factory = new SubscriptionTokenV2Factory(address(impl));
+        rpImpl = new RewardPool();
+        factory = new Factory(address(impl), address(rpImpl));
+        fee = FactoryFeeConfig({collector: bob, basisPoints: 100, deployFee: 0});
         deal(alice, 1e19);
     }
 
     function defaultParams() internal view returns (DeployParams memory) {
-        return DeployParams({feeConfigId: 0, initParams: initParams, tierParams: tierParams, poolParams: poolParams});
+        return
+            DeployParams({feeConfigId: 0, initParams: initParams, tierParams: tierParams, rewardParams: rewardParams});
+    }
+
+    function testRewardPoolDeployment() public {
+        RewardPoolParams memory poolParams = defaultPoolParams();
+        vm.expectEmit(false, false, false, true, address(factory));
+        emit Factory.RewardPoolDeployment(address(1));
+        RewardPool pool = RewardPool(payable(factory.deployRewardPool(poolParams)));
+        // assertEq(pool.name(), "Rewards");
+    }
+
+    function testSubAndPoolDeployment() public {
+        DeployParams memory params = defaultParams();
+        RewardPoolParams memory poolParams = defaultPoolParams();
+        params.rewardParams.bips = 1000;
+
+        vm.expectEmit(false, false, false, true, address(factory));
+        emit Factory.RewardPoolDeployment(address(1));
+        vm.expectEmit(false, false, false, true, address(factory));
+        emit Factory.SubscriptionDeployment(address(1), 0);
+        (address sub, address pool) = factory.deploySubscription(params, poolParams);
+
+        SubscriptionTokenV2 nft = SubscriptionTokenV2(payable(sub));
+        (address poolAddr, uint16 bps) = nft.rewardParams();
+        assertEq(poolAddr, pool);
+        assertEq(bps, 1000);
+
+        // Ensure NFT transfers funds to pool
+        vm.startPrank(alice);
+        nft.mint{value: 1e5}(1e5);
+        assertEq(RewardPool(payable(pool)).balanceOf(alice), 1e5 * 64);
+        vm.stopPrank();
     }
 
     function testDeployment() public {
@@ -42,7 +61,7 @@ contract FactoryTest is BaseTest {
         DeployParams memory params = defaultParams();
 
         vm.expectEmit(false, false, false, true, address(factory));
-        emit Deployment(address(1), 0);
+        emit Factory.SubscriptionDeployment(address(1), 0);
         address deployment = factory.deploySubscription(params);
 
         SubscriptionTokenV2 nft = SubscriptionTokenV2(payable(deployment));
@@ -65,13 +84,13 @@ contract FactoryTest is BaseTest {
     }
 
     function testDeploymentWithReferral() public {
-        factory.createFee(1, bob, 100);
+        factory.createFee(1, fee);
         DeployParams memory params = defaultParams();
         params.feeConfigId = 1;
 
         vm.startPrank(alice);
         vm.expectEmit(false, false, false, true, address(factory));
-        emit Deployment(address(1), 1);
+        emit Factory.SubscriptionDeployment(address(1), 1);
         address deployment = factory.deploySubscription(params);
         SubscriptionTokenV2 nft = SubscriptionTokenV2(payable(deployment));
         (address recipient, uint16 bps) = nft.feeParams();
@@ -80,13 +99,13 @@ contract FactoryTest is BaseTest {
     }
 
     function testInvalidReferral() public {
-        factory.createFee(0, bob, 100);
+        factory.createFee(0, fee);
         DeployParams memory params = defaultParams();
         params.feeConfigId = 1;
 
         vm.startPrank(alice);
         vm.expectEmit(false, false, false, true, address(factory));
-        emit Deployment(address(1), 1);
+        emit Factory.SubscriptionDeployment(address(1), 1); // ?
         address deployment = factory.deploySubscription(params);
         SubscriptionTokenV2 nft = SubscriptionTokenV2(payable(deployment));
         (address recipient, uint16 bps) = nft.feeParams();
@@ -96,93 +115,64 @@ contract FactoryTest is BaseTest {
 
     function testFeeCreate() public {
         vm.expectEmit(true, true, true, true, address(factory));
-        emit FeeCreated(1, bob, 100);
-        factory.createFee(1, bob, 100);
+        emit Factory.FeeCreated(1, bob, 100, 0);
+        factory.createFee(1, fee);
 
-        (address addr, uint16 bips, uint256 deploy) = factory.feeInfo(1);
-        assertEq(bob, addr);
-        assertEq(100, bips);
-        assertEq(0, deploy);
+        FactoryFeeConfig memory result = factory.feeInfo(1);
+        assertEq(bob, result.collector);
+        assertEq(100, result.basisPoints);
+        assertEq(0, result.deployFee);
     }
 
     function testFeeCreateInvalid() public {
-        vm.expectRevert(abi.encodeWithSelector(SubscriptionTokenV2Factory.FeeBipsInvalid.selector));
-        factory.createFee(1, bob, 2000);
-        vm.expectRevert(abi.encodeWithSelector(SubscriptionTokenV2Factory.FeeBipsInvalid.selector));
-        factory.createFee(1, bob, 0);
-        vm.expectRevert(abi.encodeWithSelector(SubscriptionTokenV2Factory.FeeCollectorInvalid.selector));
-        factory.createFee(1, address(0), 100);
+        fee.basisPoints = 2000;
+        vm.expectRevert(abi.encodeWithSelector(Factory.FeeBipsInvalid.selector));
+        factory.createFee(1, fee);
+
+        fee.basisPoints = 0;
+        vm.expectRevert(abi.encodeWithSelector(Factory.FeeBipsInvalid.selector));
+        factory.createFee(1, fee);
+
+        fee.basisPoints = 100;
+        fee.collector = address(0);
+        vm.expectRevert(abi.encodeWithSelector(Factory.FeeCollectorInvalid.selector));
+        factory.createFee(1, fee);
 
         // Valid
-        factory.createFee(1, bob, 100);
-        vm.expectRevert(abi.encodeWithSelector(SubscriptionTokenV2Factory.FeeExists.selector, 1));
-        factory.createFee(1, alice, 100);
+        fee.collector = bob;
+        factory.createFee(1, fee);
+        vm.expectRevert(abi.encodeWithSelector(Factory.FeeExists.selector, 1));
+        factory.createFee(1, fee);
     }
 
     function testFeeDestroy() public {
-        factory.createFee(1, bob, 100);
+        factory.createFee(1, fee);
         factory.destroyFee(1);
 
-        vm.expectRevert(abi.encodeWithSelector(SubscriptionTokenV2Factory.FeeNotFound.selector, 1));
+        vm.expectRevert(abi.encodeWithSelector(Factory.FeeNotFound.selector, 1));
         factory.destroyFee(1);
-    }
-
-    function testDeployFeeUpdate() public {
-        vm.expectEmit(true, true, true, true, address(factory));
-        emit DeployFeeChange(1e12);
-        factory.updateMinimumDeployFee(1e12);
-
-        (address addr, uint16 bips, uint256 deploy) = factory.feeInfo(0);
-        assertEq(address(0), addr);
-        assertEq(0, bips);
-        assertEq(1e12, deploy);
-
-        vm.startPrank(alice);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
-        factory.updateMinimumDeployFee(1e12);
     }
 
     function testDeployFeeTooLow() public {
-        factory.updateMinimumDeployFee(1e12);
-        vm.expectRevert(abi.encodeWithSelector(SubscriptionTokenV2Factory.FeeInsufficient.selector, 1e12));
+        fee.deployFee = 1e12;
+        factory.createFee(0, fee);
+        vm.expectRevert(abi.encodeWithSelector(Factory.FeeInsufficient.selector, 1e12));
         factory.deploySubscription(defaultParams());
     }
 
-    function testDeployFeeCollectNone() public {
-        vm.expectRevert(abi.encodeWithSelector(SubscriptionTokenV2Factory.FeeBalanceZero.selector));
-        factory.transferDeployFees(alice);
-    }
-
     function testDeployFeeCapture() public {
-        factory.updateMinimumDeployFee(1e12);
+        fee.deployFee = 1e12;
+        factory.createFee(0, fee);
         factory.deploySubscription{value: 1e12}(defaultParams());
-        assertEq(1e12, address(factory).balance);
-    }
-
-    function testDeployFeeTransfer() public {
-        factory.updateMinimumDeployFee(1e12);
-        factory.deploySubscription{value: 1e12}(defaultParams());
-        vm.expectEmit(true, true, true, true, address(factory));
-        emit DeployFeeTransfer(alice, 1e12);
-        uint256 beforeBalance = alice.balance;
-        factory.transferDeployFees(alice);
-        assertEq(beforeBalance + 1e12, alice.balance);
-        assertEq(0, address(factory).balance);
-    }
-
-    function testDeployFeeTransferNonOwner() public {
-        factory.updateMinimumDeployFee(1e12);
-        factory.deploySubscription{value: 1e12}(defaultParams());
-        vm.startPrank(alice);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
-        factory.transferDeployFees(alice);
+        assertEq(1e12, bob.balance);
     }
 
     function testDeployFeeTransferBadReceiver() public {
-        factory.updateMinimumDeployFee(1e12);
+        fee.deployFee = 1e12;
+        fee.collector = address(this);
+        factory.createFee(0, fee);
+        vm.expectRevert(abi.encodeWithSelector(Factory.FeeTransferFailed.selector));
         factory.deploySubscription{value: 1e12}(defaultParams());
-        vm.expectRevert(abi.encodeWithSelector(SubscriptionTokenV2Factory.FeeTransferFailed.selector));
-        factory.transferDeployFees(address(this));
     }
 
     function testTransferAccept() public {

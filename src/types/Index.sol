@@ -113,7 +113,7 @@ struct DeployParams {
     /// @dev the init parameters for the default tier (tier 1)
     Tier tierParams;
     /// @dev the reward parameters for the collection
-    RewardPoolParams poolParams;
+    RewardParams rewardParams;
 }
 
 /// @dev The subscription struct which holds the state of a subscription for an account

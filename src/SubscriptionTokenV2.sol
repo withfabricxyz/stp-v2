@@ -32,8 +32,8 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     using SubscriptionLib for Subscription;
     using CurrencyLib for Currency;
 
-    uint16 private constant ROLE_MANAGER = 1;
-    uint16 private constant ROLE_AGENT = 2;
+    uint16 public constant ROLE_MANAGER = 1;
+    uint16 public constant ROLE_AGENT = 2;
 
     /// @dev Maximum protocol fee basis points (12.5%)
     uint16 private constant _MAX_FEE_BIPS = 1250;
@@ -57,7 +57,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     FeeParams public feeParams;
 
     /// @dev The reward pool parameters (pollAddress (0 = disabled), and the bips)
-    RewardParams private _rewardParams;
+    RewardParams public rewardParams;
 
     Currency private _currency;
 
@@ -117,7 +117,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         if (params.bips > _MAX_BIPS) {
             revert InvalidBps();
         }
-        _rewardParams = params;
+        rewardParams = params;
     }
 
     function _initializeCore(InitParams memory params) private {
@@ -563,22 +563,21 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     }
 
     function _transferRewards(address account, uint256 amount, uint8 multiplier) private returns (uint256) {
-        if (_rewardParams.poolAddress == address(0)) {
+        if (rewardParams.poolAddress == address(0)) {
             return amount;
         }
 
-        uint256 rewards = (amount * _rewardParams.bips) / _MAX_BIPS;
+        uint256 rewards = (amount * rewardParams.bips) / _MAX_BIPS;
         if (rewards == 0) {
             return amount;
         }
 
         if (_currency.isNative()) {
-            // need to perform the call with value, or approve
-            IRewardPool(_rewardParams.poolAddress).mint{value: rewards}(account, amount * multiplier, rewards);
+            IRewardPool(rewardParams.poolAddress).mint{value: rewards}(account, amount * multiplier, rewards);
         } else {
-            // need to perform the call with value, or approve
-            _currency.approve(_rewardParams.poolAddress, rewards);
-            IRewardPool(_rewardParams.poolAddress).mint(account, amount * multiplier, rewards);
+            // TODO: transfer and call? more risk?
+            _currency.approve(rewardParams.poolAddress, rewards);
+            IRewardPool(rewardParams.poolAddress).mint(account, amount * multiplier, rewards);
         }
         return amount - rewards;
     }

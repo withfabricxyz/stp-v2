@@ -72,28 +72,6 @@ library RewardLib {
         return (numTokens * self.bips) / MAX_BIPS;
     }
 
-    // function slash(RewardPoolParams memory self, Subscription storage subscription) internal {
-    //     if (self.bips == 0) {
-    //         revert RewardsDisabled();
-    //     }
-
-    //     if (!self.slashable) {
-    //         revert RewardSlashingDisabled();
-    //     }
-
-    //     if (subscription.rewardPoints == 0) {
-    //         revert RewardSlashingNotPossible();
-    //     }
-
-    //     uint256 slashPoint = SubscriptionLib.expiresAt(subscription) + self.slashGracePeriod;
-    //     if (block.timestamp <= slashPoint) {
-    //         revert RewardSlashingNotReady(slashPoint);
-    //     }
-
-    //     subscription.rewardPoints = 0;
-    //     subscription.rewardsWithdrawn = 0;
-    // }
-
     function surpassedPeriods(RewardPoolParams memory self) private view returns (uint256) {
         return (block.timestamp - self.startTimestamp) / self.periodSeconds;
     }
