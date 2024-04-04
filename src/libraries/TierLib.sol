@@ -76,23 +76,10 @@ library TierLib {
         }
     }
 
-    function checkSupply(Tier memory tier, uint32 subCount) internal pure {
-        if (tier.maxSupply != 0 && subCount >= tier.maxSupply) {
-            revert TierHasNoSupply(tier.id);
-        }
-    }
-
     function checkJoin(Tier memory tier, uint32 subCount, address account, uint256 numTokens) internal view {
-        if (block.timestamp < tier.startTimestamp) {
-            revert TierNotStarted();
-        }
-
-        checkSupply(tier, subCount);
-
-        if (numTokens < tier.initialMintPrice) {
-            revert TierInvalidMintPrice(tier.initialMintPrice);
-        }
-
+        if (block.timestamp < tier.startTimestamp) revert TierNotStarted();
+        if (tier.maxSupply != 0 && subCount >= tier.maxSupply) revert TierHasNoSupply(tier.id);
+        if (numTokens < tier.initialMintPrice) revert TierInvalidMintPrice(tier.initialMintPrice);
         GateLib.checkAccount(tier.gate, account);
     }
 

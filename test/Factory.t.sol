@@ -2,19 +2,19 @@
 pragma solidity ^0.8.20;
 
 import "./TestImports.t.sol";
-import {Factory} from "src/Factory.sol";
+import {STPV2Factory} from "src/STPV2Factory.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 contract FactoryTest is BaseTest {
     SubscriptionTokenV2 internal impl;
     RewardPool internal rpImpl;
-    Factory internal factory;
+    STPV2Factory internal factory;
     FactoryFeeConfig internal fee;
 
     function setUp() public {
         impl = new SubscriptionTokenV2();
         rpImpl = new RewardPool();
-        factory = new Factory(address(impl), address(rpImpl));
+        factory = new STPV2Factory(address(impl), address(rpImpl));
         fee = FactoryFeeConfig({collector: bob, basisPoints: 100, deployFee: 0});
         deal(alice, 1e19);
     }
@@ -27,7 +27,7 @@ contract FactoryTest is BaseTest {
     function testRewardPoolDeployment() public {
         RewardPoolParams memory poolParams = defaultPoolParams();
         vm.expectEmit(false, false, false, true, address(factory));
-        emit Factory.RewardPoolDeployment(address(1));
+        emit STPV2Factory.RewardPoolDeployment(address(1));
         RewardPool pool = RewardPool(payable(factory.deployRewardPool(poolParams)));
         // assertEq(pool.name(), "Rewards");
     }
@@ -38,9 +38,9 @@ contract FactoryTest is BaseTest {
         params.rewardParams.bips = 1000;
 
         vm.expectEmit(false, false, false, true, address(factory));
-        emit Factory.RewardPoolDeployment(address(1));
+        emit STPV2Factory.RewardPoolDeployment(address(1));
         vm.expectEmit(false, false, false, true, address(factory));
-        emit Factory.SubscriptionDeployment(address(1), 0);
+        emit STPV2Factory.SubscriptionDeployment(address(1), 0);
         (address sub, address pool) = factory.deploySubscription(params, poolParams);
 
         SubscriptionTokenV2 nft = SubscriptionTokenV2(payable(sub));
@@ -61,7 +61,7 @@ contract FactoryTest is BaseTest {
         DeployParams memory params = defaultParams();
 
         vm.expectEmit(false, false, false, true, address(factory));
-        emit Factory.SubscriptionDeployment(address(1), 0);
+        emit STPV2Factory.SubscriptionDeployment(address(1), 0);
         address deployment = factory.deploySubscription(params);
 
         SubscriptionTokenV2 nft = SubscriptionTokenV2(payable(deployment));
@@ -90,7 +90,7 @@ contract FactoryTest is BaseTest {
 
         vm.startPrank(alice);
         vm.expectEmit(false, false, false, true, address(factory));
-        emit Factory.SubscriptionDeployment(address(1), 1);
+        emit STPV2Factory.SubscriptionDeployment(address(1), 1);
         address deployment = factory.deploySubscription(params);
         SubscriptionTokenV2 nft = SubscriptionTokenV2(payable(deployment));
         (address recipient, uint16 bps) = nft.feeParams();
@@ -105,7 +105,7 @@ contract FactoryTest is BaseTest {
 
         vm.startPrank(alice);
         vm.expectEmit(false, false, false, true, address(factory));
-        emit Factory.SubscriptionDeployment(address(1), 1); // ?
+        emit STPV2Factory.SubscriptionDeployment(address(1), 1); // ?
         address deployment = factory.deploySubscription(params);
         SubscriptionTokenV2 nft = SubscriptionTokenV2(payable(deployment));
         (address recipient, uint16 bps) = nft.feeParams();
@@ -115,7 +115,7 @@ contract FactoryTest is BaseTest {
 
     function testFeeCreate() public {
         vm.expectEmit(true, true, true, true, address(factory));
-        emit Factory.FeeCreated(1, bob, 100, 0);
+        emit STPV2Factory.FeeCreated(1, bob, 100, 0);
         factory.createFee(1, fee);
 
         FactoryFeeConfig memory result = factory.feeInfo(1);
@@ -126,22 +126,22 @@ contract FactoryTest is BaseTest {
 
     function testFeeCreateInvalid() public {
         fee.basisPoints = 2000;
-        vm.expectRevert(abi.encodeWithSelector(Factory.FeeBipsInvalid.selector));
+        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.FeeBipsInvalid.selector));
         factory.createFee(1, fee);
 
         fee.basisPoints = 0;
-        vm.expectRevert(abi.encodeWithSelector(Factory.FeeBipsInvalid.selector));
+        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.FeeBipsInvalid.selector));
         factory.createFee(1, fee);
 
         fee.basisPoints = 100;
         fee.collector = address(0);
-        vm.expectRevert(abi.encodeWithSelector(Factory.FeeCollectorInvalid.selector));
+        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.FeeCollectorInvalid.selector));
         factory.createFee(1, fee);
 
         // Valid
         fee.collector = bob;
         factory.createFee(1, fee);
-        vm.expectRevert(abi.encodeWithSelector(Factory.FeeExists.selector, 1));
+        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.FeeExists.selector, 1));
         factory.createFee(1, fee);
     }
 
@@ -149,14 +149,14 @@ contract FactoryTest is BaseTest {
         factory.createFee(1, fee);
         factory.destroyFee(1);
 
-        vm.expectRevert(abi.encodeWithSelector(Factory.FeeNotFound.selector, 1));
+        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.FeeNotFound.selector, 1));
         factory.destroyFee(1);
     }
 
     function testDeployFeeTooLow() public {
         fee.deployFee = 1e12;
         factory.createFee(0, fee);
-        vm.expectRevert(abi.encodeWithSelector(Factory.FeeInsufficient.selector, 1e12));
+        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.FeeInsufficient.selector, 1e12));
         factory.deploySubscription(defaultParams());
     }
 
@@ -171,7 +171,7 @@ contract FactoryTest is BaseTest {
         fee.deployFee = 1e12;
         fee.collector = address(this);
         factory.createFee(0, fee);
-        vm.expectRevert(abi.encodeWithSelector(Factory.FeeTransferFailed.selector));
+        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.FeeTransferFailed.selector));
         factory.deploySubscription{value: 1e12}(defaultParams());
     }
 

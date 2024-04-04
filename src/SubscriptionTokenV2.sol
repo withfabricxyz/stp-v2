@@ -11,8 +11,6 @@ import {InitParams, Tier, FeeParams, RewardParams, Tier, Subscription} from "./t
 import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
 import {TierLib} from "./libraries/TierLib.sol";
 import {ISubscriptionTokenV2} from "./interfaces/ISubscriptionTokenV2.sol";
-// import {ERC721} from "./abstracts/ERC721.sol";
-// import {Proxied} from "./abstracts/Proxied.sol";
 import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
 import {IRewardPool} from "./interfaces/IRewardPool.sol";
 
@@ -91,18 +89,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         mintFor(msg.sender, msg.value);
     }
 
-    function _initializeFees(FeeParams memory fees) private {
-        if (fees.bips > _MAX_FEE_BIPS) {
-            revert InvalidBps();
-        }
-        if (fees.collector != address(0)) {
-            if (fees.bips == 0) {
-                revert InvalidBps();
-            }
-        }
-        feeParams = fees;
-    }
-
+    /// @dev Initialize a new tier
     function _initializeTier(Tier memory params) private {
         _tierCount += 1;
         if (params.id != _tierCount) {
@@ -113,48 +100,35 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         emit TierCreated(_tierCount);
     }
 
-    function _initializeRewards(RewardParams memory params) private {
-        if (params.bips > _MAX_BIPS) {
-            revert InvalidBps();
-        }
-        rewardParams = params;
-    }
-
-    function _initializeCore(InitParams memory params) private {
-        if (params.owner == address(0)) {
-            revert InvalidOwner();
-        }
-
-        if (bytes(params.name).length == 0) {
-            revert InvalidName();
-        }
-
-        if (bytes(params.symbol).length == 0) {
-            revert InvalidSymbol();
-        }
-
-        if (bytes(params.contractUri).length == 0) {
-            revert InvalidContractUri();
-        }
-
-        _setOwner(params.owner);
-        _name = params.name;
-        _symbol = params.symbol;
-        contractURI = params.contractUri;
-        _globalSupplyCap = params.globalSupplyCap;
-
-        _currency = Currency.wrap(params.erc20TokenAddr);
-    }
-
     function initialize(InitParams memory params, Tier memory tier, RewardParams memory rewards, FeeParams memory fees)
         public
         initializer
     {
-        // TODO: If we inline all this, it will be smaller
-        _initializeCore(params);
-        _initializeFees(fees);
+        // Validate core params
+        if (params.owner == address(0)) revert InvalidOwner();
+        if (bytes(params.name).length == 0) revert InvalidName();
+        if (bytes(params.symbol).length == 0) revert InvalidSymbol();
+        if (bytes(params.contractUri).length == 0) revert InvalidContractUri();
+
+        // Validate fee params
+        if (fees.bips > _MAX_FEE_BIPS) revert InvalidFeeParams();
+        if (fees.collector != address(0) && fees.bips == 0) revert InvalidFeeParams();
+
+        // Validate reward params
+        if (rewards.bips > _MAX_BIPS) revert InvalidRewardParams();
+        if (rewards.poolAddress == address(0) && rewards.bips > 0) revert InvalidRewardParams();
+
+        // Validate and initialize the initial tier
         _initializeTier(tier);
-        _initializeRewards(rewards);
+
+        _setOwner(params.owner);
+        feeParams = fees;
+        rewardParams = rewards;
+        _name = params.name;
+        _symbol = params.symbol;
+        contractURI = params.contractUri;
+        _globalSupplyCap = params.globalSupplyCap;
+        _currency = Currency.wrap(params.erc20TokenAddr);
     }
 
     /////////////////////////
@@ -439,6 +413,8 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         uint48 numSeconds = tier.tokensToSeconds(tokensForTime);
         sub.renew(tokensForTime, numSeconds);
 
+        // TODO: All transfers elsewhere
+
         // TODO sub.purchase(tier, tokensTransferred);
         uint256 remaining = tokensIn;
         if (referrer != address(0)) {
@@ -453,6 +429,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         remaining = _transferFees(remaining);
         remaining = _transferRewards(account, remaining, tier.rewardMultiplier);
 
+        // TODO emit a refresh metadata event (for nft indexers)
         emit Purchase(account, sub.tokenId, numTokens, numSeconds, 0, sub.expiresAt());
     }
 

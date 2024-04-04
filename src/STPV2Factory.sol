@@ -17,9 +17,7 @@ import {FactoryFeeConfig} from "src/types/Factory.sol";
  * @dev A factory which leverages Clones to deploy Fabric Subscription Token Contracts
  *
  */
-contract Factory is
-    Ownable2Step // TODO: AccessControl
-{
+contract STPV2Factory is Ownable2Step {
     /// @dev The maximum fee that can be charged for a subscription contract
     uint16 private constant _MAX_FEE_BIPS = 1250;
 
@@ -209,7 +207,7 @@ contract Factory is
     }
 
     /**
-     * @dev Owner Only: Transfer accumulated fees
+     * @dev Transfer the deploy fee to the collector (if configured)
      * @param fees the fee configuration
      */
     function _transferDeployFee(FactoryFeeConfig memory fees) internal {

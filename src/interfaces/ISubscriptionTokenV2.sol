@@ -14,7 +14,9 @@ interface ISubscriptionTokenV2 {
     error InvalidName();
     error InvalidSymbol();
     error InvalidContractUri();
+    error InvalidFeeParams();
     error InvalidBps();
+    error InvalidRewardParams();
     error InvalidAccount();
     error InvalidTransfer();
     error Unauthorized();
