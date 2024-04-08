@@ -25,23 +25,24 @@ contract FactoryTest is BaseTest {
     }
 
     function testRewardPoolDeployment() public {
-        RewardCurveParams memory poolParams = defaultPoolParams();
+        RewardCurveParams memory poolParams = defaultCurveParams();
         vm.expectEmit(false, false, false, true, address(factory));
         emit STPV2Factory.RewardPoolDeployment(address(1));
-        RewardPool pool = RewardPool(payable(factory.deployRewardPool(poolParams)));
+        RewardPool pool = RewardPool(payable(factory.deployRewardPool(defaultPoolParams(), defaultCurveParams())));
         // assertEq(pool.name(), "Rewards");
     }
 
     function testSubAndPoolDeployment() public {
         DeployParams memory params = defaultParams();
-        RewardCurveParams memory poolParams = defaultPoolParams();
+        RewardCurveParams memory poolParams = defaultCurveParams();
         params.rewardParams.bips = 1000;
 
         vm.expectEmit(false, false, false, true, address(factory));
         emit STPV2Factory.RewardPoolDeployment(address(1));
         vm.expectEmit(false, false, false, true, address(factory));
         emit STPV2Factory.SubscriptionDeployment(address(1), 0);
-        (address sub, address pool) = factory.deploySubscription(params, poolParams);
+        (address sub, address pool) =
+            factory.deploySubscriptionWithPool(params, defaultPoolParams(), defaultCurveParams());
 
         SubscriptionTokenV2 nft = SubscriptionTokenV2(payable(sub));
         (address poolAddr, uint16 bps) = nft.rewardParams();

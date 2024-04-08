@@ -6,9 +6,9 @@ import {LibClone} from "@solady/utils/LibClone.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {SubscriptionTokenV2} from "./SubscriptionTokenV2.sol";
 import {RewardPool} from "./RewardPool.sol";
-import {RewardParams, RewardCurveParams} from "./types/Rewards.sol";
+import {RewardParams, RewardCurveParams, RewardPoolParams} from "./types/Rewards.sol";
 import {InitParams, Tier, FeeParams} from "./types/Index.sol";
-import {FactoryFeeConfig, DeployParams} from "src/types/Factory.sol";
+import {FactoryFeeConfig, DeployParams, RewardDeployParams} from "src/types/Factory.sol";
 
 /**
  *
@@ -93,25 +93,29 @@ contract STPV2Factory is Ownable2Step {
     /**
      * @notice Deploy a new Clone of a RewardPool contract
      *
-     * @param params the initialization parameters for the contract (@see RewardCurveParams)
+     * @param poolParams the initialization parameters for the pool
+     * @param curveParams the curve parameters for the pool
      */
-    function deployRewardPool(RewardCurveParams memory params) public returns (address deployment) {
+    function deployRewardPool(RewardPoolParams memory poolParams, RewardCurveParams memory curveParams)
+        public
+        returns (address deployment)
+    {
         deployment = LibClone.clone(_rewardPoolImplementation);
-        RewardPool(payable(deployment)).initialize("", "", params, address(0));
+        RewardPool(payable(deployment)).initialize(poolParams, curveParams);
         emit RewardPoolDeployment(deployment);
     }
 
-    function deploySubscription(DeployParams memory params, RewardCurveParams memory rewardParams)
-        public
-        payable
-        returns (address subscriptionAddress, address poolAddress)
-    {
-        poolAddress = deployRewardPool(rewardParams);
+    function deploySubscriptionWithPool(
+        DeployParams memory params,
+        RewardPoolParams memory poolParams,
+        RewardCurveParams memory curveParams
+    ) public payable returns (address subscriptionAddress, address poolAddress) {
+        poolAddress = deployRewardPool(poolParams, curveParams);
 
         // get the address of the subscription
         address predictedAddress =
             LibClone.predictDeterministicAddress(_stpImplementation, bytes32(_salt + 1), address(this));
-        RewardPool(payable(poolAddress)).setRoles(predictedAddress, 1); // Const RewardPool.ROLE_MINTER
+        RewardPool(payable(poolAddress)).setRoles(predictedAddress, 1); // TODO Const RewardPool.ROLE_MINTER
 
         // set the reward pool address
         params.rewardParams.poolAddress = poolAddress;

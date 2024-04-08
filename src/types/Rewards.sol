@@ -9,10 +9,6 @@ struct RewardPoolParams {
     string symbol;
     /// @dev the address of the currency contract
     address currencyAddress;
-    /// @dev the address of the owner of the contract
-    address owner;
-    /// @dev a flag to indicate if rewards are slashable
-    bool slashable;
     /// @dev the grace period of inactivity before a sub is slashable
     uint32 slashGracePeriod;
     /// @dev Transfer unlock date
@@ -21,6 +17,8 @@ struct RewardPoolParams {
     bool acceptMultipliers;
     /// @dev trusted minters only?
     bool trustedMintOnly;
+    /// @dev a flag to indicate if rewards are slashable
+    bool slashable;
 }
 
 /// @dev The initialization/config parameters for rewards

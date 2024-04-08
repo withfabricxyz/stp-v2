@@ -16,7 +16,8 @@ contract RewardPoolTests is BaseTest {
             bytes32(uint256(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffbf601132)),
             bytes32(0)
         );
-        pool.initialize("Rewards", "rSUB", params, currency);
+        // pool.initialize("Rewards", "rSUB", params, currency);
+        pool.initialize(defaultPoolParams(), defaultCurveParams());
         pool.setRoles(address(this), 0xff); // allow admin mint
         return pool;
     }
@@ -26,8 +27,8 @@ contract RewardPoolTests is BaseTest {
     }
 
     function testConfig() public {
-        assertEq(pool.name(), "Rewards");
-        assertEq(pool.symbol(), "rSUB");
+        assertEq(pool.name(), defaultPoolParams().name);
+        assertEq(pool.symbol(), defaultPoolParams().symbol);
         assertEq(pool.currency(), address(0));
         assertEq(pool.balance(), 0);
         assertEq(pool.totalSupply(), 0);

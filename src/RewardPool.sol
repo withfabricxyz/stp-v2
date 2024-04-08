@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {AccessControlled} from "./abstracts/AccessControlled.sol";
-import {RewardCurveParams} from "./types/Rewards.sol";
+import {RewardCurveParams, RewardPoolParams} from "./types/Rewards.sol";
 import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
 import {RewardLib} from "./libraries/RewardLib.sol";
 import {IRewardPool} from "./interfaces/IRewardPool.sol";
@@ -30,7 +30,9 @@ contract RewardPool is IRewardPool, AccessControlled, ERC20, Initializable {
     /// @dev The ERC20 token symbol
     string private _symbol;
 
-    RewardCurveParams private _params;
+    // RewardPoolParams private _params;
+
+    RewardCurveParams private _curve;
 
     /// @dev The base currency for the reward pool (what staked withdraws receive)
     Currency private _currency;
@@ -46,14 +48,11 @@ contract RewardPool is IRewardPool, AccessControlled, ERC20, Initializable {
         _disableInitializers();
     }
 
-    function initialize(string memory name_, string memory symbol_, RewardCurveParams memory params_, address currency)
-        external
-        initializer
-    {
-        _name = name_;
-        _symbol = symbol_;
-        _params = params_;
-        _currency = Currency.wrap(currency);
+    function initialize(RewardPoolParams memory params, RewardCurveParams memory curve) external initializer {
+        _name = params.name;
+        _symbol = params.symbol;
+        _curve = curve;
+        _currency = Currency.wrap(params.currencyAddress);
         _setOwner(msg.sender); // Factory is the owner
             // set the role for the creator
     }
@@ -168,7 +167,7 @@ contract RewardPool is IRewardPool, AccessControlled, ERC20, Initializable {
      * @return multiplier the current value
      */
     function rewardMultiplier() public view returns (uint256 multiplier) {
-        return _params.currentMultiplier();
+        return _curve.currentMultiplier();
     }
 
     function balance() external view returns (uint256 numTokens) {
@@ -180,7 +179,7 @@ contract RewardPool is IRewardPool, AccessControlled, ERC20, Initializable {
     }
 
     function params() external view returns (RewardCurveParams memory) {
-        return _params;
+        return _curve;
     }
 
     /**

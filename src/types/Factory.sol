@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {InitParams, Tier} from "./Index.sol";
-import {RewardParams} from "./Rewards.sol";
+import {RewardParams, RewardPoolParams, RewardCurveParams} from "./Rewards.sol";
 
 /// @dev Fee configuration for agreements and revshare
 struct FactoryFeeConfig {
@@ -20,4 +20,11 @@ struct DeployParams {
     Tier tierParams;
     /// @dev the reward parameters for the collection
     RewardParams rewardParams;
+}
+
+struct RewardDeployParams {
+    /// @dev the reward pool parameters
+    RewardPoolParams params;
+    /// @dev the curve parameters for calculating token amounts
+    RewardCurveParams curveParams;
 }
