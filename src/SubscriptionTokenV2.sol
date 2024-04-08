@@ -7,7 +7,8 @@ import {LibString} from "@solady/utils/LibString.sol";
 import {Multicallable} from "@solady/utils/Multicallable.sol";
 import {Initializable} from "@solady/utils/Initializable.sol";
 import {ERC721} from "@solady/tokens/ERC721.sol";
-import {InitParams, Tier, FeeParams, RewardParams, Tier, Subscription} from "./types/Index.sol";
+import {InitParams, Tier, FeeParams, Tier, Subscription} from "./types/Index.sol";
+import {RewardParams} from "./types/Rewards.sol";
 import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
 import {TierLib} from "./libraries/TierLib.sol";
 import {ISubscriptionTokenV2} from "./interfaces/ISubscriptionTokenV2.sol";
@@ -254,9 +255,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      */
     function setGlobalSupplyCap(uint64 supplyCap) external {
         _checkOwnerOrRoles(ROLE_MANAGER);
-        if (_tokenCounter > supplyCap) {
-            revert GlobalSupplyLimitExceeded();
-        }
+        if (_tokenCounter > supplyCap) revert GlobalSupplyLimitExceeded();
         _globalSupplyCap = supplyCap;
         emit GlobalSupplyCapChange(supplyCap);
     }
@@ -448,9 +447,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param newCollector the new fee collector address
      */
     function updateFeeRecipient(address newCollector) external {
-        if (msg.sender != feeParams.collector) {
-            revert Unauthorized();
-        }
+        if (msg.sender != feeParams.collector) revert Unauthorized();
 
         // Give tokens back to creator and set fee rate to 0
         if (newCollector == address(0)) {
@@ -471,13 +468,8 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      */
     function createReferralCode(uint256 code, uint16 bps) external {
         _checkOwnerOrRoles(ROLE_MANAGER);
-        if (bps == 0 || bps > _MAX_BIPS) {
-            revert InvalidBps();
-        }
-
-        if (_referralCodes[code] != 0) {
-            revert ReferralExists(code);
-        }
+        if (bps == 0 || bps > _MAX_BIPS) revert InvalidBps();
+        if (_referralCodes[code] != 0) revert ReferralExists(code);
 
         _referralCodes[code] = bps;
         emit ReferralCreated(code, bps);
@@ -508,17 +500,13 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
 
     function _getTier(uint16 tierId) private view returns (Tier storage) {
         Tier storage tier = _tiers[tierId];
-        if (tier.id == 0) {
-            revert TierLib.TierNotFound(tierId);
-        }
+        if (tier.id == 0) revert TierLib.TierNotFound(tierId);
         return tier;
     }
 
     function _getSub(address account) private view returns (Subscription storage) {
         Subscription storage sub = _subscriptions[account];
-        if (sub.tokenId == 0) {
-            revert SubscriptionLib.SubscriptionNotFound(account);
-        }
+        if (sub.tokenId == 0) revert SubscriptionLib.SubscriptionNotFound(account);
         return sub;
     }
 

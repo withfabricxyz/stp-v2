@@ -5,7 +5,8 @@ import {Test} from "@forge/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {InitParams, Tier, FeeParams, RewardCurveParams, Gate, GateType, RewardParams} from "src/types/Index.sol";
+import {InitParams, Tier, FeeParams, Gate, GateType} from "src/types/Index.sol";
+import {RewardCurveParams, RewardParams} from "src/types/Rewards.sol";
 
 contract TestERC1155Token is ERC1155 {
     constructor() ERC1155("test") {

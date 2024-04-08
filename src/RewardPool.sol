@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {AccessControlled} from "./abstracts/AccessControlled.sol";
-import {RewardCurveParams} from "./types/Index.sol";
+import {RewardCurveParams} from "./types/Rewards.sol";
 import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
 import {RewardLib} from "./libraries/RewardLib.sol";
 import {IRewardPool} from "./interfaces/IRewardPool.sol";

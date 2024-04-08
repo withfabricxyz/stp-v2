@@ -2,15 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import {RewardCurveParams, Subscription} from "src/types/Index.sol";
-import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
-
-// struct RewardCurveParams {
-// }
-
-struct TmpRewardCurveParams {
-    uint48 adminControlEndDate;
-}
+import {RewardCurveParams} from "src/types/Rewards.sol";
 
 library RewardLib {
     /// @dev The maximum reward factor (limiting this prevents overflow)

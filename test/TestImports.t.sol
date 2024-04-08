@@ -5,17 +5,9 @@ import {Test} from "@forge/Test.sol";
 
 import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {
-    InitParams,
-    Subscription,
-    RewardCurveParams,
-    Tier,
-    Subscription,
-    Gate,
-    GateType,
-    DeployParams
-} from "src/types/Index.sol";
-import {FactoryFeeConfig} from "src/types/Factory.sol";
+import {InitParams, Subscription, Tier, Subscription, Gate, GateType} from "src/types/Index.sol";
+import {RewardParams, RewardCurveParams} from "src/types/Rewards.sol";
+import {FactoryFeeConfig, DeployParams} from "src/types/Factory.sol";
 import {BaseTest, TestERC20Token, TestFeeToken, SelfDestruct, TestERC1155Token} from "./TestHelpers.t.sol";
 import {AccessControlled} from "src/abstracts/AccessControlled.sol";
 

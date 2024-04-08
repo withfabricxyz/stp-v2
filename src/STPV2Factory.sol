@@ -6,8 +6,9 @@ import {LibClone} from "@solady/utils/LibClone.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {SubscriptionTokenV2} from "./SubscriptionTokenV2.sol";
 import {RewardPool} from "./RewardPool.sol";
-import {InitParams, Tier, DeployParams, FeeParams, RewardParams, RewardCurveParams} from "./types/Index.sol";
-import {FactoryFeeConfig} from "src/types/Factory.sol";
+import {RewardParams, RewardCurveParams} from "./types/Rewards.sol";
+import {InitParams, Tier, FeeParams} from "./types/Index.sol";
+import {FactoryFeeConfig, DeployParams} from "src/types/Factory.sol";
 
 /**
  *
