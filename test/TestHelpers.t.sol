@@ -5,7 +5,7 @@ import {Test} from "@forge/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {InitParams, Tier, FeeParams, RewardPoolParams, Gate, GateType, RewardParams} from "src/types/Index.sol";
+import {InitParams, Tier, FeeParams, RewardCurveParams, Gate, GateType, RewardParams} from "src/types/Index.sol";
 
 contract TestERC1155Token is ERC1155 {
     constructor() ERC1155("test") {
@@ -176,17 +176,8 @@ abstract contract BaseTest is Test {
         return reinitStp();
     }
 
-    function defaultPoolParams() internal view returns (RewardPoolParams memory) {
-        return RewardPoolParams({
-            bips: 0,
-            numPeriods: 6,
-            periodSeconds: 2,
-            startTimestamp: 0,
-            minMultiplier: 0,
-            slashable: true,
-            formulaBase: 2,
-            slashGracePeriod: 0
-        });
+    function defaultPoolParams() internal view returns (RewardCurveParams memory) {
+        return RewardCurveParams({numPeriods: 6, periodSeconds: 2, startTimestamp: 0, minMultiplier: 0, formulaBase: 2});
     }
 
     function testIgnore() internal {}

@@ -62,10 +62,23 @@ struct FeeParams {
     uint16 bips;
 }
 
-/// @dev The initialization/config parameters for rewards
 struct RewardPoolParams {
-    /// @dev the reward amount in basis points
-    uint16 bips;
+    /// @dev the name of the reward pool
+    string name;
+    /// @dev the symbol of the reward pool
+    string symbol;
+    /// @dev the address of the currency contract
+    address currencyAddress;
+    /// @dev the address of the owner of the contract
+    address owner;
+    /// @dev a flag to indicate if rewards are slashable
+    bool slashable;
+    /// @dev the grace period of inactivity before a sub is slashable
+    uint32 slashGracePeriod;
+}
+
+/// @dev The initialization/config parameters for rewards
+struct RewardCurveParams {
     /// @dev the number of periods for which rewards are paid (acts as the exponent)
     uint8 numPeriods;
     /// @dev The base of the exponential formula for reward calculations
@@ -76,10 +89,6 @@ struct RewardPoolParams {
     uint48 startTimestamp;
     /// @dev the minimum multiplier for rewards
     uint8 minMultiplier;
-    /// @dev a flag to indicate if rewards are slashable
-    bool slashable;
-    /// @dev the grace period of inactivity before a sub is slashable
-    uint32 slashGracePeriod;
 }
 
 struct RewardParams {

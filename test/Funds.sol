@@ -17,29 +17,17 @@ contract FundsTest is BaseTest {
         stp.topUp{value: 1 ether}(1 ether);
     }
 
-    // TODO
-    // function testDistribute() public prank(creator) {
-    //     vm.expectEmit(true, true, false, true, address(stp));
-    //     emit ISubscriptionTokenV2.TopUp(1 ether);
-    //     stp.topUp{value: 1 ether}(1 ether);
-    // }
+    function testTransferRecipient() public {
+        vm.startPrank(creator);
+        vm.expectEmit(true, true, false, true, address(stp));
+        emit ISubscriptionTokenV2.TransferRecipientChange(alice);
+        stp.setTransferRecipient(alice);
+        vm.stopPrank();
 
-    // function testRewardDistribution() public {
-    //     mint(alice, 1e8);
-    //     mint(charlie, 1e8);
+        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
+        stp.setTransferRecipient(alice);
 
-    //     uint256 b1 = stp.rewardBalanceOf(alice);
-
-    //     vm.startPrank(creator);
-    //     stp.distributeRewards{value: 1e18}(1e18);
-    //     vm.stopPrank();
-
-    //     uint256 b2 = stp.rewardBalanceOf(alice);
-    //     assertEq(b1 + 0.5 ether, b2);
-    // }
-
-    // function testDistributeNoRewards() public prank(creator) {
-    //     vm.expectRevert(abi.encodeWithSelector(RewardLib.RewardsDisabled.selector));
-    //     stp.distributeRewards{value: 1e18}(1e18);
-    // }
+        mint(alice, 1 ether);
+        stp.transferFunds(alice, stp.creatorBalance());
+    }
 }

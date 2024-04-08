@@ -31,14 +31,14 @@ contract InitializationTest is BaseTest {
     function testFeeBps() public {
         feeParams.bips = 1500;
 
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidBps.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidFeeParams.selector));
         stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 
     function testFeeRequirement() public {
         feeParams.collector = fees;
 
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidBps.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidFeeParams.selector));
         stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 
@@ -51,7 +51,11 @@ contract InitializationTest is BaseTest {
 
     function testInvalidRewards() public {
         rewardParams.bips = 11000;
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidBps.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidRewardParams.selector));
+        stp.initialize(initParams, tierParams, rewardParams, feeParams);
+
+        rewardParams.bips = 500;
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidRewardParams.selector));
         stp.initialize(initParams, tierParams, rewardParams, feeParams);
     }
 

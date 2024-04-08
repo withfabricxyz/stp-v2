@@ -8,7 +8,7 @@ import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {
     InitParams,
     Subscription,
-    RewardPoolParams,
+    RewardCurveParams,
     Tier,
     Subscription,
     Gate,

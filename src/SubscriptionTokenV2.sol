@@ -384,9 +384,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     function _mintOrRenew(address account, uint256 numTokens, uint16 tierId, uint256 referralCode, address referrer)
         internal
     {
-        if (account == address(0)) {
-            revert InvalidAccount();
-        }
+        if (account == address(0)) revert InvalidAccount();
 
         uint256 tokensIn = _currency.capture(msg.sender, numTokens);
         uint256 tokensForTime = tokensIn;
@@ -549,6 +547,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
             return amount;
         }
 
+        // emit RewardsTransferred(amount, account, poolAddress)
         if (_currency.isNative()) {
             IRewardPool(rewardParams.poolAddress).mint{value: rewards}(account, amount * multiplier, rewards);
         } else {
@@ -663,7 +662,6 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @return numSeconds the number of seconds remaining in the subscription
      */
     function balanceOf(address account) public view override returns (uint256 numSeconds) {
-        // TODO: 0 or 1 depending on state
         return _subscriptions[account].remainingSeconds();
     }
 
@@ -679,16 +677,11 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
             }
         }
 
-        if (_subscriptions[to].tokenId != 0) {
+        if (_subscriptions[to].tokenId != 0 || to == address(0)) {
             revert InvalidTransfer();
         }
 
-        if (to != address(0)) {
-            _subscriptions[to] = _subscriptions[from];
-        } else {
-            // TODO
-            // At a minimum decrement the tier count, and increase burn count?
-        }
+        _subscriptions[to] = _subscriptions[from];
 
         delete _subscriptions[from];
     }

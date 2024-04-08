@@ -2,13 +2,13 @@
 
 pragma solidity ^0.8.20;
 
-import {RewardPoolParams, Subscription} from "src/types/Index.sol";
+import {RewardCurveParams, Subscription} from "src/types/Index.sol";
 import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
 
 // struct RewardCurveParams {
 // }
 
-struct TmpRewardPoolParams {
+struct TmpRewardCurveParams {
     uint48 adminControlEndDate;
 }
 
@@ -35,20 +35,9 @@ library RewardLib {
 
     error RewardSlashingNotReady(uint256 readyAt);
 
-    function validate(RewardPoolParams memory self) internal view returns (RewardPoolParams memory) {
-        if (self.bips > MAX_BIPS) {
-            revert RewardBipsTooHigh(self.bips);
-        }
-
-        if (uint256(self.formulaBase) ** self.numPeriods > MAX_MULTIPLIER) {
-            revert RewardFormulaInvalid();
-        }
-
-        if (self.bips > 0) {
-            if (self.numPeriods == 0 && self.minMultiplier == 0) {
-                revert RewardFormulaInvalid();
-            }
-        }
+    function validate(RewardCurveParams memory self) internal view returns (RewardCurveParams memory) {
+        if (uint256(self.formulaBase) ** self.numPeriods > MAX_MULTIPLIER) revert RewardFormulaInvalid();
+        if (self.numPeriods == 0 && self.minMultiplier == 0) revert RewardFormulaInvalid();
 
         if (self.startTimestamp == 0) {
             self.startTimestamp = uint48(block.timestamp);
@@ -57,7 +46,7 @@ library RewardLib {
         return self;
     }
 
-    function currentMultiplier(RewardPoolParams memory self) internal view returns (uint256 multiplier) {
+    function currentMultiplier(RewardCurveParams memory self) internal view returns (uint256 multiplier) {
         if (self.numPeriods == 0) {
             return self.minMultiplier;
         }
@@ -68,11 +57,7 @@ library RewardLib {
         return (uint256(self.formulaBase) ** self.numPeriods) / (uint256(self.formulaBase) ** periods);
     }
 
-    function rewardValue(RewardPoolParams memory self, uint256 numTokens) internal pure returns (uint256 tokens) {
-        return (numTokens * self.bips) / MAX_BIPS;
-    }
-
-    function surpassedPeriods(RewardPoolParams memory self) private view returns (uint256) {
+    function surpassedPeriods(RewardCurveParams memory self) private view returns (uint256) {
         return (block.timestamp - self.startTimestamp) / self.periodSeconds;
     }
 }

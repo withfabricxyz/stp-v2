@@ -6,16 +6,12 @@ import "../TestImports.t.sol";
 // We need to create a shim contract to call the internal functions of RewardLib in order to get
 // foundry to generate the coverage report correctly
 contract RewardTestShim {
-    function validate(RewardPoolParams memory params) external view returns (RewardPoolParams memory) {
+    function validate(RewardCurveParams memory params) external view returns (RewardCurveParams memory) {
         return RewardLib.validate(params);
     }
 
-    function currentMultiplier(RewardPoolParams memory params) external view returns (uint256 multiplier) {
+    function currentMultiplier(RewardCurveParams memory params) external view returns (uint256 multiplier) {
         return RewardLib.currentMultiplier(params);
-    }
-
-    function rewardValue(RewardPoolParams memory params, uint256 numTokens) external pure returns (uint256 tokens) {
-        return RewardLib.rewardValue(params, numTokens);
     }
 }
 
@@ -23,27 +19,24 @@ contract RewardLibTest is Test {
     RewardTestShim public shim = new RewardTestShim();
 
     // Call all methods iva RewardLib.method so the coverage tool can track them
-    function defaults() internal pure returns (RewardPoolParams memory) {
-        return RewardPoolParams({
-            bips: 500,
+    function defaults() internal pure returns (RewardCurveParams memory) {
+        return RewardCurveParams({
             numPeriods: 6,
             periodSeconds: 86400,
             startTimestamp: 0,
             minMultiplier: 0,
-            slashable: true,
-            formulaBase: 2,
-            slashGracePeriod: 0
+            formulaBase: 2
         });
     }
 
     function testValid() public {
-        RewardPoolParams memory params = defaults();
+        RewardCurveParams memory params = defaults();
         params = shim.validate(params);
         assertEq(params.startTimestamp, block.timestamp);
     }
 
     function testValidNoDecay() public {
-        RewardPoolParams memory params = defaults();
+        RewardCurveParams memory params = defaults();
         params.numPeriods = 0;
         params.minMultiplier = 1;
         params = shim.validate(params);
@@ -52,15 +45,8 @@ contract RewardLibTest is Test {
         assertEq(shim.currentMultiplier(params), 1);
     }
 
-    function testInvalidBips() public {
-        RewardPoolParams memory params = defaults();
-        params.bips = 10001;
-        vm.expectRevert(abi.encodeWithSelector(RewardLib.RewardBipsTooHigh.selector, 10001));
-        params = shim.validate(params);
-    }
-
     function testInvalidFormula() public {
-        RewardPoolParams memory params = defaults();
+        RewardCurveParams memory params = defaults();
         params.numPeriods = 128;
         params.formulaBase = 2;
         vm.expectRevert(abi.encodeWithSelector(RewardLib.RewardFormulaInvalid.selector));
@@ -68,7 +54,7 @@ contract RewardLibTest is Test {
     }
 
     function testInvalidFormulaWithBips() public {
-        RewardPoolParams memory params = defaults();
+        RewardCurveParams memory params = defaults();
         params.numPeriods = 0;
         params.minMultiplier = 0;
         vm.expectRevert(abi.encodeWithSelector(RewardLib.RewardFormulaInvalid.selector));
@@ -76,42 +62,37 @@ contract RewardLibTest is Test {
     }
 
     function testSinglePeriod() public {
-        RewardPoolParams memory params = defaults();
+        RewardCurveParams memory params = defaults();
         assertEq(shim.currentMultiplier(params), 64);
         vm.warp(block.timestamp + 1 + 1 days);
         assertEq(shim.currentMultiplier(params), 32);
     }
 
     function testZeroMin() public {
-        RewardPoolParams memory params = defaults();
+        RewardCurveParams memory params = defaults();
         vm.warp(block.timestamp + 30 days);
         assertEq(params.minMultiplier, 0);
         assertEq(shim.currentMultiplier(params), 0);
     }
 
     function testOneMin() public {
-        RewardPoolParams memory params = defaults();
+        RewardCurveParams memory params = defaults();
         params.minMultiplier = 1;
         vm.warp(block.timestamp + 20 days);
         assertEq(shim.currentMultiplier(params), 1);
     }
 
     function testZeroPeriods() public {
-        RewardPoolParams memory params = defaults();
+        RewardCurveParams memory params = defaults();
         params.numPeriods = 0;
         assertEq(shim.currentMultiplier(params), 0);
-    }
-
-    function testValueCalculation() public {
-        RewardPoolParams memory params = defaults();
-        assertEq(shim.rewardValue(params, 100), 5);
     }
 
     function testFuzzDecay(uint8 periods) public {
         vm.assume(periods > 0);
         vm.assume(periods <= 64);
 
-        RewardPoolParams memory params = defaults();
+        RewardCurveParams memory params = defaults();
         params.numPeriods = periods;
         uint256 start = block.timestamp;
         for (uint256 i = 0; i <= params.numPeriods; i++) {

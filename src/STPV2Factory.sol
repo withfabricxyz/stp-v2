@@ -6,7 +6,7 @@ import {LibClone} from "@solady/utils/LibClone.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {SubscriptionTokenV2} from "./SubscriptionTokenV2.sol";
 import {RewardPool} from "./RewardPool.sol";
-import {InitParams, Tier, DeployParams, FeeParams, RewardParams, RewardPoolParams} from "./types/Index.sol";
+import {InitParams, Tier, DeployParams, FeeParams, RewardParams, RewardCurveParams} from "./types/Index.sol";
 import {FactoryFeeConfig} from "src/types/Factory.sol";
 
 /**
@@ -92,15 +92,15 @@ contract STPV2Factory is Ownable2Step {
     /**
      * @notice Deploy a new Clone of a RewardPool contract
      *
-     * @param params the initialization parameters for the contract (@see RewardPoolParams)
+     * @param params the initialization parameters for the contract (@see RewardCurveParams)
      */
-    function deployRewardPool(RewardPoolParams memory params) public returns (address deployment) {
+    function deployRewardPool(RewardCurveParams memory params) public returns (address deployment) {
         deployment = LibClone.clone(_rewardPoolImplementation);
         RewardPool(payable(deployment)).initialize("", "", params, address(0));
         emit RewardPoolDeployment(deployment);
     }
 
-    function deploySubscription(DeployParams memory params, RewardPoolParams memory rewardParams)
+    function deploySubscription(DeployParams memory params, RewardCurveParams memory rewardParams)
         public
         payable
         returns (address subscriptionAddress, address poolAddress)

@@ -6,16 +6,8 @@ import "./TestImports.t.sol";
 contract RewardPoolTests is BaseTest {
     RewardPool internal pool;
 
-    RewardPoolParams internal params = RewardPoolParams({
-        bips: 0,
-        numPeriods: 6,
-        periodSeconds: 2,
-        startTimestamp: 0,
-        minMultiplier: 0,
-        slashable: true,
-        formulaBase: 2,
-        slashGracePeriod: 0
-    });
+    RewardCurveParams internal params =
+        RewardCurveParams({numPeriods: 6, periodSeconds: 2, startTimestamp: 0, minMultiplier: 0, formulaBase: 2});
 
     function reinitPool(address currency) internal returns (RewardPool pool) {
         pool = new RewardPool();
@@ -79,9 +71,9 @@ contract RewardPoolTests is BaseTest {
     }
 
     // function testSingleHalving() public {
-    //     RewardPoolParams.bips = 500;
-    //     RewardPoolParams.numPeriods = 1;
-    //     RewardPoolParams.periodSeconds = 10;
+    //     RewardCurveParams.bips = 500;
+    //     RewardCurveParams.numPeriods = 1;
+    //     RewardCurveParams.periodSeconds = 10;
     //     reinitStp();
     //     assertEq(stp.rewardMultiplier(), 2);
     //     vm.warp(block.timestamp + 11);
@@ -197,7 +189,7 @@ contract RewardPoolTests is BaseTest {
     //     }
 
     //     function testSlashingNoRewards() public {
-    //         RewardPoolParams.bips = 0;
+    //         RewardCurveParams.bips = 0;
 
     //         reinitStp();
 

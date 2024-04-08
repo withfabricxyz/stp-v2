@@ -25,7 +25,7 @@ contract FactoryTest is BaseTest {
     }
 
     function testRewardPoolDeployment() public {
-        RewardPoolParams memory poolParams = defaultPoolParams();
+        RewardCurveParams memory poolParams = defaultPoolParams();
         vm.expectEmit(false, false, false, true, address(factory));
         emit STPV2Factory.RewardPoolDeployment(address(1));
         RewardPool pool = RewardPool(payable(factory.deployRewardPool(poolParams)));
@@ -34,7 +34,7 @@ contract FactoryTest is BaseTest {
 
     function testSubAndPoolDeployment() public {
         DeployParams memory params = defaultParams();
-        RewardPoolParams memory poolParams = defaultPoolParams();
+        RewardCurveParams memory poolParams = defaultPoolParams();
         params.rewardParams.bips = 1000;
 
         vm.expectEmit(false, false, false, true, address(factory));

@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {AccessControlled} from "./abstracts/AccessControlled.sol";
-import {RewardPoolParams} from "./types/Index.sol";
+import {RewardCurveParams} from "./types/Index.sol";
 import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
 import {RewardLib} from "./libraries/RewardLib.sol";
 import {IRewardPool} from "./interfaces/IRewardPool.sol";
@@ -12,7 +12,7 @@ import {Initializable} from "@solady/utils/Initializable.sol";
 
 contract RewardPool is IRewardPool, AccessControlled, ERC20, Initializable {
     using CurrencyLib for Currency;
-    using RewardLib for RewardPoolParams;
+    using RewardLib for RewardCurveParams;
 
     /// @dev The minter role is granted to contracts which are allowed to mint tokens with funds
     uint16 public constant ROLE_MINTER = 1;
@@ -30,7 +30,7 @@ contract RewardPool is IRewardPool, AccessControlled, ERC20, Initializable {
     /// @dev The ERC20 token symbol
     string private _symbol;
 
-    RewardPoolParams private _params;
+    RewardCurveParams private _params;
 
     /// @dev The base currency for the reward pool (what staked withdraws receive)
     Currency private _currency;
@@ -46,7 +46,7 @@ contract RewardPool is IRewardPool, AccessControlled, ERC20, Initializable {
         _disableInitializers();
     }
 
-    function initialize(string memory name_, string memory symbol_, RewardPoolParams memory params_, address currency)
+    function initialize(string memory name_, string memory symbol_, RewardCurveParams memory params_, address currency)
         external
         initializer
     {
@@ -99,6 +99,7 @@ contract RewardPool is IRewardPool, AccessControlled, ERC20, Initializable {
     // @inheritdoc IRewardPool
     // transferRewardsFor?
     function transferRewardsFor(address account) public override {
+        // TODO: _checkOwnerOrRoles(ROLE_MEOW) -> Factory can transfer rewards for accounts (in bulk)
         uint256 amount = rewardBalanceOf(account);
         if (amount == 0) {
             revert InsufficientRewards();
@@ -178,7 +179,7 @@ contract RewardPool is IRewardPool, AccessControlled, ERC20, Initializable {
         return Currency.unwrap(_currency);
     }
 
-    function params() external view returns (RewardPoolParams memory) {
+    function params() external view returns (RewardCurveParams memory) {
         return _params;
     }
 
