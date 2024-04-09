@@ -1,9 +1,28 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity >=0.8.0;
 
+import "../interfaces/IERC4906.sol";
+import "../interfaces/IERC5192.sol";
+
 /// @notice Modern, minimalist, and gas efficient ERC-721 implementation.
 /// @author Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC721.sol), Modified by Fabric
-abstract contract ERC721 {
+abstract contract ERC721 is IERC4906, IERC5192 {
+    /// @dev Only the token owner or an approved account can manage the token.
+    error TokenNotAuthorized();
+
+    /// @dev The token does not exist.
+    error TokenDoesNotExist();
+
+    /// @dev The token already exists.
+    error TokenAlreadyExists();
+
+    // /// @dev Cannot mint or transfer to the zero address.
+    error TransferToZeroAddress();
+
+    // /// @dev Cannot safely transfer to a contract that does not implement
+    // /// the ERC721Receiver interface.
+    error TransferToNonERC721ReceiverImplementer();
+
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -26,6 +45,8 @@ abstract contract ERC721 {
 
     function balanceOf(address owner) public view virtual returns (uint256);
 
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual {}
+
     /*//////////////////////////////////////////////////////////////
                       ERC721 BALANCE/OWNER STORAGE
     //////////////////////////////////////////////////////////////*/
@@ -33,7 +54,7 @@ abstract contract ERC721 {
     mapping(uint256 => address) internal _ownerOf;
 
     function ownerOf(uint256 id) public view virtual returns (address owner) {
-        require((owner = _ownerOf[id]) != address(0), "NOT_MINTED");
+        if ((owner = _ownerOf[id]) == address(0)) revert TokenDoesNotExist();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -50,8 +71,7 @@ abstract contract ERC721 {
 
     function approve(address spender, uint256 id) public virtual {
         address owner = _ownerOf[id];
-
-        require(msg.sender == owner || isApprovedForAll[owner][msg.sender], "NOT_AUTHORIZED");
+        if (!(msg.sender == owner || isApprovedForAll[owner][msg.sender])) revert TokenNotAuthorized();
 
         getApproved[id] = spender;
 
@@ -65,13 +85,13 @@ abstract contract ERC721 {
     }
 
     function transferFrom(address from, address to, uint256 id) public virtual {
-        require(from == _ownerOf[id], "WRONG_FROM");
+        if (from != _ownerOf[id]) revert TokenNotAuthorized();
+        if (to == address(0)) revert TransferToZeroAddress();
+        if (!(msg.sender == from || isApprovedForAll[from][msg.sender] || msg.sender == getApproved[id])) {
+            revert TokenNotAuthorized();
+        }
 
-        require(to != address(0), "INVALID_RECIPIENT");
-
-        require(
-            msg.sender == from || isApprovedForAll[from][msg.sender] || msg.sender == getApproved[id], "NOT_AUTHORIZED"
-        );
+        _beforeTokenTransfer(from, to, id);
 
         _ownerOf[id] = to;
 
@@ -82,24 +102,12 @@ abstract contract ERC721 {
 
     function safeTransferFrom(address from, address to, uint256 id) public virtual {
         transferFrom(from, to, id);
-
-        require(
-            to.code.length == 0
-                || ERC721TokenReceiver(to).onERC721Received(msg.sender, from, id, "")
-                    == ERC721TokenReceiver.onERC721Received.selector,
-            "UNSAFE_RECIPIENT"
-        );
+        _checkReceiver(from, to, id, "");
     }
 
     function safeTransferFrom(address from, address to, uint256 id, bytes calldata data) public virtual {
         transferFrom(from, to, id);
-
-        require(
-            to.code.length == 0
-                || ERC721TokenReceiver(to).onERC721Received(msg.sender, from, id, data)
-                    == ERC721TokenReceiver.onERC721Received.selector,
-            "UNSAFE_RECIPIENT"
-        );
+        _checkReceiver(from, to, id, data);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -109,7 +117,9 @@ abstract contract ERC721 {
     function supportsInterface(bytes4 interfaceId) public view virtual returns (bool) {
         return interfaceId == 0x01ffc9a7 // ERC165 Interface ID for ERC165
             || interfaceId == 0x80ac58cd // ERC165 Interface ID for ERC721
-            || interfaceId == 0x5b5e139f; // ERC165 Interface ID for ERC721Metadata
+            || interfaceId == 0x5b5e139f // ERC165 Interface ID for ERC721Metadata
+            || interfaceId == 0x49064906 // ERC165 Interface ID for ERC4906
+            || interfaceId == 0xb45a3c0e; // ERC165 Interface ID for ERC5192
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -117,26 +127,12 @@ abstract contract ERC721 {
     //////////////////////////////////////////////////////////////*/
 
     function _mint(address to, uint256 id) internal virtual {
-        require(to != address(0), "INVALID_RECIPIENT");
-
-        require(_ownerOf[id] == address(0), "ALREADY_MINTED");
+        if (to == address(0)) revert TransferToZeroAddress();
+        if (_ownerOf[id] != address(0)) revert TokenAlreadyExists();
 
         _ownerOf[id] = to;
 
         emit Transfer(address(0), to, id);
-    }
-
-    /// TODO?
-    function _burn(uint256 id) internal virtual {
-        address owner = _ownerOf[id];
-
-        require(owner != address(0), "NOT_MINTED");
-
-        delete _ownerOf[id];
-
-        delete getApproved[id];
-
-        emit Transfer(owner, address(0), id);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -145,24 +141,17 @@ abstract contract ERC721 {
 
     function _safeMint(address to, uint256 id) internal virtual {
         _mint(to, id);
-
-        require(
-            to.code.length == 0
-                || ERC721TokenReceiver(to).onERC721Received(msg.sender, address(0), id, "")
-                    == ERC721TokenReceiver.onERC721Received.selector,
-            "UNSAFE_RECIPIENT"
-        );
+        _checkReceiver(address(0), to, id, "");
     }
 
-    function _safeMint(address to, uint256 id, bytes memory data) internal virtual {
-        _mint(to, id);
-
-        require(
-            to.code.length == 0
-                || ERC721TokenReceiver(to).onERC721Received(msg.sender, address(0), id, data)
-                    == ERC721TokenReceiver.onERC721Received.selector,
-            "UNSAFE_RECIPIENT"
-        );
+    function _checkReceiver(address from, address to, uint256 id, bytes memory data) private {
+        if (
+            !(
+                to.code.length == 0
+                    || ERC721TokenReceiver(to).onERC721Received(to, from, id, data)
+                        == ERC721TokenReceiver.onERC721Received.selector
+            )
+        ) revert TransferToNonERC721ReceiverImplementer();
     }
 }
 

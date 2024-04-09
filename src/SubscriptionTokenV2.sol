@@ -6,7 +6,8 @@ import {AccessControlled} from "./abstracts/AccessControlled.sol";
 import {LibString} from "@solady/utils/LibString.sol";
 import {Multicallable} from "@solady/utils/Multicallable.sol";
 import {Initializable} from "@solady/utils/Initializable.sol";
-import {ERC721} from "@solady/tokens/ERC721.sol";
+// import {ERC721} from "@solady/tokens/ERC721.sol";
+import {ERC721} from "./abstracts/ERC721.sol";
 import {InitParams, Tier, FeeParams, Tier, Subscription} from "./types/Index.sol";
 import {RewardParams} from "./types/Rewards.sol";
 import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
@@ -159,14 +160,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     /////////////////////////
 
     function transferFunds(address to, uint256 amount) external {
-        if (to == address(0)) {
-            revert InvalidAccount();
-        }
-
-        if (to != _transferRecipient) {
-            _checkOwner();
-        }
-
+        if (to != _transferRecipient) _checkOwner();
         emit Withdraw(to, amount);
         _currency.transfer(to, amount);
     }
@@ -204,6 +198,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         if (bytes(uri).length == 0) {
             revert InvalidContractUri();
         }
+        emit BatchMetadataUpdate(1, _tokenCounter);
         contractURI = uri;
     }
 
@@ -272,6 +267,8 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         _checkOwnerOrRoles(ROLE_MANAGER);
         _initializeTier(params);
     }
+
+    /// TODO: Single updateTier call?
 
     /**
      * @notice Update the supply cap for a given tier
@@ -460,6 +457,8 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     /////////////////////////
     // Referral Rewards
     /////////////////////////
+
+    // TODO: Sizing, we can use a single setter (allow setting to 0)
 
     /**
      * @notice Create a referral code for giving rewards to referrers on mint
@@ -672,6 +671,14 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         _subscriptions[to] = _subscriptions[from];
 
         delete _subscriptions[from];
+    }
+
+    function locked(uint256 tokenId) public view override returns (bool) {
+        uint16 tierId = _subscriptions[ownerOf(tokenId)].tierId;
+        if (tierId == 0) {
+            return false;
+        }
+        return !_tiers[tierId].transferrable;
     }
 
     //////////////////////

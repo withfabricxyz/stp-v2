@@ -106,7 +106,7 @@ library TierLib {
 
     function tokensToSeconds(Tier memory tier, uint256 numTokens) internal pure returns (uint48) {
         // TODO: numPeriods + remainder
-        return uint48(numTokens / tokensPerSecond(tier));
+        return uint48(numTokens / (tier.pricePerPeriod / tier.periodDurationSeconds));
     }
 
     function mintPrice(Tier memory tier, uint256 numPeriods, bool firstMint) internal pure returns (uint256) {
