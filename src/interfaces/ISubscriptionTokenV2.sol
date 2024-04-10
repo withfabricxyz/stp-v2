@@ -217,7 +217,7 @@ interface ISubscriptionTokenV2 {
     //////////////////
 
     // function pools() external view returns (Pool memory creator, Pool memory rewards, Pool memory fees);
-    // function rewardDetails() external view returns (RewardCurveParams memory);
+    // function rewardDetails() external view returns (CurveParams memory);
 
     /**
      * @notice Distribute rewards to subscribers

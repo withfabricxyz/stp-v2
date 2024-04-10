@@ -13,7 +13,7 @@ interface IRewardPool {
      * @notice Distribute rewards to all holders
      * @param numTokens The number of tokens to distribute (must match msg.value or have an approval for the token transfer)
      */
-    function distributeRewards(uint256 numTokens) external payable;
+    // function allocateRewards(uint256 numTokens) external payable;
 
     /**
      * @notice Transfer reward balance for a given account. Requires the account to have all funds staked.
@@ -22,7 +22,7 @@ interface IRewardPool {
     function transferRewardsFor(address account) external;
 
     // Requires authentication
-    function mint(address account, uint256 amount, uint256 payment) external payable;
+    // function mint(address account, uint256 amount, uint256 payment) external payable;
 
     // function allocate(address account, uint256 amount, uint256 tokensIn) external;
 

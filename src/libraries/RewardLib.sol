@@ -2,24 +2,21 @@
 
 pragma solidity ^0.8.20;
 
-import {RewardCurveParams} from "src/types/Rewards.sol";
+import {CurveParams, PoolState} from "src/types/Rewards.sol";
+import {Currency, CurrencyLib} from "src/libraries/CurrencyLib.sol";
+import {RewardCurveLib} from "src/libraries/RewardCurveLib.sol";
 
 library RewardLib {
-    /// @dev The maximum reward factor (limiting this prevents overflow)
-    uint256 private constant MAX_MULTIPLIER = 2 ** 64;
-
-    /// @dev Maximum basis points (100%)
-    uint16 private constant MAX_BIPS = 10_000;
+    using CurrencyLib for Currency;
+    using RewardCurveLib for CurveParams;
+    using RewardLib for PoolState;
 
     /////////////////////
     // ERRORS
     /////////////////////
 
-    error RewardBipsTooHigh(uint16 bips);
-
-    error RewardFormulaInvalid();
-
-    error RewardsDisabled();
+    // error RewardBipsTooHigh(uint16 bips);
+    // error RewardsDisabled();
 
     error RewardSlashingDisabled();
 
@@ -27,29 +24,48 @@ library RewardLib {
 
     error RewardSlashingNotReady(uint256 readyAt);
 
-    function validate(RewardCurveParams memory self) internal view returns (RewardCurveParams memory) {
-        if (uint256(self.formulaBase) ** self.numPeriods > MAX_MULTIPLIER) revert RewardFormulaInvalid();
-        if (self.numPeriods == 0 && self.minMultiplier == 0) revert RewardFormulaInvalid();
-
-        if (self.startTimestamp == 0) {
-            self.startTimestamp = uint48(block.timestamp);
-        }
-
-        return self;
+    function issue(PoolState storage state, address holder, uint256 numShares) internal {
+        state.holders[holder].numShares += numShares;
+        state.totalShares += numShares;
     }
 
-    function currentMultiplier(RewardCurveParams memory self) internal view returns (uint256 multiplier) {
-        if (self.numPeriods == 0) {
-            return self.minMultiplier;
-        }
-        uint256 periods = surpassedPeriods(self);
-        if (periods > self.numPeriods) {
-            return self.minMultiplier;
-        }
-        return (uint256(self.formulaBase) ** self.numPeriods) / (uint256(self.formulaBase) ** periods);
+    function issueWithCurve(PoolState storage state, address holder, uint256 numShares, uint8 curveId) internal {
+        // Test size increase here
+        // state.holders[holder].numShares += numShares * state.curves[curveId].currentMultiplier();
+        state.issue(holder, numShares * state.curves[curveId].currentMultiplier());
     }
 
-    function surpassedPeriods(RewardCurveParams memory self) private view returns (uint256) {
-        return (block.timestamp - self.startTimestamp) / self.periodSeconds;
+    function allocate(PoolState storage state, address from, uint256 amount) internal {
+        state.totalRewardIngress += state.currency.capture(from, amount);
     }
+
+    function allocateAndMint(PoolState storage state, address from, uint256 allocation, uint8 curveId) internal {
+        state.totalRewardIngress += state.currency.capture(msg.sender, allocation);
+        state.holders[msg.sender].numShares += allocation * state.curves[curveId].currentMultiplier();
+    }
+
+    function setSlashingPoint(PoolState storage state, address holder, uint48 slashingPoint) internal {
+        state.holders[holder].slashingPoint = slashingPoint;
+    }
+
+    function rewardBalanceOf(PoolState storage state, address account) internal view returns (uint256) {
+        // Holdings memory holding = _holdings[account];
+
+        // // - 0 -> deals with burned tokens
+        // uint256 burnedWithdrawTotals = 0;
+        // uint256 userShare = ((_currencyCaptured - burnedWithdrawTotals) * balanceOf(account)) / totalSupply();
+        // if (userShare <= _withdraws[account]) {
+        //     return 0;
+        // }
+        // return userShare - _withdraws[account];
+        // return 0;
+
+        return state.holders[account].numShares;
+    }
+
+    /// Slash a holder's shares
+    function slash() internal {
+        revert RewardSlashingDisabled();
+    }
+
 }

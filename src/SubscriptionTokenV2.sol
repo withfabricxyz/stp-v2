@@ -536,11 +536,11 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
 
         // emit RewardsTransferred(amount, account, poolAddress)
         if (_currency.isNative()) {
-            IRewardPool(rewardParams.poolAddress).mint{value: rewards}(account, amount * multiplier, rewards);
+            // IRewardPool(rewardParams.poolAddress).mint{value: rewards}(account, amount * multiplier, rewards);
         } else {
             // TODO: transfer and call? more risk?
             _currency.approve(rewardParams.poolAddress, rewards);
-            IRewardPool(rewardParams.poolAddress).mint(account, amount * multiplier, rewards);
+            // IRewardPool(rewardParams.poolAddress).mint(account, amount * multiplier, rewards);
         }
         return amount - rewards;
     }

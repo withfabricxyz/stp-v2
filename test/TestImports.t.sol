@@ -12,12 +12,13 @@ import {ERC721} from "solady/tokens/ERC721.sol";
 import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {InitParams, Subscription, Tier, Subscription, Gate, GateType, FeeParams} from "src/types/Index.sol";
-import {RewardParams, RewardCurveParams, RewardPoolParams} from "src/types/Rewards.sol";
+import {RewardParams, CurveParams, RewardPoolParams, PoolState, Holder} from "src/types/Rewards.sol";
 import {FactoryFeeConfig, DeployParams} from "src/types/Factory.sol";
 import {AccessControlled} from "src/abstracts/AccessControlled.sol";
 import {GateLib} from "src/libraries/GateLib.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
 import {RewardLib} from "src/libraries/RewardLib.sol";
+import {RewardCurveLib} from "src/libraries/RewardCurveLib.sol";
 import {CurrencyLib, Currency} from "src/libraries/CurrencyLib.sol";
 import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
 import {RewardPool} from "src/RewardPool.sol";
@@ -191,19 +192,19 @@ abstract contract BaseTest is Test {
         return reinitStp();
     }
 
-    function defaultCurveParams() internal view returns (RewardCurveParams memory) {
-        return RewardCurveParams({numPeriods: 6, periodSeconds: 2, startTimestamp: 0, minMultiplier: 0, formulaBase: 2});
+    function defaultCurveParams() internal view returns (CurveParams memory) {
+        return CurveParams({id: 0, numPeriods: 6, periodSeconds: 2, startTimestamp: 0, minMultiplier: 0, formulaBase: 2});
     }
 
     function defaultPoolParams() internal view returns (RewardPoolParams memory) {
         return RewardPoolParams({
-            name: "name",
-            symbol: "symbol",
+            // name: "name",
+            // symbol: "symbol",
             currencyAddress: address(0),
             slashGracePeriod: 0,
-            transferUnlockDate: 0,
-            acceptMultipliers: true,
-            trustedMintOnly: true,
+            // transferUnlockDate: 0,
+            // acceptMultipliers: true,
+            // trustedMintOnly: true,
             slashable: false
         });
     }
