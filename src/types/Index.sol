@@ -29,8 +29,6 @@ struct Gate {
 /// @notice A struct to represent tier configuration. Active subscribers belong to a tier, and each tier
 /// has a set of constraints and properties to differentiate it from other tiers.
 struct Tier {
-    /// @dev The id of the tier
-    uint16 id;
     /// @dev The minimimum subscription time for the tier
     uint32 periodDurationSeconds;
     /// @dev The maximum number of subscribers the tier can have (0 = unlimited)

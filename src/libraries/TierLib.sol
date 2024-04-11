@@ -4,11 +4,19 @@ pragma solidity ^0.8.20;
 
 import {Subscription, Tier} from "../types/Index.sol";
 import {GateLib} from "./GateLib.sol";
-import {SubscriptionLib} from "./SubscriptionLib.sol";
+import {SubscriberLib} from "./SubscriberLib.sol";
 
 /// @dev The initialization parameters for a subscription token
 library TierLib {
-    using SubscriptionLib for Subscription;
+    using SubscriberLib for Subscription;
+    using TierLib for Tier;
+
+    struct State {
+        uint32 subCount;
+        uint16 id;
+        Tier params;
+    }
+
     /////////////////////
     // ERRORS
     /////////////////////
@@ -67,23 +75,65 @@ library TierLib {
         }
 
         GateLib.validate(tier.gate);
-
-        // Gates can refer to other tiers, but not self
-        if (tier.gate.contractAddress == address(this) && tier.gate.componentId == tier.id) {
-            revert GateLib.GateInvalid();
-        }
     }
 
-    function checkJoin(Tier memory tier, uint32 subCount, address account, uint256 numTokens) internal view {
-        if (block.timestamp < tier.startTimestamp) revert TierNotStarted();
-        if (tier.maxSupply != 0 && subCount >= tier.maxSupply) revert TierHasNoSupply(tier.id);
-        if (numTokens < tier.initialMintPrice) revert TierInvalidMintPrice(tier.initialMintPrice);
-        GateLib.checkAccount(tier.gate, account);
+    function checkJoin(State storage state, address account, uint256 numTokens) internal view {
+        if (state.id == 0) revert TierNotFound(state.id);
+        if (block.timestamp < state.params.startTimestamp) revert TierNotStarted();
+        if (state.params.maxSupply != 0 && state.subCount >= state.params.maxSupply) revert TierHasNoSupply(state.id);
+        if (numTokens < state.params.initialMintPrice) revert TierInvalidMintPrice(state.params.initialMintPrice);
+        GateLib.checkAccount(state.params.gate, account);
+    }
+
+    function join(
+        State storage state,
+        address account,
+        Subscription storage sub,
+        uint256 numTokens
+    ) internal returns (uint256) {
+        // checkJoin(state, account, numTokens);
+        if (state.id == 0) revert TierNotFound(state.id);
+        if (block.timestamp < state.params.startTimestamp) revert TierNotStarted();
+        if (state.params.maxSupply != 0 && state.subCount >= state.params.maxSupply) revert TierHasNoSupply(state.id);
+        if (numTokens < state.params.initialMintPrice) revert TierInvalidMintPrice(state.params.initialMintPrice);
+        GateLib.checkAccount(state.params.gate, account);
+
+        state.subCount += 1;
+        sub.tierId = state.id;
+        return numTokens - state.params.initialMintPrice;
+    }
+
+    function renew(State storage state, Subscription storage sub, uint256 numTokens) internal {
+        Tier memory tier = state.params;
+
+        if (tier.paused) revert TierRenewalsPaused();
+        if (numTokens < tier.pricePerPeriod) revert TierInvalidRenewalPrice(tier.pricePerPeriod);
+
+        uint48 numSeconds = tokensToSeconds(tier, numTokens);
+        uint48 totalFutureSeconds = sub.purchasedTimeRemaining() + numSeconds;
+
+        if (tier.maxCommitmentSeconds > 0 && totalFutureSeconds > tier.maxCommitmentSeconds) {
+            revert MaxCommitmentExceeded();
+        }
+
+        if (tier.endTimestamp > 0 && (block.timestamp + totalFutureSeconds) > tier.endTimestamp) {
+            revert TierEndExceeded();
+        }
+
+        // checkRenewal(state.params, sub, numTokens);
+        // if(state.id == 0) revert TierNotFound(state.id);
+        // if (block.timestamp < state.params.startTimestamp) revert TierNotStarted();
+        // if (state.params.maxSupply != 0 && state.subCount >= state.params.maxSupply) revert
+        // TierHasNoSupply(state.id);
+        // if (numTokens < state.params.initialMintPrice) revert TierInvalidMintPrice(state.params.initialMintPrice);
+        // sub.addTime(tokensToSeconds());
+        sub.renew(numTokens, numSeconds);
+
+        // return numTokens - state.params.initialMintPrice;
     }
 
     function checkRenewal(Tier memory tier, Subscription memory sub, uint256 numTokens) internal view {
         if (tier.paused) revert TierRenewalsPaused();
-
         if (numTokens < tier.pricePerPeriod) revert TierInvalidRenewalPrice(tier.pricePerPeriod);
 
         uint256 numSeconds = tokensToSeconds(tier, numTokens);

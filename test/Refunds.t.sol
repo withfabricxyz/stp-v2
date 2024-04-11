@@ -40,7 +40,7 @@ contract RefundsTests is BaseTest {
     }
 
     function testRefundNoPurchase() public prank(creator) {
-        vm.expectRevert(abi.encodeWithSelector(SubscriptionLib.SubscriptionNotFound.selector, bob));
+        vm.expectRevert(abi.encodeWithSelector(SubscriberLib.SubscriptionNotFound.selector, bob));
         stp.refund(bob, 0);
     }
 

@@ -7,7 +7,6 @@ struct PoolStatePartial {
     uint256 totalShares;
     uint256 totalRewardIngress;
     uint256 slashedWithdraws;
-    Currency currency;
 }
 
 // We need to create a shim contract to call the internal functions of RewardLib in order to get
@@ -16,7 +15,7 @@ contract RewardTestShim {
     PoolState private _state;
 
     constructor() {
-        _state.currency = Currency.wrap(address(0));
+        // _state.currency = Currency.wrap(address(0));
         _state.curves[0] = CurveParams({
             id: 0,
             numPeriods: 6,
@@ -47,8 +46,7 @@ contract RewardTestShim {
         return PoolStatePartial({
             totalShares: _state.totalShares,
             totalRewardIngress: _state.totalRewardIngress,
-            slashedWithdraws: _state.slashedWithdraws,
-            currency: _state.currency
+            slashedWithdraws: _state.slashedWithdraws
         });
     }
 }

@@ -2,100 +2,108 @@
 
 pragma solidity ^0.8.20;
 
-import {Subscription, Tier} from "../types/Index.sol";
+import {Currency, CurrencyLib} from "src/libraries/CurrencyLib.sol";
 
-/// @dev The initialization parameters for a subscription token
+import {SubscriberLib} from "src/libraries/SubscriberLib.sol";
+import {TierLib} from "src/libraries/TierLib.sol";
+import {Subscription, Tier} from "src/types/Index.sol";
+
 library SubscriptionLib {
-    error SubscriptionNotActive();
+    using SubscriptionLib for State;
+    using SubscriberLib for Subscription;
+    using CurrencyLib for Currency;
+    using TierLib for Tier;
+    using TierLib for TierLib.State;
 
-    error SubscriptionGrantInvalidTime();
-
-    error SubscriptionNotFound(address account);
-
-    error DeactivationFailure();
-
-    function expiresAt(Subscription memory sub) internal pure returns (uint256) {
-        uint256 purchase = sub.purchaseOffset + sub.secondsPurchased;
-        uint256 grant = sub.grantOffset + sub.secondsGranted;
-        return purchase > grant ? purchase : grant;
+    struct State {
+        uint64 supplyCap;
+        uint64 subCount;
+        uint16 tierCount;
+        mapping(uint16 => TierLib.State) tiers;
+        mapping(address => Subscription) subscriptions;
     }
 
-    /// @dev Check if a subscription is active
-    function checkActive(Subscription memory sub) internal view {
-        if (expiresAt(sub) <= block.timestamp) revert SubscriptionNotActive();
+    /////////////////////
+    // EVENTS
+    /////////////////////
+
+    event Grant(address indexed account, uint256 indexed tokenId, uint256 secondsGranted, uint256 expiresAt);
+
+    /////////////////////
+    // ERRORS
+    /////////////////////
+
+    error GlobalSupplyLimitExceeded();
+
+    function createTier(State storage state, Tier memory tierParams) internal {
+        tierParams.validate();
+        uint16 id = ++state.tierCount;
+        state.tiers[id] = TierLib.State({params: tierParams, subCount: 0, id: id});
     }
 
-    /// @dev The amount of purchased time remaining for a given subscription
-    function purchasedTimeRemaining(Subscription memory sub) internal view returns (uint48) {
-        uint256 _expiresAt = sub.purchaseOffset + sub.secondsPurchased;
-        if (_expiresAt <= block.timestamp) return 0;
-        return uint48(_expiresAt - block.timestamp);
+    function updateTier(State storage state, uint16 tierId, Tier memory tierParams) internal {
+        tierParams.validate();
+        if (state.tiers[tierId].id == 0) revert TierLib.TierNotFound(tierId);
+        state.tiers[tierId].params = tierParams;
     }
 
-    /// @dev The amount of granted time remaining for a given subscription
-    function grantedTimeRemaining(Subscription memory sub) internal view returns (uint256) {
-        uint256 _expiresAt = sub.grantOffset + sub.secondsGranted;
-        if (_expiresAt <= block.timestamp) return 0;
-        return _expiresAt - block.timestamp;
-    }
-
-    function remainingSeconds(Subscription memory sub) internal view returns (uint256) {
-        return purchasedTimeRemaining(sub) + grantedTimeRemaining(sub);
-    }
-
-    function grantTime(Subscription storage sub, uint48 secondsToGrant) internal {
-        if (secondsToGrant == 0) revert SubscriptionGrantInvalidTime();
-
-        // Adjust offset to account for existing time
-        if (block.timestamp > sub.grantOffset + sub.secondsGranted) {
-            sub.grantOffset = uint48(block.timestamp - sub.secondsGranted);
-        }
-
-        sub.secondsGranted += secondsToGrant;
-    }
-
-    function renew(Subscription storage sub, uint256 numTokens, uint48 numSeconds) internal {
-        if (block.timestamp > sub.purchaseOffset + sub.secondsPurchased) {
-            sub.purchaseOffset = uint48(block.timestamp - sub.secondsPurchased);
-        }
-
-        sub.totalPurchased += numTokens;
-        sub.secondsPurchased += numSeconds;
-    }
-
-    function revokeTime(Subscription storage sub) internal returns (uint256) {
-        uint256 remaining = grantedTimeRemaining(sub);
-        sub.secondsGranted = 0;
-        return remaining;
-    }
-
-    // TODO: Lot's of testing?
-    function estimatedRefund(Subscription memory sub) internal view returns (uint256) {
-        uint48 secondsLeft = purchasedTimeRemaining(sub);
-        if (secondsLeft == 0) return 0;
-        uint256 divisor = uint256(sub.secondsPurchased / secondsLeft);
-        if (divisor == 0) return 0;
-        return sub.totalPurchased / divisor;
-    }
-
-    function deactivate(Subscription storage sub) internal {
-        if (sub.tierId == 0) return;
-
-        if (remainingSeconds(sub) > 0) revert DeactivationFailure();
-
-        sub.tierId = 0;
+    function deactivateSubscription(State storage state, address account) internal {
+        uint16 id = state.subscriptions[account].tierId;
+        if (id == 0) revert("no");
+        state.tiers[id].subCount -= 1;
+        state.subscriptions[account].deactivate();
         // emit Deactivatation(account, sub.tokenId);
     }
 
-    function refund(
-        Subscription storage sub,
-        uint256 numTokens
-    ) internal returns (uint256 refundedTokens, uint48 refundedTime) {
-        refundedTime = purchasedTimeRemaining(sub);
-        refundedTokens = numTokens > 0 ? numTokens : estimatedRefund(sub);
-        // TODO: Checks?
-        // TODO: Test
-        sub.totalPurchased -= refundedTokens;
-        sub.secondsPurchased -= refundedTime;
+    function mint(State storage state, address account) internal returns (uint256 tokenId) {
+        if (state.supplyCap != 0 && state.subCount >= state.supplyCap) revert GlobalSupplyLimitExceeded();
+        tokenId = ++state.subCount;
+        state.subscriptions[account].tokenId = tokenId;
+    }
+
+    function purchase(
+        State storage state,
+        address account,
+        uint256 numTokens,
+        uint16 tierId
+    ) internal returns (uint256 tokenId) {
+        // Mint a new token if necessary
+        tokenId = state.subscriptions[account].tokenId;
+        if (tokenId == 0) tokenId = state.mint(account);
+
+        // Determine which tier to use
+        uint16 subTierId = state.subscriptions[account].tierId;
+        uint16 resolvedTier = tierId == 0 ? subTierId : tierId;
+        if (resolvedTier == 0) resolvedTier = 1;
+
+        // Join the tier, if necessary, and deduct the initial mint price
+        uint256 tokensForTime = numTokens;
+        if (subTierId != resolvedTier) {
+            tokensForTime = state.tiers[resolvedTier].join(account, state.subscriptions[account], numTokens);
+            // state.subscriptions[account].tierId = resolvedTier;
+        }
+
+        state.tiers[resolvedTier].renew(state.subscriptions[account], tokensForTime);
+
+        // emit Purchase(account, tokenId, numTokens, numSeconds, 0, sub.expiresAt());
+    }
+
+    function grant(
+        State storage state,
+        address account,
+        uint48 numSeconds,
+        uint16 tierId
+    ) internal returns (uint256 tokenId) {
+        Subscription storage sub = state.subscriptions[account];
+        tokenId = sub.tokenId;
+        if (tokenId == 0) {
+            tokenId = state.mint(account);
+            sub.tokenId = tokenId;
+        }
+
+        sub.tierId = tierId;
+        sub.grantTime(numSeconds);
+
+        emit Grant(account, tokenId, numSeconds, sub.expiresAt());
     }
 }

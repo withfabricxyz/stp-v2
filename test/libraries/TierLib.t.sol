@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import "../TestImports.t.sol";
 
 contract TierTestShim {
+    TierLib.State state;
+
     function validate(Tier memory tier) external view {
         TierLib.validate(tier);
     }
@@ -12,8 +14,10 @@ contract TierTestShim {
         return TierLib.mintPrice(tier, numPeriods, firstMint);
     }
 
-    function checkJoin(Tier memory tier, uint32 subCount, address account, uint256 numTokens) external view {
-        TierLib.checkJoin(tier, subCount, account, numTokens);
+    function checkJoin(Tier memory tier, uint32 subCount, address account, uint256 numTokens) external {
+        state = TierLib.State({id: 1, subCount: subCount, params: tier});
+
+        TierLib.checkJoin(state, account, numTokens);
     }
 
     function checkRenewal(Tier memory tier, Subscription memory sub, uint256 numTokens) external view {
@@ -30,7 +34,6 @@ contract TierLibTest is Test {
         Gate memory gate = Gate({gateType: GateType.NONE, contractAddress: address(0), componentId: 0, balanceMin: 1});
 
         return Tier({
-            id: 1,
             periodDurationSeconds: 2_592_000,
             paused: false,
             transferrable: true,
@@ -51,16 +54,6 @@ contract TierLibTest is Test {
 
         tier.periodDurationSeconds = 0;
         vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidDuration.selector));
-        shim.validate(tier);
-
-        tier = defaults();
-        tier.gate.gateType = GateType.STPV2;
-        tier.gate.componentId = tier.id;
-        vm.expectRevert(abi.encodeWithSelector(GateLib.GateInvalid.selector));
-        shim.validate(tier);
-
-        tier.gate.contractAddress = address(shim);
-        vm.expectRevert(abi.encodeWithSelector(GateLib.GateInvalid.selector));
         shim.validate(tier);
 
         tier = defaults();

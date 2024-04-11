@@ -36,6 +36,8 @@ contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicall
     /// @dev The pool state (holders, supply, counts, etc)
     PoolState private _state;
 
+    Currency private _currency;
+
     /// @dev RewardPools are cloned, so the constructor is disabled
     constructor() {
         _disableInitializers();
@@ -43,7 +45,7 @@ contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicall
 
     function initialize(RewardPoolParams memory params, CurveParams memory curve) external initializer {
         _setOwner(msg.sender); // TODO: Creator?
-        _state.currency = Currency.wrap(params.currencyAddress);
+        _currency = Currency.wrap(params.currencyAddress);
         _state.curves[0] = curve;
     }
 
@@ -61,17 +63,18 @@ contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicall
     /**
      * @notice Mint tokens to an account without payment (used for migrations, tips, etc)
      */
-    function adminMint(address account, uint256 amount) external {
+    function adminMint(address account, uint256 numShares, uint48 slashPointExtension) external {
         // _checkAdmin();
         _checkRoles(ROLE_CREATOR);
-        _state.issue(account, amount);
+        _state.issue(account, numShares);
+        // _state.extendSlashingPoint(account, slashPointExtension);
     }
 
     function issue(IssueParams calldata params) external payable {
         _checkRoles(ROLE_MINTER);
         _state.issueWithCurve(params.holder, params.numShares, params.curveId);
         _state.allocate(msg.sender, params.allocation);
-        _state.setSlashingPoint(params.holder, params.slashingThreshold);
+        // _state.setSlashingPoint(params.holder, params.slashingThreshold);
     }
 
     /**
@@ -79,7 +82,10 @@ contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicall
      * @param amount the amount of tokens (native or ERC20) to allocate
      */
     function yieldRewards(uint256 amount) public payable {
+        if (_state.totalShares == 0) revert RewardLib.NoSupply();
+        uint256 amount = _currency.capture(msg.sender, amount);
         _state.allocate(msg.sender, amount);
+
         // TODO: locking minting?
     }
 
@@ -91,7 +97,8 @@ contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicall
     // @inheritdoc IRewardPool
     // transferRewardsFor?
     function transferRewardsFor(address account) public {
-        _state.claimRewards(account);
+        uint256 amount = _state.claimRewards(account);
+        _currency.transfer(account, amount);
     }
 
     function slash(address account) external {
@@ -105,9 +112,9 @@ contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicall
     function poolDetail() external view returns (PoolDetailView memory) {
         return PoolDetailView({
             totalShares: _state.totalShares,
-            currencyAddress: Currency.unwrap(_state.currency),
+            currencyAddress: Currency.unwrap(_currency),
             numCurves: 1,
-            balance: _state.currency.balance()
+            balance: _currency.balance()
         });
     }
 

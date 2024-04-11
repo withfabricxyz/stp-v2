@@ -7,24 +7,6 @@ import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 /// @dev A wrapper for the address type to represent a denomination (ERC20, Native)
 type Currency is address;
 
-using {greaterThan as >, lessThan as <, greaterThanOrEqualTo as >=, equals as ==} for Currency global;
-
-function equals(Currency currency, Currency other) pure returns (bool) {
-    return Currency.unwrap(currency) == Currency.unwrap(other);
-}
-
-function greaterThan(Currency currency, Currency other) pure returns (bool) {
-    return Currency.unwrap(currency) > Currency.unwrap(other);
-}
-
-function lessThan(Currency currency, Currency other) pure returns (bool) {
-    return Currency.unwrap(currency) < Currency.unwrap(other);
-}
-
-function greaterThanOrEqualTo(Currency currency, Currency other) pure returns (bool) {
-    return Currency.unwrap(currency) >= Currency.unwrap(other);
-}
-
 /// @title CurrencyLibrary
 /// @dev This library allows for transferring and holding native tokens and ERC20 tokens
 library CurrencyLib {
@@ -66,13 +48,8 @@ library CurrencyLib {
 
     /// @dev show the balance of the contract
     function balance(Currency currency) internal view returns (uint256) {
-        return currency.balanceOf(address(this));
-    }
-
-    /// @dev show the balance of an account
-    function balanceOf(Currency currency, address owner) internal view returns (uint256) {
-        if (currency.isNative()) return owner.balance;
-        else return Currency.unwrap(currency).balanceOf(owner);
+        if (currency.isNative()) return address(this).balance;
+        return Currency.unwrap(currency).balanceOf(address(this));
     }
 
     /// @dev approve an ERC20 token (note, this is intended for sending tokens to another contract in a single txn)

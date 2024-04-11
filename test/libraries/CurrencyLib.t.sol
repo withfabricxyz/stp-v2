@@ -17,11 +17,6 @@ contract MockCurrencyLib {
         return CurrencyLib.balance(currency);
     }
 
-    /// @dev show the balance of an account
-    function balanceOf(Currency currency, address owner) public view returns (uint256) {
-        return CurrencyLib.balanceOf(currency, owner);
-    }
-
     function approve(Currency currency, address spender, uint256 amount) public {
         CurrencyLib.approve(currency, spender, amount);
     }
@@ -59,7 +54,6 @@ contract CurrencyLibTest is Test {
     function testEth() public {
         assert(shim.isNative(eth));
         assertEq(shim.balance(eth), 0);
-        assertEq(shim.balanceOf(eth, alice), alice.balance);
 
         vm.startPrank(alice);
         shim.capture{value: 1e9}(eth, alice, 1e9);
@@ -81,7 +75,6 @@ contract CurrencyLibTest is Test {
     function testUsdc() public {
         assert(!shim.isNative(usdc));
         assertEq(shim.balance(usdc), 0);
-        assertEq(shim.balanceOf(usdc, alice), 1e9);
 
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(CurrencyLib.InvalidCapture.selector));

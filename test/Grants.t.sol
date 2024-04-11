@@ -20,7 +20,7 @@ contract GrantsTest is BaseTest {
         emit ISubscriptionTokenV2.Grant(alice, 1, 90 days, block.timestamp + 90 days);
         stp.grantTime(alice, 90 days, 1);
 
-        vm.expectRevert(abi.encodeWithSelector(SubscriptionLib.SubscriptionGrantInvalidTime.selector));
+        vm.expectRevert(abi.encodeWithSelector(SubscriberLib.SubscriptionGrantInvalidTime.selector));
         stp.grantTime(alice, 0, 1);
 
         vm.stopPrank();
@@ -56,8 +56,8 @@ contract GrantsTest is BaseTest {
     }
 
     function testInvalidRevoke() public prank(creator) {
-        vm.expectRevert(abi.encodeWithSelector(SubscriptionLib.SubscriptionNotFound.selector, alice));
         stp.revokeTime(alice);
+        assertEq(stp.balanceOf(alice), 0);
     }
 
     function testGrantRevokeWithPayment() public {

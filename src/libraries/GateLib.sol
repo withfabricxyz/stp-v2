@@ -35,7 +35,6 @@ library GateLib {
         }
 
         if (gate.gateType == GateType.STPV2 && gate.componentId >= 2 ** 16) revert GateInvalid();
-
         if (gate.gateType == GateType.ERC1155 && gate.componentId == 0) revert GateInvalid();
     }
 

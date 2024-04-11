@@ -10,48 +10,36 @@ contract TierManagementTest is BaseTest {
         deal(bob, 1e19);
     }
 
-    function testValidTier() public prank(creator) {
-        tierParams.id = 2;
-        stp.createTier(tierParams);
-    }
-
-    function testTierInvalidId() public prank(creator) {
-        tierParams.id = 3;
-        vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidId.selector));
-        stp.createTier(tierParams);
-
-        tierParams.id = 0;
-        vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidId.selector));
-        stp.createTier(tierParams);
-
-        tierParams.id = 1;
-        vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidId.selector));
-        stp.createTier(tierParams);
-
+    function testUpdate() public prank(creator) {
+        stp.updateTier(1, tierParams);
         vm.expectRevert(abi.encodeWithSelector(TierLib.TierNotFound.selector, 5));
-        stp.pauseTier(5);
+        stp.updateTier(5, tierParams);
     }
 
     function testTierPausing() public prank(creator) {
         vm.expectEmit(true, true, false, true, address(stp));
         emit ISubscriptionTokenV2.TierPaused(1);
-        stp.pauseTier(1);
+        tierParams.paused = true;
+        stp.updateTier(1, tierParams);
 
         vm.expectEmit(true, true, false, true, address(stp));
         emit ISubscriptionTokenV2.TierUnpaused(1);
-        stp.unpauseTier(1);
+        tierParams.paused = false;
+        stp.updateTier(1, tierParams);
     }
 
     function testTierPriceUpdate() public prank(creator) {
         vm.expectEmit(true, true, false, true, address(stp));
         emit ISubscriptionTokenV2.TierPriceChange(1, 100);
-        stp.setTierPrice(1, 100);
+        tierParams.pricePerPeriod = 100;
+        stp.updateTier(1, tierParams);
     }
 
     function testTierUpdateSupplyCap() public prank(creator) {
         vm.expectEmit(true, true, false, true, address(stp));
         emit ISubscriptionTokenV2.TierSupplyCapChange(1, 5);
-        stp.setTierSupplyCap(1, 5);
+        tierParams.maxSupply = 5;
+        stp.updateTier(1, tierParams);
     }
 
     function testInvalidTierCap() public {
@@ -59,22 +47,14 @@ contract TierManagementTest is BaseTest {
         mint(bob, 1e18);
         vm.startPrank(creator);
         vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidSupplyCap.selector));
-        stp.setTierSupplyCap(1, 1);
+        tierParams.maxSupply = 1;
+        stp.updateTier(1, tierParams);
         vm.stopPrank();
     }
 
     function testAccessControl() public {
         vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
-        stp.setTierPrice(1, 100);
-
-        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
-        stp.pauseTier(1);
-
-        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
-        stp.unpauseTier(1);
-
-        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
-        stp.setTierSupplyCap(1, 5);
+        stp.updateTier(1, tierParams);
 
         vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
         stp.createTier(tierParams);

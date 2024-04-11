@@ -46,19 +46,12 @@ struct RewardParams {
     uint16 bips;
 }
 
-// TODO?
-struct HolderKey {
-    address tokenAddress;
-    uint256 tokenId;
-}
-
 struct PoolState {
     uint256 totalShares;
     uint256 totalRewardEgress;
     uint256 totalRewardIngress;
     uint256 slashedWithdraws;
     uint256 pointsPerShare;
-    Currency currency;
     mapping(address => Holder) holders;
     mapping(uint8 => CurveParams) curves;
 }

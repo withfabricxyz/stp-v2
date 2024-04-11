@@ -98,7 +98,8 @@ contract MintingTest is BaseTest {
     function testNewMintChecks() public {}
 
     function testRenewalChecks() public prank(creator) {
-        stp.pauseTier(1);
+        tierParams.paused = true;
+        stp.updateTier(1, tierParams);
         vm.expectRevert(abi.encodeWithSelector(TierLib.TierRenewalsPaused.selector));
         stp.mintFor{value: 0.001 ether}(alice, 0.001 ether);
     }

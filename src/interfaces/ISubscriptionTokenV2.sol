@@ -189,12 +189,12 @@ interface ISubscriptionTokenV2 {
      */
     function tierBalanceOf(uint16 tierId, address account) external view returns (uint256 balance);
 
-    /**
-     * @notice Get the details of a specific tier
-     * @param tierId the tier id filter
-     * @return tier the tier
-     */
-    function tierDetails(uint16 tierId) external view returns (Tier memory tier);
+    // /**
+    //  * @notice Get the details of a specific tier
+    //  * @param tierId the tier id filter
+    //  * @return tier the tier
+    //  */
+    // function tierDetails(uint16 tierId) external view returns (Tier memory tier);
 
     /**
      * @notice Get the number of tiers
@@ -202,13 +202,13 @@ interface ISubscriptionTokenV2 {
      */
     function tierCount() external view returns (uint16 count);
 
-    /**
-     * @notice Get the current supply and supply cap of a tier
-     * @param tierId the tier id to pause
-     * @return currentSupply the current supply of the tier
-     * @return maxSupply the maximum supply of the tier
-     */
-    function tierSupply(uint16 tierId) external view returns (uint32 currentSupply, uint32 maxSupply);
+    // /**
+    //  * @notice Get the current supply and supply cap of a tier
+    //  * @param tierId the tier id to pause
+    //  * @return currentSupply the current supply of the tier
+    //  * @return maxSupply the maximum supply of the tier
+    //  */
+    // function tierSupply(uint16 tierId) external view returns (uint32 currentSupply, uint32 maxSupply);
 
     function subscriptionOf(address account) external view returns (Subscription memory subscription);
 

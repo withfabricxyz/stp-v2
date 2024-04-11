@@ -123,7 +123,6 @@ contract GateLibTest is BaseTest {
         vm.startPrank(creator);
         stp.createTier(
             Tier({
-                id: 2,
                 periodDurationSeconds: 2_592_000,
                 paused: false,
                 transferrable: true,

@@ -21,7 +21,7 @@ import {GateLib} from "src/libraries/GateLib.sol";
 import {RewardCurveLib} from "src/libraries/RewardCurveLib.sol";
 import {RewardLib} from "src/libraries/RewardLib.sol";
 
-import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
+import {SubscriberLib} from "src/libraries/SubscriberLib.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
 import {DeployParams, FactoryFeeConfig} from "src/types/Factory.sol";
 import {FeeParams, Gate, GateType, InitParams, Subscription, Subscription, Tier} from "src/types/Index.sol";
@@ -102,7 +102,6 @@ abstract contract BaseTest is Test {
     address internal doug = 0xB4c79dAb8f259c7aee6e5b2aa729821864227E7b;
 
     Tier internal tierParams = Tier({
-        id: 1,
         periodDurationSeconds: 2,
         maxSupply: 0,
         maxCommitmentSeconds: 0,
