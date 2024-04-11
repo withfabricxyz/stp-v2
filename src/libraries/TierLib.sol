@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import {Tier, Subscription} from "../types/Index.sol";
+import {Subscription, Tier} from "../types/Index.sol";
 import {GateLib} from "./GateLib.sol";
 import {SubscriptionLib} from "./SubscriptionLib.sol";
 
@@ -57,9 +57,7 @@ library TierLib {
     /////////////////////
 
     function validate(Tier memory tier) internal view {
-        if (tier.periodDurationSeconds == 0) {
-            revert TierInvalidDuration();
-        }
+        if (tier.periodDurationSeconds == 0) revert TierInvalidDuration();
 
         // We don't really care about the start timestamp, but it must be less than the end timestamp
         if (tier.endTimestamp != 0) {
@@ -84,13 +82,9 @@ library TierLib {
     }
 
     function checkRenewal(Tier memory tier, Subscription memory sub, uint256 numTokens) internal view {
-        if (tier.paused) {
-            revert TierRenewalsPaused();
-        }
+        if (tier.paused) revert TierRenewalsPaused();
 
-        if (numTokens < tier.pricePerPeriod) {
-            revert TierInvalidRenewalPrice(tier.pricePerPeriod);
-        }
+        if (numTokens < tier.pricePerPeriod) revert TierInvalidRenewalPrice(tier.pricePerPeriod);
 
         uint256 numSeconds = tokensToSeconds(tier, numTokens);
         uint256 totalFutureSeconds = sub.purchasedTimeRemaining() + numSeconds;

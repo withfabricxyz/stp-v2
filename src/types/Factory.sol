@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {InitParams, Tier} from "./Index.sol";
-import {RewardParams, RewardPoolParams, CurveParams} from "./Rewards.sol";
+import {CurveParams, RewardParams, RewardPoolParams} from "./Rewards.sol";
 
 /// @dev Fee configuration for agreements and revshare
 struct FactoryFeeConfig {

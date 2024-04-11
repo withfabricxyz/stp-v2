@@ -124,14 +124,14 @@ contract GateLibTest is BaseTest {
         stp.createTier(
             Tier({
                 id: 2,
-                periodDurationSeconds: 2592000,
+                periodDurationSeconds: 2_592_000,
                 paused: false,
                 transferrable: true,
                 maxSupply: 0,
                 rewardMultiplier: 0,
                 initialMintPrice: 0.01 ether,
                 pricePerPeriod: 0.005 ether,
-                maxCommitmentSeconds: 24 * 2592000,
+                maxCommitmentSeconds: 24 * 2_592_000,
                 startTimestamp: 0,
                 endTimestamp: 0,
                 gate: defaults()

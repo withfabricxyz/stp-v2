@@ -3,11 +3,9 @@ pragma solidity ^0.8.20;
 
 import "../TestImports.t.sol";
 
-
 // We need to create a shim contract to call the internal functions of RewardLib in order to get
 // foundry to generate the coverage report correctly
 contract RewardCurveTestShim {
-
     function validate(CurveParams memory params) external view returns (CurveParams memory) {
         return RewardCurveLib.validate(params);
     }
@@ -29,7 +27,7 @@ contract RewardLibTest is BaseTest {
         return CurveParams({
             id: 0,
             numPeriods: 6,
-            periodSeconds: 86400,
+            periodSeconds: 86_400,
             startTimestamp: 0,
             minMultiplier: 0,
             formulaBase: 2
@@ -79,7 +77,7 @@ contract RewardLibTest is BaseTest {
 
     function testFlattensAt() public {
         CurveParams memory params = shim.validate(defaults());
-        assertEq(shim.flattensAt(params), params.startTimestamp + (86400 * (6 + 1)));
+        assertEq(shim.flattensAt(params), params.startTimestamp + (86_400 * (6 + 1)));
         vm.warp(params.startTimestamp + shim.flattensAt(params) + 1);
         assertEq(shim.currentMultiplier(params), params.minMultiplier);
     }

@@ -2,70 +2,94 @@
 
 pragma solidity ^0.8.20;
 
-import {CurveParams, PoolState} from "src/types/Rewards.sol";
+import "forge-std/console.sol";
 import {Currency, CurrencyLib} from "src/libraries/CurrencyLib.sol";
 import {RewardCurveLib} from "src/libraries/RewardCurveLib.sol";
+import {CurveParams, Holder, PoolState} from "src/types/Rewards.sol";
 
 library RewardLib {
     using CurrencyLib for Currency;
     using RewardCurveLib for CurveParams;
     using RewardLib for PoolState;
 
+    uint256 private constant pointsMultiplier = 2 ** 64;
+
+    /////////////////////
+    // EVENTS
+    /////////////////////
+    event RewardsAllocated(uint256 amount);
+
+    event RewardsClaimed(address indexed account, uint256 amount);
+
+    event AccountSlashed(address indexed account, uint256 numShares);
+
     /////////////////////
     // ERRORS
     /////////////////////
 
-    // error RewardBipsTooHigh(uint16 bips);
-    // error RewardsDisabled();
+    error NoRewardsToClaim();
 
-    error RewardSlashingDisabled();
+    error NoSupply();
 
     error RewardSlashingNotPossible();
 
     error RewardSlashingNotReady(uint256 readyAt);
 
     function issue(PoolState storage state, address holder, uint256 numShares) internal {
-        state.holders[holder].numShares += numShares;
         state.totalShares += numShares;
+        state.holders[holder].numShares += numShares;
+        state.holders[holder].pointsCorrection -= int256(state.pointsPerShare * numShares);
     }
 
     function issueWithCurve(PoolState storage state, address holder, uint256 numShares, uint8 curveId) internal {
-        // Test size increase here
-        // state.holders[holder].numShares += numShares * state.curves[curveId].currentMultiplier();
         state.issue(holder, numShares * state.curves[curveId].currentMultiplier());
     }
 
     function allocate(PoolState storage state, address from, uint256 amount) internal {
-        state.totalRewardIngress += state.currency.capture(from, amount);
-    }
+        if (state.totalShares == 0) revert NoSupply();
 
-    function allocateAndMint(PoolState storage state, address from, uint256 allocation, uint8 curveId) internal {
-        state.totalRewardIngress += state.currency.capture(msg.sender, allocation);
-        state.holders[msg.sender].numShares += allocation * state.curves[curveId].currentMultiplier();
+        uint256 captured = state.currency.capture(from, amount);
+
+        state.pointsPerShare += (captured * pointsMultiplier) / state.totalShares;
+        state.totalRewardIngress += captured;
+
+        emit RewardsAllocated(captured);
     }
 
     function setSlashingPoint(PoolState storage state, address holder, uint48 slashingPoint) internal {
         state.holders[holder].slashingPoint = slashingPoint;
     }
 
-    function rewardBalanceOf(PoolState storage state, address account) internal view returns (uint256) {
-        // Holdings memory holding = _holdings[account];
-
-        // // - 0 -> deals with burned tokens
-        // uint256 burnedWithdrawTotals = 0;
-        // uint256 userShare = ((_currencyCaptured - burnedWithdrawTotals) * balanceOf(account)) / totalSupply();
-        // if (userShare <= _withdraws[account]) {
-        //     return 0;
-        // }
-        // return userShare - _withdraws[account];
-        // return 0;
-
-        return state.holders[account].numShares;
+    function claimRewards(PoolState storage state, address account) internal {
+        uint256 amount = state.rewardBalanceOf(account);
+        if (amount == 0) revert NoRewardsToClaim();
+        state.holders[account].rewardsWithdrawn += amount;
+        state.totalRewardEgress += amount;
+        emit RewardsClaimed(account, amount);
+        state.currency.transfer(account, amount);
     }
+
+    function rewardBalanceOf(PoolState storage state, address account) internal view returns (uint256) {
+        if (state.totalShares == 0) return 0;
+        Holder memory holder = state.holders[account];
+        uint256 accumlated =
+            uint256(int256(state.pointsPerShare * holder.numShares) + holder.pointsCorrection) / pointsMultiplier;
+        return accumlated - holder.rewardsWithdrawn;
+    }
+
+    // TODO: Reconcile function
 
     /// Slash a holder's shares
-    function slash() internal {
-        revert RewardSlashingDisabled();
-    }
+    function burn(PoolState storage state, address account) internal {
+        // TODO: Check slashability
 
+        uint256 numShares = state.holders[account].numShares;
+        state.totalShares -= numShares;
+        state.pointsPerShare = (state.totalRewardIngress * pointsMultiplier) / state.totalShares;
+
+        delete state.holders[account];
+
+        // emit Burn();
+        emit AccountSlashed(account, numShares);
+    }
 }

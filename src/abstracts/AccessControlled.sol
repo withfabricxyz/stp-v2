@@ -25,22 +25,16 @@ abstract contract AccessControlled {
 
     /// @dev Check if the caller is the owner
     function _checkOwner() internal view {
-        if (msg.sender != _owner) {
-            revert NotAuthorized();
-        }
+        if (msg.sender != _owner) revert NotAuthorized();
     }
 
     /// @dev Check if the caller has the required role (owner can do anything)
     function _checkRoles(uint16 roles) internal view {
-        if (_roles[msg.sender] & roles == 0) {
-            revert NotAuthorized();
-        }
+        if (_roles[msg.sender] & roles == 0) revert NotAuthorized();
     }
 
     function _checkOwnerOrRoles(uint16 roles) internal view {
-        if (msg.sender != _owner && _roles[msg.sender] & roles == 0) {
-            revert NotAuthorized();
-        }
+        if (msg.sender != _owner && _roles[msg.sender] & roles == 0) revert NotAuthorized();
     }
 
     /// @dev Set the owner (initialization)
@@ -66,9 +60,7 @@ abstract contract AccessControlled {
      * @notice Accept the ownership of the contract as proposed owner
      */
     function acceptOwnership() external {
-        if (msg.sender != _pendingOwner) {
-            revert NotAuthorized();
-        }
+        if (msg.sender != _pendingOwner) revert NotAuthorized();
         _setOwner(_pendingOwner);
     }
 

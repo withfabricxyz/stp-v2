@@ -3,14 +3,24 @@
 pragma solidity ^0.8.20;
 
 import {AccessControlled} from "./abstracts/AccessControlled.sol";
-import {CurveParams, RewardPoolParams, PoolState, IssueParams, Holder, PoolDetailView, HolderDetailView, CurveDetailView} from "./types/Rewards.sol";
-import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
-import {RewardLib} from "./libraries/RewardLib.sol";
-import {RewardCurveLib} from "./libraries/RewardCurveLib.sol";
+
 import {TokenRecovery} from "./abstracts/TokenRecovery.sol";
+import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
+import {RewardCurveLib} from "./libraries/RewardCurveLib.sol";
+import {RewardLib} from "./libraries/RewardLib.sol";
+import {
+    CurveDetailView,
+    CurveParams,
+    Holder,
+    HolderDetailView,
+    IssueParams,
+    PoolDetailView,
+    PoolState,
+    RewardPoolParams
+} from "./types/Rewards.sol";
+
 import {Initializable} from "@solady/utils/Initializable.sol";
 import {Multicallable} from "@solady/utils/Multicallable.sol";
-
 
 contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicallable {
     using CurrencyLib for Currency;
@@ -59,8 +69,8 @@ contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicall
 
     function issue(IssueParams calldata params) external payable {
         _checkRoles(ROLE_MINTER);
-        _state.allocate(msg.sender, params.allocation);
         _state.issueWithCurve(params.holder, params.numShares, params.curveId);
+        _state.allocate(msg.sender, params.allocation);
         _state.setSlashingPoint(params.holder, params.slashingThreshold);
     }
 
@@ -70,7 +80,7 @@ contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicall
      */
     function yieldRewards(uint256 amount) public payable {
         _state.allocate(msg.sender, amount);
-        // emit Yield(amount);
+        // TODO: locking minting?
     }
 
     function createCurve(CurveParams memory curve) external {
@@ -78,24 +88,14 @@ contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicall
         _state.curves[curve.id] = curve;
     }
 
-
     // @inheritdoc IRewardPool
     // transferRewardsFor?
     function transferRewardsFor(address account) public {
-        // _state.transferRewardsFor(account);
-        // uint256 amount = rewardBalanceOf(account);
-        // if (amount == 0) {
-        //     revert InsufficientRewards();
-        // }
-        // if (!_staked[account]) {
-        //     revert AccountNotStaked();
-        // }
+        _state.claimRewards(account);
+    }
 
-        // _withdraws[account] += amount;
-
-        // emit RewardTransfer(account, amount);
-        // _currency.transfer(account, amount);
-        revert("no");
+    function slash(address account) external {
+        _state.burn(account);
     }
 
     //////////////////////////////
@@ -112,17 +112,15 @@ contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicall
     }
 
     function curveDetail(uint8 curve) external view returns (CurveDetailView memory) {
-        return CurveDetailView({
-            currentMultiplier: _state.curves[curve].currentMultiplier(),
-            flattenTimestamp: 0
-        });
+        return CurveDetailView({currentMultiplier: _state.curves[curve].currentMultiplier(), flattenTimestamp: 0});
     }
 
     function holderDetail(address account) external view returns (HolderDetailView memory) {
         return HolderDetailView({
             numShares: _state.holders[account].numShares,
             rewardsWithdrawn: _state.holders[account].rewardsWithdrawn,
-            slashingPoint: _state.holders[account].slashingPoint
+            slashingPoint: _state.holders[account].slashingPoint,
+            rewardBalance: _state.rewardBalanceOf(account)
         });
     }
 
@@ -134,5 +132,4 @@ contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicall
     function rewardBalanceOf(address account) public view returns (uint256 numTokens) {
         return _state.rewardBalanceOf(account);
     }
-
 }

@@ -2,13 +2,15 @@
 
 pragma solidity ^0.8.20;
 
-import {LibClone} from "@solady/utils/LibClone.sol";
-import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {SubscriptionTokenV2} from "./SubscriptionTokenV2.sol";
 import {RewardPool} from "./RewardPool.sol";
-import {RewardParams, CurveParams, RewardPoolParams} from "./types/Rewards.sol";
-import {InitParams, Tier, FeeParams} from "./types/Index.sol";
-import {FactoryFeeConfig, DeployParams, RewardDeployParams} from "src/types/Factory.sol";
+import {SubscriptionTokenV2} from "./SubscriptionTokenV2.sol";
+
+import {FeeParams, InitParams, Tier} from "./types/Index.sol";
+import {CurveParams, RewardParams, RewardPoolParams} from "./types/Rewards.sol";
+import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {LibClone} from "@solady/utils/LibClone.sol";
+
+import {DeployParams, FactoryFeeConfig, RewardDeployParams} from "src/types/Factory.sol";
 
 /**
  *
@@ -96,10 +98,10 @@ contract STPV2Factory is Ownable2Step {
      * @param poolParams the initialization parameters for the pool
      * @param curveParams the curve parameters for the pool
      */
-    function deployRewardPool(RewardPoolParams memory poolParams, CurveParams memory curveParams)
-        public
-        returns (address deployment)
-    {
+    function deployRewardPool(
+        RewardPoolParams memory poolParams,
+        CurveParams memory curveParams
+    ) public returns (address deployment) {
         deployment = LibClone.clone(_rewardPoolImplementation);
         RewardPool(payable(deployment)).initialize(poolParams, curveParams);
         emit RewardPoolDeployment(deployment);
@@ -138,9 +140,7 @@ contract STPV2Factory is Ownable2Step {
         address deployment = LibClone.cloneDeterministic(_stpImplementation, bytes32(++_salt));
 
         // Set the owner to the sender if it is not set
-        if (params.initParams.owner == address(0)) {
-            params.initParams.owner = msg.sender;
-        }
+        if (params.initParams.owner == address(0)) params.initParams.owner = msg.sender;
 
         // TODO
         // FeeParams memory rewardFees = FeeParams({collector: source, bips: bips, controller: address(this)});
@@ -167,15 +167,9 @@ contract STPV2Factory is Ownable2Step {
      * @param config the fee configuration
      */
     function createFee(uint256 id, FactoryFeeConfig memory config) external onlyOwner {
-        if (config.basisPoints == 0 || config.basisPoints > _MAX_FEE_BIPS) {
-            revert FeeBipsInvalid();
-        }
-        if (config.collector == address(0)) {
-            revert FeeCollectorInvalid();
-        }
-        if (_feeConfigs[id].collector != address(0)) {
-            revert FeeExists(id);
-        }
+        if (config.basisPoints == 0 || config.basisPoints > _MAX_FEE_BIPS) revert FeeBipsInvalid();
+        if (config.collector == address(0)) revert FeeCollectorInvalid();
+        if (_feeConfigs[id].collector != address(0)) revert FeeExists(id);
         _feeConfigs[id] = config;
         emit FeeCreated(id, config.collector, config.basisPoints, config.deployFee);
     }
@@ -185,9 +179,7 @@ contract STPV2Factory is Ownable2Step {
      * @param id the id of the fee to destroy
      */
     function destroyFee(uint256 id) external onlyOwner {
-        if (_feeConfigs[id].collector == address(0)) {
-            revert FeeNotFound(id);
-        }
+        if (_feeConfigs[id].collector == address(0)) revert FeeNotFound(id);
         emit FeeDestroyed(id);
         delete _feeConfigs[id];
     }
@@ -205,9 +197,7 @@ contract STPV2Factory is Ownable2Step {
 
     function _feeConfig(uint256 feeConfigId) internal view returns (FactoryFeeConfig memory fees) {
         FactoryFeeConfig memory _fees = _feeConfigs[feeConfigId];
-        if (feeConfigId != 0 && _fees.collector == address(0)) {
-            _fees = _feeConfigs[0];
-        }
+        if (feeConfigId != 0 && _fees.collector == address(0)) _fees = _feeConfigs[0];
         return _fees;
     }
 
@@ -216,18 +206,12 @@ contract STPV2Factory is Ownable2Step {
      * @param fees the fee configuration
      */
     function _transferDeployFee(FactoryFeeConfig memory fees) internal {
-        if (fees.deployFee == 0) {
-            return;
-        }
+        if (fees.deployFee == 0) return;
 
-        if (msg.value < fees.deployFee) {
-            revert FeeInsufficient(fees.deployFee);
-        }
+        if (msg.value < fees.deployFee) revert FeeInsufficient(fees.deployFee);
 
         emit DeployFeeTransfer(fees.collector, msg.value);
         (bool sent,) = payable(fees.collector).call{value: msg.value}("");
-        if (!sent) {
-            revert FeeTransferFailed();
-        }
+        if (!sent) revert FeeTransferFailed();
     }
 }

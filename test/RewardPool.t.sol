@@ -27,85 +27,57 @@ contract RewardPoolTests is BaseTest {
     }
 
     function testConfig() public {
-      assertEq(pool.poolDetail().currencyAddress, address(0));
-      assertEq(pool.poolDetail().balance, 0);
-      // assertEq(pool.curveStatus(0).currentMultiplier, 64);
+        assertEq(pool.poolDetail().currencyAddress, address(0));
+        assertEq(pool.poolDetail().balance, 0);
     }
 
     function testAdminMint() public {
         pool.adminMint(alice, 1e18);
         assertEq(pool.holderDetail(alice).numShares, 1e18);
         assertEq(pool.poolDetail().totalShares, 1e18);
-        // assertEq(pool.totalSupply(), 1e18);
     }
 
-    // function testAllocation() public {
-    //     pool.distributeRewards{value: 1e18}(1e18);
-    //     assertEq(pool.balance(), 1e18);
-    //     assertEq(address(pool).balance, 1e18);
-    //     (bool sent,) = address(pool).call{value: 1e18}("");
-    //     assertEq(pool.balance(), 2e18);
-    // }
+    function testYield() public {
+        pool.adminMint(alice, 1e5);
+        vm.expectEmit(true, true, false, true, address(pool));
+        emit RewardLib.RewardsAllocated(1e18);
+        pool.yieldRewards{value: 1e18}(1e18);
+        assertEq(pool.poolDetail().balance, 1e18);
+        (bool sent,) = address(pool).call{value: 1e18}("");
+        assertEq(pool.poolDetail().balance, 2e18);
+    }
 
-    // function testRewardBalance() public {
-    //     pool.adminMint(alice, 1e18);
-    //     assertEq(pool.rewardBalanceOf(alice), 0);
-    //     pool.distributeRewards{value: 1e18}(1e18);
-    //     assertEq(pool.rewardBalanceOf(alice), 1e18);
-    // }
+    function testRewards() public {
+        pool.adminMint(alice, 1e18);
+        pool.yieldRewards{value: 1e18}(1e18);
+        assertEq(pool.holderDetail(alice).rewardBalance, 1e18);
+        pool.transferRewardsFor(alice);
+        assertEq(pool.holderDetail(alice).rewardBalance, 0);
+        assertEq(pool.poolDetail().balance, 0);
+    }
 
     function testRewardBalanceOverTime() public {
-        // pool.adminMint(alice, 1e18);
-        // pool.distributeRewards{value: 1e18}(1e18);
-        // pool.transferRewardsFor(alice);
-        // assertEq(pool.rewardBalanceOf(alice), 0);
-        // pool.distributeRewards{value: 1e17}(1e17);
-        // assertEq(pool.rewardBalanceOf(alice), 1e17);
-
-        // TODO
-        // vm.startPrank(alice);
-        // pool.unstake();
-        // vm.stopPrank();
-        // assertEq(pool.rewardBalanceOf(alice), 0);
+        pool.adminMint(alice, 1e18);
+        pool.yieldRewards{value: 1e18}(1e18);
+        pool.transferRewardsFor(alice);
+        assertEq(pool.holderDetail(alice).rewardBalance, 0);
+        pool.yieldRewards{value: 1e17}(1e17);
+        assertApproxEqRel(pool.holderDetail(alice).rewardBalance, 1e17, 100);
+        pool.adminMint(bob, 1e18);
+        assertApproxEqRel(pool.holderDetail(alice).rewardBalance, 1e17, 100);
+        assertEq(pool.holderDetail(bob).rewardBalance, 0);
+        pool.yieldRewards{value: 1e17}(1e17);
+        assertApproxEqRel(pool.holderDetail(bob).rewardBalance, 1e17 / 2, 100);
+        assertApproxEqRel(pool.holderDetail(alice).rewardBalance, 1e17 * 3 / 2, 100);
+        pool.adminMint(bob, 1e18);
+        assertApproxEqRel(pool.holderDetail(bob).rewardBalance, 1e17 / 2, 100);
+        assertApproxEqRel(pool.holderDetail(alice).rewardBalance, 1e17 * 3 / 2, 100);
+        pool.slash(bob);
+        assertApproxEqRel(pool.holderDetail(bob).rewardBalance, 0, 100);
+        assertApproxEqRel(pool.holderDetail(alice).rewardBalance, 1e17 * 2, 100);
+        pool.transferRewardsFor(alice);
+        assertEq(pool.holderDetail(alice).rewardBalance, 0);
     }
-
-    // function testSingleHalving() public {
-    //     CurveParams.bips = 500;
-    //     CurveParams.numPeriods = 1;
-    //     CurveParams.periodSeconds = 10;
-    //     reinitStp();
-    //     assertEq(stp.rewardMultiplier(), 2);
-    //     vm.warp(block.timestamp + 11);
-    //     assertEq(stp.rewardMultiplier(), 1);
-    //     vm.warp(block.timestamp + 21);
-    //     assertEq(stp.rewardMultiplier(), 0);
-    // }
-
-    //     function testDecay() public {
-    //         uint256 halvings = 6;
-    //         for (uint256 i = 0; i <= halvings; i++) {
-    //             vm.warp((stp.minPurchaseSeconds() * i) + 1);
-    //             assertEq(stp.rewardMultiplier(), (2 ** (halvings - i)));
-    //         }
-    //         vm.warp((stp.minPurchaseSeconds() * 7) + 1);
-    //         assertEq(stp.rewardMultiplier(), 0);
-    //     }
-
-    //     function testRewardPointPool() public prank(alice) {
-    //         vm.expectEmit(true, true, false, true, address(stp));
-    //         emit ISubscriptionTokenV2.RewardsAllocated(1e18 * 500 / 10_000);
-    //         stp.mint{value: 1e18}(1e18);
-    //         Subscription memory sub = stp.subscriptionOf(alice);
-    //         assertEq(stp.rewardMultiplier(), 64);
-    //         assertEq(sub.rewardPoints, 1e18 * 64);
-    //         assertEq(stp.totalRewardPoints(), 1e18 * 64);
-
-    //         // 2nd allocation
-    //         stp.mint{value: 1e18}(1e18);
-    //         Subscription memory sub2 = stp.subscriptionOf(alice);
-    //         assertEq(sub2.rewardPoints, 2e18 * 64);
-    //         assertEq(stp.totalRewardPoints(), 2e18 * 64);
-    //     }
 
     //     function testDisabledWithdraw() public {
     //         stp = createETHSub(2592000, 0, 0);
@@ -114,75 +86,6 @@ contract RewardPoolTests is BaseTest {
     //         assertEq(0, stp.rewardBalanceOf(alice));
     //         vm.startPrank(alice);
     //         vm.expectRevert(abi.encodeWithSelector(PoolLib.InvalidZeroTransfer.selector));
-    //         stp.transferRewardsFor(alice);
-    //         vm.stopPrank();
-    //     }
-
-    //     function testRewardPointWithdraw() public {
-    //         mint(alice, 1e18);
-    //         uint256 preBalance = creator.balance;
-    //         withdraw();
-    //         assertEq(preBalance + 1e18 - ((1e18 * 500) / 10_000), creator.balance);
-    //         vm.startPrank(alice);
-    //         preBalance = alice.balance;
-    //         assertEq((1e18 * 500) / 10_000, stp.rewardBalanceOf(alice));
-    //         vm.expectEmit(true, true, false, true, address(stp));
-    //         emit ISubscriptionTokenV2.RewardWithdraw(alice, (1e18 * 500) / 10_000);
-    //         stp.transferRewardsFor(alice);
-    //         assertEq(preBalance + (1e18 * 500) / 10_000, alice.balance);
-    //         assertEq(0, stp.rewardBalanceOf(alice));
-    //         vm.expectRevert(abi.encodeWithSelector(PoolLib.InvalidZeroTransfer.selector));
-    //         stp.transferRewardsFor(alice);
-    //         vm.stopPrank();
-
-    //         mint(bob, 1e18);
-    //         withdraw();
-    //         assertEq((1e18 * 500) / 10_000, stp.rewardBalanceOf(bob));
-    //         assertEq(0, stp.rewardBalanceOf(alice));
-
-    //         mint(charlie, 1e18);
-    //         withdraw();
-    //         assertEq((1e18 * 500) / 10_000, stp.rewardBalanceOf(bob));
-    //         assertEq((1e18 * 500) / 10_000, stp.rewardBalanceOf(charlie));
-    //         assertEq(0, stp.rewardBalanceOf(alice));
-    //     }
-
-    //     function testRewardPointWithdrawStepped() public {
-    //         mint(alice, 1e18);
-    //         vm.warp(31 days);
-    //         mint(bob, 1e18);
-    //         vm.warp(61 days);
-    //         mint(charlie, 1e18);
-    //         vm.warp(91 days);
-    //         mint(doug, 1e18);
-
-    //         withdraw();
-    //         uint256 totalPool = (4e18 * 500) / 10_000;
-
-    //         assertEq((totalPool * 64) / (64 + 32 + 16 + 8), stp.rewardBalanceOf(alice));
-    //         assertEq((totalPool * 32) / (64 + 32 + 16 + 8), stp.rewardBalanceOf(bob));
-    //         assertEq((totalPool * 16) / (64 + 32 + 16 + 8), stp.rewardBalanceOf(charlie));
-    //         assertEq((totalPool * 8) / (64 + 32 + 16 + 8), stp.rewardBalanceOf(doug));
-
-    //         stp.transferRewardsFor(alice);
-    //         assertEq(0, stp.rewardBalanceOf(alice));
-
-    //         mint(doug, 1e18);
-    //         withdraw();
-
-    //         uint256 withdrawn = (totalPool * 64) / (64 + 32 + 16 + 8);
-    //         totalPool = (5e18 * 500) / 10_000;
-    //         assertEq((totalPool * 64) / (64 + 32 + 16 + 8 + 8) - withdrawn, stp.rewardBalanceOf(alice));
-
-    //         stp.transferRewardsFor(alice);
-    //     }
-
-    //     function testWithdrawExpired() public {
-    //         mint(alice, 2592000 * 2);
-    //         vm.warp(60 days);
-    //         withdraw();
-    //         vm.startPrank(alice);
-    //         vm.expectRevert(abi.encodeWithSelector(SubscriptionLib.SubscriptionNotActive.selector));
     //         stp.transferRewardsFor(alice);
     //         vm.stopPrank();
     //     }

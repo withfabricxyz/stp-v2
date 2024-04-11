@@ -11,7 +11,8 @@ interface IRewardPool {
 
     /**
      * @notice Distribute rewards to all holders
-     * @param numTokens The number of tokens to distribute (must match msg.value or have an approval for the token transfer)
+     * @param numTokens The number of tokens to distribute (must match msg.value or have an approval for the token
+     * transfer)
      */
     // function allocateRewards(uint256 numTokens) external payable;
 

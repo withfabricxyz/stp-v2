@@ -22,7 +22,7 @@ contract FeesTest is BaseTest {
         assertEq(bps, 500);
         assertEq(recipient, fees);
 
-        uint256 expectedFee = (1e18 * 500) / 10000;
+        uint256 expectedFee = (1e18 * 500) / 10_000;
         uint256 balance = creator.balance;
 
         vm.startPrank(alice);

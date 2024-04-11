@@ -2,9 +2,10 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
-import "src/SubscriptionTokenV2.sol";
+
 import "src/RewardPool.sol";
 import "src/STPV2Factory.sol";
+import "src/SubscriptionTokenV2.sol";
 
 contract Deploy is Script {
     function run() external {

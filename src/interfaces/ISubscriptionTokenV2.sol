@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import {Tier, Subscription} from "src/types/Index.sol";
+import {Subscription, Tier} from "src/types/Index.sol";
 
 interface ISubscriptionTokenV2 {
     //////////////////
@@ -133,9 +133,12 @@ interface ISubscriptionTokenV2 {
      * @param referralCode the referral code to use for rewards
      * @param referrer the referrer address and reward recipient
      */
-    function mintWithReferralFor(address account, uint256 numTokens, uint256 referralCode, address referrer)
-        external
-        payable;
+    function mintWithReferralFor(
+        address account,
+        uint256 numTokens,
+        uint256 referralCode,
+        address referrer
+    ) external payable;
 
     //~~~~~~~~~~~ V2 ~~~~~~~~~~~~//
 

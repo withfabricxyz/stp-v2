@@ -99,12 +99,9 @@ struct Subscription {
 struct MintParams {
     /// @dev The tokenId to mint
     address account;
-
     /// @dev The tier id to mint
     uint16 tierId;
-
     address referrer;
-
     uint256 referralCode;
     /// @dev The number of tokens to mint
     uint256 numTokens;

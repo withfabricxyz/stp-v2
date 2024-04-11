@@ -2,26 +2,30 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "@forge/Test.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
 import {ERC721} from "solady/tokens/ERC721.sol";
+import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 
 //////////// Project Imports ////////////
 
-import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
-import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
-import {InitParams, Subscription, Tier, Subscription, Gate, GateType, FeeParams} from "src/types/Index.sol";
-import {RewardParams, CurveParams, RewardPoolParams, PoolState, Holder} from "src/types/Rewards.sol";
-import {FactoryFeeConfig, DeployParams} from "src/types/Factory.sol";
-import {AccessControlled} from "src/abstracts/AccessControlled.sol";
-import {GateLib} from "src/libraries/GateLib.sol";
-import {TierLib} from "src/libraries/TierLib.sol";
-import {RewardLib} from "src/libraries/RewardLib.sol";
-import {RewardCurveLib} from "src/libraries/RewardCurveLib.sol";
-import {CurrencyLib, Currency} from "src/libraries/CurrencyLib.sol";
-import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
 import {RewardPool} from "src/RewardPool.sol";
+import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
+import {AccessControlled} from "src/abstracts/AccessControlled.sol";
+import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
+
+import {Currency, CurrencyLib} from "src/libraries/CurrencyLib.sol";
+import {GateLib} from "src/libraries/GateLib.sol";
+import {RewardCurveLib} from "src/libraries/RewardCurveLib.sol";
+import {RewardLib} from "src/libraries/RewardLib.sol";
+
+import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
+import {TierLib} from "src/libraries/TierLib.sol";
+import {DeployParams, FactoryFeeConfig} from "src/types/Factory.sol";
+import {FeeParams, Gate, GateType, InitParams, Subscription, Subscription, Tier} from "src/types/Index.sol";
+import {CurveParams, Holder, PoolState, RewardParams, RewardPoolParams} from "src/types/Rewards.sol";
 
 contract TestERC1155Token is ERC1155 {
     constructor() ERC1155("test") {
@@ -178,11 +182,11 @@ abstract contract BaseTest is Test {
         return reinitStp();
     }
 
-    function createETHSub(uint256 minPurchase, uint16 feeBps, uint16 bips)
-        public
-        virtual
-        returns (SubscriptionTokenV2 sub)
-    {
+    function createETHSub(
+        uint256 minPurchase,
+        uint16 feeBps,
+        uint16 bips
+    ) public virtual returns (SubscriptionTokenV2 sub) {
         tierParams.periodDurationSeconds = uint32(minPurchase);
         tierParams.pricePerPeriod = minPurchase * 2;
         feeParams.bips = feeBps;
@@ -192,11 +196,12 @@ abstract contract BaseTest is Test {
         return reinitStp();
     }
 
-    function defaultCurveParams() internal view returns (CurveParams memory) {
-        return CurveParams({id: 0, numPeriods: 6, periodSeconds: 2, startTimestamp: 0, minMultiplier: 0, formulaBase: 2});
+    function defaultCurveParams() internal pure returns (CurveParams memory) {
+        return
+            CurveParams({id: 0, numPeriods: 6, periodSeconds: 2, startTimestamp: 0, minMultiplier: 0, formulaBase: 2});
     }
 
-    function defaultPoolParams() internal view returns (RewardPoolParams memory) {
+    function defaultPoolParams() internal pure returns (RewardPoolParams memory) {
         return RewardPoolParams({
             // name: "name",
             // symbol: "symbol",

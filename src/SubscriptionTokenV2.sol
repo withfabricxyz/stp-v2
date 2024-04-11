@@ -3,27 +3,31 @@
 pragma solidity ^0.8.20;
 
 import {AccessControlled} from "./abstracts/AccessControlled.sol";
+
+import {Initializable} from "@solady/utils/Initializable.sol";
 import {LibString} from "@solady/utils/LibString.sol";
 import {Multicallable} from "@solady/utils/Multicallable.sol";
-import {Initializable} from "@solady/utils/Initializable.sol";
 // import {ERC721} from "@solady/tokens/ERC721.sol";
 import {ERC721} from "./abstracts/ERC721.sol";
-import {InitParams, Tier, FeeParams, Tier, Subscription} from "./types/Index.sol";
-import {RewardParams} from "./types/Rewards.sol";
-import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
-import {TierLib} from "./libraries/TierLib.sol";
+
+import {IRewardPool} from "./interfaces/IRewardPool.sol";
 import {ISubscriptionTokenV2} from "./interfaces/ISubscriptionTokenV2.sol";
 import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
-import {IRewardPool} from "./interfaces/IRewardPool.sol";
+import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
+import {TierLib} from "./libraries/TierLib.sol";
+import {FeeParams, InitParams, Subscription, Tier, Tier} from "./types/Index.sol";
+import {RewardParams} from "./types/Rewards.sol";
 
 /**
  * @title Subscription Token Protocol Version 2
  * @author Fabric Inc.
  * @notice An NFT contract which allows users to mint time and access token gated content while time remains.
  * @dev The balanceOf function returns the number of seconds remaining in the subscription. Token gated systems leverage
- *      the balanceOf function to determine if a user has the token, and if no time remains, the balance is 0. NFT holders
+ *      the balanceOf function to determine if a user has the token, and if no time remains, the balance is 0. NFT
+ * holders
  *      can mint additional time. The creator/owner of the contract can withdraw the funds at any point. There are
- *      additional functionalities for granting time, refunding accounts, fees, rewards, etc. This contract is designed to be used with
+ *      additional functionalities for granting time, refunding accounts, fees, rewards, etc. This contract is designed
+ * to be used with
  *      Clones, but is not designed to be upgradeable. Added functionality will come with new versions.
  */
 contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initializable, ISubscriptionTokenV2 {
@@ -39,7 +43,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     uint16 private constant _MAX_FEE_BIPS = 1250;
 
     /// @dev Maximum basis points (100%)
-    uint16 private constant _MAX_BIPS = 10000;
+    uint16 private constant _MAX_BIPS = 10_000;
 
     /// @dev The metadata URI for the contract (tokenUri is derived from this)
     string public contractURI;
@@ -94,18 +98,18 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     /// @dev Initialize a new tier
     function _initializeTier(Tier memory params) private {
         _tierCount += 1;
-        if (params.id != _tierCount) {
-            revert TierLib.TierInvalidId();
-        }
+        if (params.id != _tierCount) revert TierLib.TierInvalidId();
         params.validate();
         _tiers[params.id] = params;
         emit TierCreated(_tierCount);
     }
 
-    function initialize(InitParams memory params, Tier memory tier, RewardParams memory rewards, FeeParams memory fees)
-        public
-        initializer
-    {
+    function initialize(
+        InitParams memory params,
+        Tier memory tier,
+        RewardParams memory rewards,
+        FeeParams memory fees
+    ) public initializer {
         // Validate core params
         if (params.owner == address(0)) revert InvalidOwner();
         if (bytes(params.name).length == 0) revert InvalidName();
@@ -195,9 +199,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      */
     function updateMetadata(string memory uri) external {
         _checkOwnerOrRoles(ROLE_MANAGER);
-        if (bytes(uri).length == 0) {
-            revert InvalidContractUri();
-        }
+        if (bytes(uri).length == 0) revert InvalidContractUri();
         emit BatchMetadataUpdate(1, _tokenCounter);
         contractURI = uri;
     }
@@ -213,9 +215,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
 
         Subscription storage sub = _subscriptions[account];
         // If the subscription does not exist, mint the token
-        if (sub.tokenId == 0) {
-            _mint(sub, account);
-        }
+        if (sub.tokenId == 0) _mint(sub, account);
 
         // TODO: Check join tier logic, etc
         sub.tierId = tierId;
@@ -278,9 +278,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     function setTierSupplyCap(uint16 tierId, uint32 supplyCap) public {
         _checkOwnerOrRoles(ROLE_MANAGER);
         Tier storage tier = _getTier(tierId);
-        if (supplyCap != 0 && supplyCap < _tierSubCounts[tierId]) {
-            revert TierLib.TierInvalidSupplyCap();
-        }
+        if (supplyCap != 0 && supplyCap < _tierSubCounts[tierId]) revert TierLib.TierInvalidSupplyCap();
         tier.maxSupply = supplyCap;
         emit TierSupplyCapChange(tierId, supplyCap);
     }
@@ -336,21 +334,23 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param referralCode the referral code to use for rewards
      * @param referrer the referrer address and reward recipient
      */
-    function mintWithReferralFor(address account, uint256 numTokens, uint256 referralCode, address referrer)
-        public
-        payable
-    {
-        if (referrer == address(0)) {
-            revert InvalidAccount();
-        }
+    function mintWithReferralFor(
+        address account,
+        uint256 numTokens,
+        uint256 referralCode,
+        address referrer
+    ) public payable {
+        if (referrer == address(0)) revert InvalidAccount();
         _mintOrRenew(account, numTokens, 0, referralCode, referrer);
     }
 
     /// @dev Associate the subscription with the tier, adjusting the cap, etc
-    function _joinTier(Subscription storage sub, Tier memory tier, address account, uint256 numTokens)
-        internal
-        returns (uint256)
-    {
+    function _joinTier(
+        Subscription storage sub,
+        Tier memory tier,
+        address account,
+        uint256 numTokens
+    ) internal returns (uint256) {
         // TODO: What do we do for existing time?
         uint32 subs = _tierSubCounts[tier.id];
 
@@ -368,18 +368,20 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @dev Create a new subscription and NFT for the given account
      */
     function _mint(Subscription storage sub, address account) internal {
-        if (_globalSupplyCap != 0 && _tokenCounter >= _globalSupplyCap) {
-            revert GlobalSupplyLimitExceeded();
-        }
+        if (_globalSupplyCap != 0 && _tokenCounter >= _globalSupplyCap) revert GlobalSupplyLimitExceeded();
 
         _tokenCounter += 1;
         sub.tokenId = _tokenCounter;
         _safeMint(account, sub.tokenId);
     }
 
-    function _mintOrRenew(address account, uint256 numTokens, uint16 tierId, uint256 referralCode, address referrer)
-        internal
-    {
+    function _mintOrRenew(
+        address account,
+        uint256 numTokens,
+        uint16 tierId,
+        uint256 referralCode,
+        address referrer
+    ) internal {
         if (account == address(0)) revert InvalidAccount();
 
         uint256 tokensIn = _currency.capture(msg.sender, numTokens);
@@ -388,9 +390,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         Subscription storage sub = _subscriptions[account];
 
         // If the subscription does not exist, mint the token
-        if (sub.tokenId == 0) {
-            _mint(sub, account);
-        }
+        if (sub.tokenId == 0) _mint(sub, account);
 
         // Switch tiers if necessary (checking join logic and pricing)
         if (sub.tierId == 0 || (tierId != 0 && sub.tierId != tierId)) {
@@ -447,9 +447,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         if (msg.sender != feeParams.collector) revert Unauthorized();
 
         // Give tokens back to creator and set fee rate to 0
-        if (newCollector == address(0)) {
-            feeParams.bips = 0;
-        }
+        if (newCollector == address(0)) feeParams.bips = 0;
         feeParams.collector = newCollector;
         emit FeeCollectorChange(newCollector);
     }
@@ -511,13 +509,9 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
 
     /// @dev Allocate tokens to the fee collector
     function _transferFees(uint256 amount) private returns (uint256) {
-        if (feeParams.bips == 0) {
-            return amount;
-        }
+        if (feeParams.bips == 0) return amount;
         uint256 fee = (amount * feeParams.bips) / _MAX_BIPS;
-        if (fee == 0) {
-            return amount;
-        }
+        if (fee == 0) return amount;
 
         _currency.transfer(feeParams.collector, fee);
         emit FeeTransfer(feeParams.collector, fee);
@@ -525,14 +519,10 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     }
 
     function _transferRewards(address account, uint256 amount, uint8 multiplier) private returns (uint256) {
-        if (rewardParams.poolAddress == address(0)) {
-            return amount;
-        }
+        if (rewardParams.poolAddress == address(0)) return amount;
 
         uint256 rewards = (amount * rewardParams.bips) / _MAX_BIPS;
-        if (rewards == 0) {
-            return amount;
-        }
+        if (rewards == 0) return amount;
 
         // emit RewardsTransferred(amount, account, poolAddress)
         if (_currency.isNative()) {
@@ -548,9 +538,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     /// @dev Compute the reward amount for a given token amount and referral code
     function _referralAmount(uint256 tokenAmount, uint256 referralCode) internal view returns (uint256) {
         uint16 referralBps = _referralCodes[referralCode];
-        if (referralBps == 0) {
-            return 0;
-        }
+        if (referralBps == 0) return 0;
         return (tokenAmount * referralBps) / _MAX_BIPS;
     }
 
@@ -633,9 +621,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     /// @inheritdoc ISubscriptionTokenV2
     function tierBalanceOf(uint16 tierId, address account) external view returns (uint256 numSeconds) {
         Subscription memory sub = _subscriptions[account];
-        if (sub.tierId != tierId) {
-            return 0;
-        }
+        if (sub.tierId != tierId) return 0;
         return sub.remainingSeconds();
     }
 
@@ -653,20 +639,12 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal override {
-        if (from == address(0)) {
-            return;
-        }
+        if (from == address(0)) return;
 
         uint16 tierId = _subscriptions[from].tierId;
-        if (tierId != 0) {
-            if (!_tiers[tierId].transferrable) {
-                revert TierLib.TierTransferDisabled();
-            }
-        }
+        if (tierId != 0) if (!_tiers[tierId].transferrable) revert TierLib.TierTransferDisabled();
 
-        if (_subscriptions[to].tokenId != 0 || to == address(0)) {
-            revert InvalidTransfer();
-        }
+        if (_subscriptions[to].tokenId != 0 || to == address(0)) revert InvalidTransfer();
 
         _subscriptions[to] = _subscriptions[from];
 
@@ -675,9 +653,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
 
     function locked(uint256 tokenId) public view override returns (bool) {
         uint16 tierId = _subscriptions[ownerOf(tokenId)].tierId;
-        if (tierId == 0) {
-            return false;
-        }
+        if (tierId == 0) return false;
         return !_tiers[tierId].transferrable;
     }
 
@@ -694,9 +670,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     function recoverCurrency(address tokenAddress, address recipientAddress, uint256 tokenAmount) external {
         _checkOwner();
         Currency target = Currency.wrap(tokenAddress);
-        if (target == _currency) {
-            revert InvalidRecovery();
-        }
+        if (target == _currency) revert InvalidRecovery();
         target.transfer(recipientAddress, tokenAmount);
     }
 }

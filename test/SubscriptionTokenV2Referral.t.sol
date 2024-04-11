@@ -27,7 +27,7 @@ contract SubscriptionTokenV2ReferralTest is BaseTest {
 
     function testCreateInvalid() public prank(creator) {
         vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidBps.selector));
-        stp.createReferralCode(1, 11000);
+        stp.createReferralCode(1, 11_000);
         stp.createReferralCode(1, 500);
         vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.ReferralExists.selector, 1));
         stp.createReferralCode(1, 500);

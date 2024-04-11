@@ -2,16 +2,16 @@
 
 pragma solidity ^0.8.20;
 
-
 import {Currency} from "../libraries/CurrencyLib.sol";
 
 struct Holder {
-  /// @dev The number of shares earned
-  uint256 numShares;
-  /// @dev The number of rewards withdrawn
-  uint256 rewardsWithdrawn;
-  /// @dev The timestamp at which point slashing is allowed (+ grace period)
-  uint48 slashingPoint;
+    /// @dev The number of shares earned
+    uint256 numShares;
+    /// @dev The number of rewards withdrawn
+    uint256 rewardsWithdrawn;
+    /// @dev The timestamp at which point slashing is allowed (+ grace period)
+    uint48 slashingPoint;
+    int256 pointsCorrection;
 }
 
 struct RewardPoolParams {
@@ -48,8 +48,8 @@ struct RewardParams {
 
 // TODO?
 struct HolderKey {
-  address tokenAddress;
-  uint256 tokenId;
+    address tokenAddress;
+    uint256 tokenId;
 }
 
 struct PoolState {
@@ -57,6 +57,7 @@ struct PoolState {
     uint256 totalRewardEgress;
     uint256 totalRewardIngress;
     uint256 slashedWithdraws;
+    uint256 pointsPerShare;
     Currency currency;
     mapping(address => Holder) holders;
     mapping(uint8 => CurveParams) curves;
@@ -94,5 +95,5 @@ struct HolderDetailView {
     uint256 numShares;
     uint256 rewardsWithdrawn;
     uint48 slashingPoint;
+    uint256 rewardBalance;
 }
-

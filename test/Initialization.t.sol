@@ -50,7 +50,7 @@ contract InitializationTest is BaseTest {
     }
 
     function testInvalidRewards() public {
-        rewardParams.bips = 11000;
+        rewardParams.bips = 11_000;
         vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidRewardParams.selector));
         stp.initialize(initParams, tierParams, rewardParams, feeParams);
 

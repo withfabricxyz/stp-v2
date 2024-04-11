@@ -4,9 +4,8 @@ pragma solidity ^0.8.20;
 
 import {Currency, CurrencyLib} from "../libraries/CurrencyLib.sol";
 
-contract TokenRecovery  {
+contract TokenRecovery {
     using CurrencyLib for Currency;
-
 
     error InvalidRecovery();
 
@@ -14,8 +13,7 @@ contract TokenRecovery  {
      * @dev Check whether the token can be recovered (revert to prevent a recovery)
      * @param tokenAddress the address of the token to check
      */
-    function _checkRecovery(address tokenAddress) internal virtual view {
-    }
+    function _checkRecovery(address tokenAddress) internal view virtual {}
 
     /**
      * @notice Recover a token from the contract (with a check to prevent recovering a contract dependency)

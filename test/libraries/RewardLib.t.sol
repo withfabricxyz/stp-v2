@@ -3,10 +3,8 @@ pragma solidity ^0.8.20;
 
 import "../TestImports.t.sol";
 
-
 struct PoolStatePartial {
     uint256 totalShares;
-    uint256 totalRewardEgress;
     uint256 totalRewardIngress;
     uint256 slashedWithdraws;
     Currency currency;
@@ -15,7 +13,6 @@ struct PoolStatePartial {
 // We need to create a shim contract to call the internal functions of RewardLib in order to get
 // foundry to generate the coverage report correctly
 contract RewardTestShim {
-
     PoolState private _state;
 
     constructor() {
@@ -23,13 +20,12 @@ contract RewardTestShim {
         _state.curves[0] = CurveParams({
             id: 0,
             numPeriods: 6,
-            periodSeconds: 86400,
+            periodSeconds: 86_400,
             startTimestamp: uint48(block.timestamp),
             minMultiplier: 0,
             formulaBase: 2
         });
     }
-
 
     function issue(address holder, uint256 numShares) external {
         RewardLib.issue(_state, holder, numShares);
@@ -50,7 +46,6 @@ contract RewardTestShim {
     function state() external view returns (PoolStatePartial memory) {
         return PoolStatePartial({
             totalShares: _state.totalShares,
-            totalRewardEgress: _state.totalRewardEgress,
             totalRewardIngress: _state.totalRewardIngress,
             slashedWithdraws: _state.slashedWithdraws,
             currency: _state.currency
@@ -59,7 +54,6 @@ contract RewardTestShim {
 }
 
 contract RewardLibTest is BaseTest {
-
     RewardTestShim public shim = new RewardTestShim();
 
     function testIssuance() public {

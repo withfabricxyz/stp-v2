@@ -47,13 +47,9 @@ library CurrencyLib {
     function capture(Currency currency, address from, uint256 amount) internal returns (uint256 capturedAmount) {
         capturedAmount = amount;
         if (currency.isNative()) {
-            if (msg.value != amount) {
-                revert InvalidCapture();
-            }
+            if (msg.value != amount) revert InvalidCapture();
         } else {
-            if (msg.value > 0) {
-                revert InvalidCapture();
-            }
+            if (msg.value > 0) revert InvalidCapture();
             // Note: We support tokens which take fees, but do not support rebasing tokens
             uint256 preBalance = currency.balance();
             Currency.unwrap(currency).safeTransferFrom(from, address(this), amount);
@@ -63,14 +59,9 @@ library CurrencyLib {
 
     /// @dev release native or ERC20 tokens
     function transfer(Currency currency, address to, uint256 amount) internal {
-        if (to == address(0)) {
-            revert InvalidAccount();
-        }
-        if (currency.isNative()) {
-            to.safeTransferETH(amount);
-        } else {
-            Currency.unwrap(currency).safeTransfer(to, amount);
-        }
+        if (to == address(0)) revert InvalidAccount();
+        if (currency.isNative()) to.safeTransferETH(amount);
+        else Currency.unwrap(currency).safeTransfer(to, amount);
     }
 
     /// @dev show the balance of the contract
@@ -80,18 +71,13 @@ library CurrencyLib {
 
     /// @dev show the balance of an account
     function balanceOf(Currency currency, address owner) internal view returns (uint256) {
-        if (currency.isNative()) {
-            return owner.balance;
-        } else {
-            return Currency.unwrap(currency).balanceOf(owner);
-        }
+        if (currency.isNative()) return owner.balance;
+        else return Currency.unwrap(currency).balanceOf(owner);
     }
 
     /// @dev approve an ERC20 token (note, this is intended for sending tokens to another contract in a single txn)
     function approve(Currency currency, address spender, uint256 amount) internal {
-        if (currency.isNative()) {
-            revert InvalidApproval();
-        }
+        if (currency.isNative()) revert InvalidApproval();
         Currency.unwrap(currency).safeApprove(spender, amount);
     }
 

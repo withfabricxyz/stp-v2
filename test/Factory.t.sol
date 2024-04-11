@@ -2,8 +2,9 @@
 pragma solidity ^0.8.20;
 
 import "./TestImports.t.sol";
-import {STPV2Factory} from "src/STPV2Factory.sol";
+
 import {Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {STPV2Factory} from "src/STPV2Factory.sol";
 
 contract FactoryTest is BaseTest {
     SubscriptionTokenV2 internal impl;
