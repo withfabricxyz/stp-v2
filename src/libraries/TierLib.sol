@@ -85,59 +85,18 @@ library TierLib {
         GateLib.checkAccount(state.params.gate, account);
     }
 
-    function join(
+    function checkRenewal(
         State storage state,
-        address account,
-        Subscription storage sub,
+        Subscription memory sub,
         uint256 numTokens
-    ) internal returns (uint256) {
-        // checkJoin(state, account, numTokens);
-        if (state.id == 0) revert TierNotFound(state.id);
-        if (block.timestamp < state.params.startTimestamp) revert TierNotStarted();
-        if (state.params.maxSupply != 0 && state.subCount >= state.params.maxSupply) revert TierHasNoSupply(state.id);
-        if (numTokens < state.params.initialMintPrice) revert TierInvalidMintPrice(state.params.initialMintPrice);
-        GateLib.checkAccount(state.params.gate, account);
-
-        state.subCount += 1;
-        sub.tierId = state.id;
-        return numTokens - state.params.initialMintPrice;
-    }
-
-    function renew(State storage state, Subscription storage sub, uint256 numTokens) internal {
+    ) internal view returns (uint48 numSeconds) {
         Tier memory tier = state.params;
 
         if (tier.paused) revert TierRenewalsPaused();
         if (numTokens < tier.pricePerPeriod) revert TierInvalidRenewalPrice(tier.pricePerPeriod);
 
-        uint48 numSeconds = tokensToSeconds(tier, numTokens);
+        numSeconds = tokensToSeconds(tier, numTokens);
         uint48 totalFutureSeconds = sub.purchasedTimeRemaining() + numSeconds;
-
-        if (tier.maxCommitmentSeconds > 0 && totalFutureSeconds > tier.maxCommitmentSeconds) {
-            revert MaxCommitmentExceeded();
-        }
-
-        if (tier.endTimestamp > 0 && (block.timestamp + totalFutureSeconds) > tier.endTimestamp) {
-            revert TierEndExceeded();
-        }
-
-        // checkRenewal(state.params, sub, numTokens);
-        // if(state.id == 0) revert TierNotFound(state.id);
-        // if (block.timestamp < state.params.startTimestamp) revert TierNotStarted();
-        // if (state.params.maxSupply != 0 && state.subCount >= state.params.maxSupply) revert
-        // TierHasNoSupply(state.id);
-        // if (numTokens < state.params.initialMintPrice) revert TierInvalidMintPrice(state.params.initialMintPrice);
-        // sub.addTime(tokensToSeconds());
-        sub.renew(numTokens, numSeconds);
-
-        // return numTokens - state.params.initialMintPrice;
-    }
-
-    function checkRenewal(Tier memory tier, Subscription memory sub, uint256 numTokens) internal view {
-        if (tier.paused) revert TierRenewalsPaused();
-        if (numTokens < tier.pricePerPeriod) revert TierInvalidRenewalPrice(tier.pricePerPeriod);
-
-        uint256 numSeconds = tokensToSeconds(tier, numTokens);
-        uint256 totalFutureSeconds = sub.purchasedTimeRemaining() + numSeconds;
 
         if (tier.maxCommitmentSeconds > 0 && totalFutureSeconds > tier.maxCommitmentSeconds) {
             revert MaxCommitmentExceeded();

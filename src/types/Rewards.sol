@@ -9,8 +9,7 @@ struct Holder {
     uint256 numShares;
     /// @dev The number of rewards withdrawn
     uint256 rewardsWithdrawn;
-    /// @dev The timestamp at which point slashing is allowed (+ grace period)
-    uint48 slashingPoint;
+    /// @dev A correction value used to calculate the reward balance for a holder
     int256 pointsCorrection;
 }
 
@@ -46,16 +45,6 @@ struct RewardParams {
     uint16 bips;
 }
 
-struct PoolState {
-    uint256 totalShares;
-    uint256 totalRewardEgress;
-    uint256 totalRewardIngress;
-    uint256 slashedWithdraws;
-    uint256 pointsPerShare;
-    mapping(address => Holder) holders;
-    mapping(uint8 => CurveParams) curves;
-}
-
 struct IssueParams {
     /// @dev The address of the pool
     address holder;
@@ -87,6 +76,5 @@ struct CurveDetailView {
 struct HolderDetailView {
     uint256 numShares;
     uint256 rewardsWithdrawn;
-    uint48 slashingPoint;
     uint256 rewardBalance;
 }

@@ -15,17 +15,19 @@ import {
     HolderDetailView,
     IssueParams,
     PoolDetailView,
-    PoolState,
     RewardPoolParams
 } from "./types/Rewards.sol";
 
 import {Initializable} from "@solady/utils/Initializable.sol";
 import {Multicallable} from "@solady/utils/Multicallable.sol";
 
-contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicallable {
+contract RewardPool is
+    AccessControlled,
+    Initializable //}, TokenRecovery, Multicallable {
+{
     using CurrencyLib for Currency;
     using RewardCurveLib for CurveParams;
-    using RewardLib for PoolState;
+    using RewardLib for RewardLib.State;
 
     /// @dev The minter role is granted to contracts which are allowed to mint tokens with funds
     uint16 public constant ROLE_MINTER = 1;
@@ -34,7 +36,7 @@ contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicall
     uint16 public constant ROLE_CREATOR = 2;
 
     /// @dev The pool state (holders, supply, counts, etc)
-    PoolState private _state;
+    RewardLib.State private _state;
 
     Currency private _currency;
 
@@ -64,17 +66,14 @@ contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicall
      * @notice Mint tokens to an account without payment (used for migrations, tips, etc)
      */
     function adminMint(address account, uint256 numShares, uint48 slashPointExtension) external {
-        // _checkAdmin();
         _checkRoles(ROLE_CREATOR);
         _state.issue(account, numShares);
-        // _state.extendSlashingPoint(account, slashPointExtension);
     }
 
     function issue(IssueParams calldata params) external payable {
         _checkRoles(ROLE_MINTER);
         _state.issueWithCurve(params.holder, params.numShares, params.curveId);
-        _state.allocate(msg.sender, params.allocation);
-        // _state.setSlashingPoint(params.holder, params.slashingThreshold);
+        _state.allocate(params.allocation);
     }
 
     /**
@@ -82,11 +81,8 @@ contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicall
      * @param amount the amount of tokens (native or ERC20) to allocate
      */
     function yieldRewards(uint256 amount) public payable {
-        if (_state.totalShares == 0) revert RewardLib.NoSupply();
         uint256 amount = _currency.capture(msg.sender, amount);
-        _state.allocate(msg.sender, amount);
-
-        // TODO: locking minting?
+        _state.allocate(amount);
     }
 
     function createCurve(CurveParams memory curve) external {
@@ -126,7 +122,6 @@ contract RewardPool is AccessControlled, Initializable, TokenRecovery, Multicall
         return HolderDetailView({
             numShares: _state.holders[account].numShares,
             rewardsWithdrawn: _state.holders[account].rewardsWithdrawn,
-            slashingPoint: _state.holders[account].slashingPoint,
             rewardBalance: _state.rewardBalanceOf(account)
         });
     }

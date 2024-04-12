@@ -18,7 +18,7 @@ contract InitializationTest is BaseTest {
     function testDefaults() public {
         stp = reinitStp();
         assertEq(initParams.contractUri, stp.contractURI());
-        assertEq(initParams.erc20TokenAddr, stp.erc20Address());
+        assertEq(initParams.erc20TokenAddr, stp.contractDetail().currency);
     }
 
     function testOwnerZero() public {

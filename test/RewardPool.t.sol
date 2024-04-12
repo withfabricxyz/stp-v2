@@ -64,7 +64,6 @@ contract RewardPoolTests is BaseTest {
         assertEq(pool.holderDetail(alice).numShares, 1e18);
         assertEq(pool.holderDetail(alice).rewardBalance, 0);
         assertEq(pool.holderDetail(alice).rewardsWithdrawn, 0);
-        assertEq(pool.holderDetail(alice).slashingPoint, block.timestamp + 10_000);
     }
 
     // Ensure the reward balance is accurate as shares and rewards are issued and burned

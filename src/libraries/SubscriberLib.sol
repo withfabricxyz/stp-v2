@@ -10,6 +10,8 @@ library SubscriberLib {
 
     event GrantRevoke(uint256 indexed tokenId, uint48 time, uint48 expiresAt);
 
+    event SwitchTier(uint256 indexed tokenId, uint16 oldTier, uint16 newTier);
+
     error SubscriptionNotActive();
 
     error SubscriptionGrantInvalidTime();
@@ -18,15 +20,10 @@ library SubscriberLib {
 
     error DeactivationFailure();
 
-    function expiresAt(Subscription memory sub) internal pure returns (uint256) {
-        uint256 purchase = sub.purchaseOffset + sub.secondsPurchased;
-        uint256 grant = sub.grantOffset + sub.secondsGranted;
+    function expiresAt(Subscription memory sub) internal pure returns (uint48) {
+        uint48 purchase = sub.purchaseOffset + sub.secondsPurchased;
+        uint48 grant = sub.grantOffset + sub.secondsGranted;
         return purchase > grant ? purchase : grant;
-    }
-
-    /// @dev Check if a subscription is active
-    function checkActive(Subscription memory sub) internal view {
-        if (expiresAt(sub) <= block.timestamp) revert SubscriptionNotActive();
     }
 
     /// @dev The amount of purchased time remaining for a given subscription
@@ -47,37 +44,7 @@ library SubscriberLib {
         return purchasedTimeRemaining(sub) + grantedTimeRemaining(sub);
     }
 
-    function grantTime(Subscription storage sub, uint48 secondsToGrant) internal {
-        if (secondsToGrant == 0) revert SubscriptionGrantInvalidTime();
-
-        // Adjust offset to account for existing time
-        if (block.timestamp > sub.grantOffset + sub.secondsGranted) {
-            sub.grantOffset = uint48(block.timestamp - sub.secondsGranted);
-        }
-
-        sub.secondsGranted += secondsToGrant;
-    }
-
-    function renew(Subscription storage sub, uint256 numTokens, uint48 numSeconds) internal {
-        if (block.timestamp > sub.purchaseOffset + sub.secondsPurchased) {
-            sub.purchaseOffset = uint48(block.timestamp - sub.secondsPurchased);
-        }
-
-        sub.totalPurchased += numTokens;
-        sub.secondsPurchased += numSeconds;
-    }
-
-    function revokeTime(Subscription storage sub) internal {
-        uint48 remaining = grantedTimeRemaining(sub);
-
-        //         // Subscription storage sub = _state.subscriptions[account];
-        // uint256 time = sub.revokeTime();
-        // emit GrantRevoke(account, sub.tokenId, time, sub.expiresAt());
-
-        sub.secondsGranted = 0;
-        // return remaining;
-        emit GrantRevoke(sub.tokenId, remaining, uint48(sub.expiresAt()));
-    }
+    // TODO: Consider how to do expiresAt properly
 
     // TODO: Lot's of testing?
     function estimatedRefund(Subscription memory sub) internal view returns (uint256) {
@@ -86,26 +53,5 @@ library SubscriberLib {
         uint256 divisor = uint256(sub.secondsPurchased / secondsLeft);
         if (divisor == 0) return 0;
         return sub.totalPurchased / divisor;
-    }
-
-    function deactivate(Subscription storage sub) internal {
-        if (sub.tierId == 0) return;
-
-        if (remainingSeconds(sub) > 0) revert DeactivationFailure();
-
-        sub.tierId = 0;
-        // emit Deactivatation(account, sub.tokenId);
-    }
-
-    function refund(
-        Subscription storage sub,
-        uint256 numTokens
-    ) internal returns (uint256 refundedTokens, uint48 refundedTime) {
-        refundedTime = purchasedTimeRemaining(sub);
-        refundedTokens = numTokens > 0 ? numTokens : estimatedRefund(sub);
-        // TODO: Checks?
-        // TODO: Test
-        sub.totalPurchased -= refundedTokens;
-        sub.secondsPurchased -= refundedTime;
     }
 }

@@ -15,9 +15,9 @@ contract ViewsTest is BaseTest {
 
     function testTierCount() public prank(creator) {
         Tier memory tier = tierParams;
-        assertEq(1, stp.tierCount());
+        assertEq(1, stp.contractDetail().tierCount);
         stp.createTier(tier);
-        assertEq(2, stp.tierCount());
+        assertEq(2, stp.contractDetail().tierCount);
     }
 
     // function testTierSupply() public prank(creator) {

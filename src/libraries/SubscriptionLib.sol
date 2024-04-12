@@ -27,11 +27,37 @@ library SubscriptionLib {
     // EVENTS
     /////////////////////
 
+    /// @dev Emitted when time is purchased (new nft or renewed)
+    event Purchase(
+        address indexed account,
+        uint256 indexed tokenId,
+        uint256 tokensTransferred,
+        uint256 timePurchased,
+        uint256 expiresAt
+    );
+
+    /// @dev Emitted when the creator refunds a subscribers remaining time
+    event Refund(address indexed account, uint256 indexed tokenId, uint256 tokensTransferred, uint256 timeReclaimed);
+
     event Grant(address indexed account, uint256 indexed tokenId, uint256 secondsGranted, uint256 expiresAt);
+
+    event GrantRevoke(uint256 indexed tokenId, uint48 time, uint48 expiresAt);
+
+    event SwitchTier(uint256 indexed tokenId, uint16 oldTier, uint16 newTier);
+
+    event TierCreated(uint16 tierId);
+
+    event TierUpdated(uint16 tierId);
 
     /////////////////////
     // ERRORS
     /////////////////////
+
+    error SubscriptionGrantInvalidTime();
+
+    error InvalidRefund();
+
+    error DeactivationFailure();
 
     error GlobalSupplyLimitExceeded();
 
@@ -39,20 +65,23 @@ library SubscriptionLib {
         tierParams.validate();
         uint16 id = ++state.tierCount;
         state.tiers[id] = TierLib.State({params: tierParams, subCount: 0, id: id});
+        emit TierCreated(id);
     }
 
     function updateTier(State storage state, uint16 tierId, Tier memory tierParams) internal {
         tierParams.validate();
         if (state.tiers[tierId].id == 0) revert TierLib.TierNotFound(tierId);
         state.tiers[tierId].params = tierParams;
+        emit TierUpdated(tierId);
     }
 
     function deactivateSubscription(State storage state, address account) internal {
-        uint16 id = state.subscriptions[account].tierId;
-        if (id == 0) revert("no");
-        state.tiers[id].subCount -= 1;
-        state.subscriptions[account].deactivate();
-        // emit Deactivatation(account, sub.tokenId);
+        Subscription storage sub = state.subscriptions[account];
+        uint16 tierId = sub.tierId;
+        if (tierId == 0 || sub.remainingSeconds() > 0) revert DeactivationFailure();
+        state.tiers[tierId].subCount -= 1;
+        sub.tierId = 0;
+        emit SwitchTier(sub.tokenId, tierId, 0);
     }
 
     function mint(State storage state, address account) internal returns (uint256 tokenId) {
@@ -61,31 +90,44 @@ library SubscriptionLib {
         state.subscriptions[account].tokenId = tokenId;
     }
 
-    function purchase(
-        State storage state,
-        address account,
-        uint256 numTokens,
-        uint16 tierId
-    ) internal returns (uint256 tokenId) {
-        // Mint a new token if necessary
-        tokenId = state.subscriptions[account].tokenId;
-        if (tokenId == 0) tokenId = state.mint(account);
+    function purchase(State storage state, address account, uint256 numTokens, uint16 tierId) internal {
+        Subscription storage sub = state.subscriptions[account];
 
-        // Determine which tier to use
-        uint16 subTierId = state.subscriptions[account].tierId;
+        // Determine which tier to use. If input is 0, default to current tier.
+        // If default tier is 0, default to tier 1. Fallback to tier 1 (default)
+        uint16 subTierId = sub.tierId;
         uint16 resolvedTier = tierId == 0 ? subTierId : tierId;
         if (resolvedTier == 0) resolvedTier = 1;
+
+        TierLib.State storage tierState = state.tiers[resolvedTier];
 
         // Join the tier, if necessary, and deduct the initial mint price
         uint256 tokensForTime = numTokens;
         if (subTierId != resolvedTier) {
-            tokensForTime = state.tiers[resolvedTier].join(account, state.subscriptions[account], numTokens);
-            // state.subscriptions[account].tierId = resolvedTier;
+            tierState.checkJoin(account, numTokens);
+            tierState.subCount += 1;
+            sub.tierId = resolvedTier;
+            tokensForTime -= tierState.params.initialMintPrice;
         }
 
-        state.tiers[resolvedTier].renew(state.subscriptions[account], tokensForTime);
+        // Check the renewal and update the subscription
+        uint48 numSeconds = tierState.checkRenewal(sub, tokensForTime);
+        if (block.timestamp > sub.purchaseOffset + sub.secondsPurchased) {
+            sub.purchaseOffset = uint48(block.timestamp - sub.secondsPurchased);
+        }
+        sub.totalPurchased += numTokens;
+        sub.secondsPurchased += numSeconds;
 
-        // emit Purchase(account, tokenId, numTokens, numSeconds, 0, sub.expiresAt());
+        emit Purchase(account, sub.tokenId, numTokens, numSeconds, sub.expiresAt());
+    }
+
+    function refund(State storage state, address account, uint256 numTokens) internal {
+        Subscription storage sub = state.subscriptions[account];
+        uint48 refundedTime = sub.purchasedTimeRemaining();
+        if (numTokens == 0 || numTokens > sub.totalPurchased) revert InvalidRefund();
+        sub.totalPurchased -= numTokens;
+        sub.secondsPurchased -= refundedTime;
+        emit Refund(account, sub.tokenId, numTokens, refundedTime);
     }
 
     function grant(
@@ -94,6 +136,8 @@ library SubscriptionLib {
         uint48 numSeconds,
         uint16 tierId
     ) internal returns (uint256 tokenId) {
+        if (numSeconds == 0) revert SubscriptionGrantInvalidTime();
+
         Subscription storage sub = state.subscriptions[account];
         tokenId = sub.tokenId;
         if (tokenId == 0) {
@@ -102,8 +146,19 @@ library SubscriptionLib {
         }
 
         sub.tierId = tierId;
-        sub.grantTime(numSeconds);
+        if (block.timestamp > sub.grantOffset + sub.secondsGranted) {
+            sub.grantOffset = uint48(block.timestamp - sub.secondsGranted);
+        }
+        sub.secondsGranted += numSeconds;
+        // sub.grantTime(numSeconds);
 
         emit Grant(account, tokenId, numSeconds, sub.expiresAt());
+    }
+
+    function revokeTime(State storage state, address account) internal {
+        Subscription storage sub = state.subscriptions[account];
+        uint48 remaining = sub.grantedTimeRemaining();
+        sub.secondsGranted = 0;
+        emit GrantRevoke(sub.tokenId, remaining, uint48(sub.expiresAt()));
     }
 }

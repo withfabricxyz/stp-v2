@@ -37,13 +37,13 @@ contract SubscriptionTokenV2Test is BaseTest {
         assertEq(token().balanceOf(address(stp)), 1e5);
         assertEq(stp.balanceOf(bob), 1e5 / 2);
         assertEq(stp.balanceOf(alice), 0);
-        Subscription memory sub = stp.subscriptionOf(bob);
+        SubscriberView memory sub = stp.subscriptionOf(bob);
         assertEq(stp.ownerOf(sub.tokenId), bob);
     }
 
     function testNonSub() public {
         assertEq(stp.balanceOf(alice), 0);
-        Subscription memory sub = stp.subscriptionOf(alice);
+        SubscriberView memory sub = stp.subscriptionOf(alice);
         vm.expectRevert(abi.encodeWithSelector(ERC721.TokenDoesNotExist.selector));
         stp.ownerOf(sub.tokenId);
     }
@@ -53,7 +53,7 @@ contract SubscriptionTokenV2Test is BaseTest {
         stp.mint{value: 1e18}(1e18);
         vm.warp(block.timestamp + 6e17);
         assertEq(stp.balanceOf(alice), 0);
-        Subscription memory sub = stp.subscriptionOf(alice);
+        SubscriberView memory sub = stp.subscriptionOf(alice);
         // assertEq(expires, time + 1e18 / 2); //TODO
         assertEq(stp.ownerOf(sub.tokenId), alice);
     }
@@ -62,22 +62,22 @@ contract SubscriptionTokenV2Test is BaseTest {
         mint(alice, 1e18);
         mint(bob, 1e18);
         mint(charlie, 1e18);
-        assertEq(stp.creatorBalance(), 3e18);
+        assertEq(stp.contractDetail().creatorBalance, 3e18);
     }
 
     function testWithdraw() public {
         mint(alice, 1e18);
         mint(bob, 1e18);
         vm.startPrank(creator);
-        assertEq(stp.creatorBalance(), 2e18);
+        assertEq(stp.contractDetail().creatorBalance, 2e18);
 
         vm.expectEmit(true, true, false, true, address(stp));
         emit ISubscriptionTokenV2.Withdraw(creator, 2e18);
-        stp.transferFunds(creator, stp.creatorBalance());
-        assertEq(stp.creatorBalance(), 0);
+        stp.transferFunds(creator, stp.contractDetail().creatorBalance);
+        assertEq(stp.contractDetail().creatorBalance, 0);
 
         // vm.expectRevert(abi.encodeWithSelector(PoolLib.InvalidZeroTransfer.selector));
-        stp.transferFunds(creator, stp.creatorBalance());
+        stp.transferFunds(creator, stp.contractDetail().creatorBalance);
         vm.stopPrank();
 
         assertEq(address(stp).balance, 0);
@@ -88,7 +88,7 @@ contract SubscriptionTokenV2Test is BaseTest {
         mint(alice, 1e18);
         address invalid = address(this);
         vm.startPrank(creator);
-        uint256 balance = stp.creatorBalance();
+        uint256 balance = stp.contractDetail().creatorBalance;
         vm.expectRevert(abi.encodeWithSelector(CurrencyLib.InvalidAccount.selector));
         stp.transferFunds(address(0), balance);
 
@@ -102,13 +102,13 @@ contract SubscriptionTokenV2Test is BaseTest {
     /// ERC20
 
     function testERC20Mint() public erc20 prank(alice) {
-        assert(stp.erc20Address() != address(0));
+        assert(stp.contractDetail().currency != address(0));
         assertEq(token().balanceOf(alice), 1e20);
         token().approve(address(stp), 1e18);
         stp.mint(1e5);
         assertEq(token().balanceOf(address(stp)), 1e5);
         assertEq(stp.balanceOf(alice), 1e5 / 2);
-        Subscription memory sub = stp.subscriptionOf(alice);
+        SubscriberView memory sub = stp.subscriptionOf(alice);
         assertEq(stp.ownerOf(sub.tokenId), alice);
     }
 
@@ -125,14 +125,14 @@ contract SubscriptionTokenV2Test is BaseTest {
 
         uint256 beforeBalance = token().balanceOf(creator);
         vm.startPrank(creator);
-        assertEq(stp.creatorBalance(), 2e18);
+        assertEq(stp.contractDetail().creatorBalance, 2e18);
         vm.expectEmit(true, true, false, true, address(stp));
         emit ISubscriptionTokenV2.Withdraw(creator, 2e18);
-        stp.transferFunds(creator, stp.creatorBalance());
-        assertEq(stp.creatorBalance(), 0);
+        stp.transferFunds(creator, stp.contractDetail().creatorBalance);
+        assertEq(stp.contractDetail().creatorBalance, 0);
 
         // vm.expectRevert(abi.encodeWithSelector(PoolLib.InvalidZeroTransfer.selector));
-        stp.transferFunds(creator, stp.creatorBalance());
+        stp.transferFunds(creator, stp.contractDetail().creatorBalance);
         vm.stopPrank();
 
         assertEq(beforeBalance + 2e18, token().balanceOf(creator));
@@ -140,7 +140,7 @@ contract SubscriptionTokenV2Test is BaseTest {
 
     function testTransfer() public {
         mint(alice, 1e18);
-        Subscription memory sub = stp.subscriptionOf(alice);
+        SubscriberView memory sub = stp.subscriptionOf(alice);
         vm.startPrank(alice);
         stp.approve(bob, sub.tokenId);
         vm.expectEmit(true, true, false, true, address(stp));
@@ -153,7 +153,7 @@ contract SubscriptionTokenV2Test is BaseTest {
     function testTransferToExistingHolder() public {
         mint(alice, 1e18);
         mint(bob, 1e18);
-        Subscription memory sub = stp.subscriptionOf(alice);
+        SubscriberView memory sub = stp.subscriptionOf(alice);
         vm.startPrank(alice);
         stp.approve(bob, sub.tokenId);
         vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidTransfer.selector));

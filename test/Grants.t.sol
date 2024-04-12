@@ -25,7 +25,7 @@ contract GrantsTest is BaseTest {
 
         vm.stopPrank();
         assertEq(stp.balanceOf(alice), 90 days);
-        assertEq(stp.estimatedRefund(alice), 0);
+        assertEq(stp.subscriptionOf(alice).estimatedRefund, 0);
     }
 
     function testGrantDouble() public {
@@ -35,7 +35,7 @@ contract GrantsTest is BaseTest {
         stp.grantTime(alice, 90 days, 1);
         vm.stopPrank();
         assertEq(stp.balanceOf(alice), 90 days);
-        assertEq(stp.estimatedRefund(alice), 0);
+        assertEq(stp.subscriptionOf(alice).estimatedRefund, 0);
     }
 
     function testGrantMixed() public {
@@ -44,7 +44,7 @@ contract GrantsTest is BaseTest {
         vm.stopPrank();
         mint(alice, 1e5);
         assertEq(stp.balanceOf(alice), 90 days + 1e5 / 4);
-        assertEq(stp.estimatedRefund(alice), 1e5);
+        assertEq(stp.subscriptionOf(alice).estimatedRefund, 1e5);
     }
 
     function testGrantRevoke() public {

@@ -28,6 +28,6 @@ contract FundsTest is BaseTest {
         stp.setTransferRecipient(alice);
 
         mint(alice, 1 ether);
-        stp.transferFunds(alice, stp.creatorBalance());
+        stp.transferFunds(alice, stp.contractDetail().creatorBalance);
     }
 }

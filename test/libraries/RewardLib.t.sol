@@ -6,13 +6,12 @@ import "../TestImports.t.sol";
 struct PoolStatePartial {
     uint256 totalShares;
     uint256 totalRewardIngress;
-    uint256 slashedWithdraws;
 }
 
 // We need to create a shim contract to call the internal functions of RewardLib in order to get
 // foundry to generate the coverage report correctly
 contract RewardTestShim {
-    PoolState private _state;
+    RewardLib.State private _state;
 
     constructor() {
         // _state.currency = Currency.wrap(address(0));
@@ -43,11 +42,7 @@ contract RewardTestShim {
     }
 
     function state() external view returns (PoolStatePartial memory) {
-        return PoolStatePartial({
-            totalShares: _state.totalShares,
-            totalRewardIngress: _state.totalRewardIngress,
-            slashedWithdraws: _state.slashedWithdraws
-        });
+        return PoolStatePartial({totalShares: _state.totalShares, totalRewardIngress: _state.totalRewardIngress});
     }
 }
 

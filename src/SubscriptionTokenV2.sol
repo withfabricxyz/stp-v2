@@ -4,11 +4,10 @@ pragma solidity ^0.8.20;
 
 import {AccessControlled} from "./abstracts/AccessControlled.sol";
 
+import {ERC721} from "./abstracts/ERC721.sol";
 import {Initializable} from "@solady/utils/Initializable.sol";
 import {LibString} from "@solady/utils/LibString.sol";
 import {Multicallable} from "@solady/utils/Multicallable.sol";
-// import {ERC721} from "@solady/tokens/ERC721.sol";
-import {ERC721} from "./abstracts/ERC721.sol";
 
 import {RewardPool} from "./RewardPool.sol";
 import {IRewardPool} from "./interfaces/IRewardPool.sol";
@@ -20,7 +19,12 @@ import {SubscriberLib} from "./libraries/SubscriberLib.sol";
 import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
 import {TierLib} from "./libraries/TierLib.sol";
 import {FeeParams, InitParams, Subscription, Tier, Tier} from "./types/Index.sol";
-import {RewardParams} from "./types/Rewards.sol";
+
+import {SubscribeParams} from "./types/Params.sol";
+import {CurveParams, RewardParams} from "./types/Rewards.sol";
+import {ContractView, SubscriberView} from "./types/Views.sol";
+
+import {RewardLib} from "./libraries/RewardLib.sol";
 
 /**
  * @title Subscription Token Protocol Version 2
@@ -41,6 +45,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     using CurrencyLib for Currency;
     using SubscriptionLib for SubscriptionLib.State;
     using ReferralLib for ReferralLib.State;
+    using RewardLib for RewardLib.State;
 
     uint16 public constant ROLE_MANAGER = 1;
     uint16 public constant ROLE_AGENT = 2;
@@ -54,20 +59,29 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     /// @dev The metadata URI for the contract (tokenUri is derived from this)
     string public contractURI;
 
+    /// @dev The name of the token
     string private _name;
 
+    /// @dev The symbol of the token
     string private _symbol;
 
+    /// @dev The fee parameters (collector, bips)
     FeeParams public feeParams;
 
     /// @dev The reward pool parameters (pollAddress (0 = disabled), and the bips)
     RewardParams public rewardParams;
 
+    /// @dev The denomination of the token (0 for native)
     Currency private _currency;
 
+    /// @dev The subscription state (subscribers, tiers, etc)
     SubscriptionLib.State private _state;
 
+    /// @dev Referral codes and rewards
     ReferralLib.State private _referrals;
+
+    /// @dev The reward pool state
+    RewardLib.State private _rewards;
 
     /// @dev The address of the account which can receive transfers via sponsored calls
     address private _transferRecipient;
@@ -107,6 +121,15 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         _state.createTier(tier);
         _state.supplyCap = params.globalSupplyCap;
 
+        _rewards.curves[0] = CurveParams({
+            id: 0,
+            numPeriods: 6,
+            formulaBase: 2,
+            periodSeconds: 0,
+            startTimestamp: uint48(block.timestamp),
+            minMultiplier: 0
+        });
+
         _setOwner(params.owner);
         feeParams = fees;
         rewardParams = rewards;
@@ -129,24 +152,27 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     }
 
     /**
-     * @notice Mint or renew a subscription for sender, with referral rewards for a referrer
+     * @notice Mint or renew a subscription for a specific account. Intended for automated renewals.
+     * @param account the account to mint or renew time for
      * @param numTokens the amount of ERC20 tokens or native tokens to transfer
-     * @param referralCode the referral code to use
-     * @param referrer the referrer address and reward recipient
      */
-    function mintWithReferral(uint256 numTokens, uint256 referralCode, address referrer) external payable {
-        mintWithReferralFor(msg.sender, numTokens, referralCode, referrer);
+    function mintFor(address account, uint256 numTokens) public payable {
+        _purchase(account, numTokens, 0);
     }
 
     // TODO: All possible mint configurations
-    // function mintAdvanced(
-    //     uint256 numTokens,
-    //     uint16 tierId,
-    //     uint256 referralCode,
-    //     address referrer
-    // ) external payable {
-    //     mintWithReferralFor(msg.sender, numTokens, referralCode, referrer);
-    // }
+    function mintAdvanced(SubscribeParams calldata params) external payable {
+        (uint256 tokenId, uint256 change) = _purchase(params.recipient, params.purchaseValue, params.tierId);
+
+        // Referral Payout
+        if (params.referrer != address(0)) {
+            uint256 payout = _referrals.computeReferralReward(params.referralCode, change);
+            if (payout > 0) {
+                _currency.transfer(params.referrer, payout);
+                emit ReferralPayout(tokenId, params.referrer, params.referralCode, payout);
+            }
+        }
+    }
 
     /////////////////////////
     // Subscriber Management
@@ -160,10 +186,10 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      */
     function refund(address account, uint256 numTokens) external {
         _checkOwner();
-        Subscription storage sub = _state.subscriptions[account];
-        (uint256 refundedTokens, uint256 refundedSeconds) = sub.refund(numTokens);
-        emit Refund(account, sub.tokenId, refundedTokens, refundedSeconds);
-        _currency.transfer(account, refundedTokens);
+        // _checkCreatorBalance(numTokens); // TODO: check creator balance
+        _state.refund(account, numTokens);
+        // TODO: check creator balance
+        _currency.transfer(account, numTokens);
     }
 
     /**
@@ -174,8 +200,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      */
     function grantTime(address account, uint48 numSeconds, uint16 tierId) external {
         _checkOwnerOrRoles(ROLE_MANAGER | ROLE_AGENT);
-        // TODO if we need a token, mint it
-        // sub.initialize(); ? emit Transfer
+        if (_state.subscriptions[account].tokenId == 0) _safeMint(account, _state.mint(account));
         _state.grant(account, numSeconds, tierId);
     }
 
@@ -185,7 +210,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      */
     function revokeTime(address account) external {
         _checkOwnerOrRoles(ROLE_MANAGER | ROLE_AGENT);
-        _state.subscriptions[account].revokeTime();
+        _state.revokeTime(account);
     }
 
     /////////////////////////
@@ -193,6 +218,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     /////////////////////////
 
     function transferFunds(address to, uint256 amount) external {
+        // _checkCreatorBalance(numTokens); // TODO: check creator balance
         if (to != _transferRecipient) _checkOwner();
         emit Withdraw(to, amount);
         _currency.transfer(to, amount);
@@ -260,69 +286,32 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     // Sponsored Calls
     /////////////////////////
 
-    /**
-     * @notice Mint or renew a subscription for a specific account. Intended for automated renewals.
-     * @param account the account to mint or renew time for
-     * @param numTokens the amount of ERC20 tokens or native tokens to transfer
-     */
-    function mintFor(address account, uint256 numTokens) public payable {
-        _mintOrRenew(account, numTokens, 0, 0, address(0));
-    }
-
-    /**
-     * @notice Mint or renew a subscription for a specific account, with referral details
-     * @param account the account to mint or renew time for
-     * @param numTokens the amount of ERC20 tokens or native tokens to transfer
-     * @param referralCode the referral code to use for rewards
-     * @param referrer the referrer address and reward recipient
-     */
-    function mintWithReferralFor(
+    function _purchase(
         address account,
         uint256 numTokens,
-        uint256 referralCode,
-        address referrer
-    ) public payable {
-        if (referrer == address(0)) revert InvalidAccount();
-        _mintOrRenew(account, numTokens, 0, referralCode, referrer);
-    }
-
-    function _mintOrRenew(
-        address account,
-        uint256 numTokens,
-        uint16 tierId,
-        uint256 referralCode,
-        address referrer
-    ) internal {
+        uint16 tierId
+    ) private returns (uint256 tokenId, uint256 change) {
         if (account == address(0)) revert InvalidAccount();
 
         uint256 tokensIn = _currency.capture(msg.sender, numTokens);
 
-        // TODO if we need a token, mint it
-
-        uint256 tokenId = _state.purchase(account, tokensIn, tierId);
-
-        // temporary
-        if (_ownerOf[tokenId] == address(0)) _safeMint(account, tokenId);
-
-        // TODO sub.purchase(tier, tokensTransferred);
-        uint256 remaining = tokensIn;
-        if (referrer != address(0)) {
-            uint256 payout = _referrals.computeReferralReward(referralCode, remaining);
-            if (payout > 0) {
-                _currency.transfer(referrer, payout);
-                emit ReferralPayout(tokenId, referrer, referralCode, payout);
-                remaining -= payout;
-            }
+        // Mint a new token if necessary
+        uint256 tokenId = _state.subscriptions[account].tokenId;
+        if (tokenId == 0) {
+            tokenId = _state.mint(account);
+            _safeMint(account, tokenId);
         }
 
-        remaining = _transferFees(remaining);
-        remaining = _transferRewards(account, remaining, 1);
+        // Purchase the subscription (switching tiers if necessary)
+        _state.purchase(account, tokensIn, tierId);
 
-        // TODO emit a refresh metadata event (for nft indexers)
-        // emit Purchase(account, sub.tokenId, numTokens, numSeconds, 0, sub.expiresAt());
+        // Transfer fees and rewards
+        tokensIn = _transferFees(tokensIn);
+        tokensIn = _transferRewards(account, tokensIn, 0);
+
+        return (tokenId, tokensIn);
     }
 
-    // @inheritdoc ISubscriptionTokenV2
     function deactivateSubscription(address account) external {
         _state.deactivateSubscription(account);
     }
@@ -348,29 +337,14 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     // Referral Rewards
     /////////////////////////
 
-    // TODO: Sizing, we can use a single setter (allow setting to 0)
-
     /**
-     * @notice Create a referral code for giving rewards to referrers on mint
+     * @notice Create or update a referral code for giving rewards to referrers on mint
      * @param code the unique integer code for the referral
      * @param basisPoints the reward basis points
      */
-    function createReferralCode(uint256 code, uint16 basisPoints) external {
+    function setReferralCode(uint256 code, uint16 basisPoints) external {
         _checkOwnerOrRoles(ROLE_MANAGER);
         _referrals.setReferral(code, basisPoints);
-        // if (bps == 0 || bps > _MAX_BIPS) revert InvalidBps();
-        // if (_referralCodes[code] != 0) revert ReferralExists(code);
-        // _referralCodes[code] = bps;
-        // emit ReferralCreated(code, bps);
-    }
-
-    /**
-     * @notice Delete a referral code
-     * @param code the unique integer code for the referral
-     */
-    function deleteReferralCode(uint256 code) external {
-        _checkOwnerOrRoles(ROLE_MANAGER);
-        _referrals.setReferral(code, 0);
     }
 
     /**
@@ -397,73 +371,105 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         return amount - fee;
     }
 
-    function _transferRewards(address account, uint256 amount, uint8 multiplier) private returns (uint256) {
+    function _transferRewards(address account, uint256 amount, uint8 curveId) private returns (uint256) {
+        // TODO: Determine if we should issue rewards (fetch curveId, bps)
         if (rewardParams.poolAddress == address(0)) return amount;
 
         uint256 rewards = (amount * rewardParams.bips) / _MAX_BIPS;
         if (rewards == 0) return amount;
 
-        // emit RewardsTransferred(amount, account, poolAddress)
-        if (_currency.isNative()) {
-            // IRewardPool(rewardParams.poolAddress).mint{value: rewards}(account, amount * multiplier, rewards);
-        } else {
-            // TODO: transfer and call? more risk?
-            _currency.approve(rewardParams.poolAddress, rewards);
-            // IRewardPool(rewardParams.poolAddress).mint(account, amount * multiplier, rewards);
-        }
+        _rewards.issueWithCurve(account, rewards, curveId);
+        _rewards.allocate(rewards);
+
         return amount - rewards;
+    }
+
+    ////////////////////////
+    // Rewards
+    ////////////////////////
+
+    /**
+     * @notice Mint tokens to an account without payment (used for migrations, tips, etc)
+     */
+    function issueRewardShares(address account, uint256 numShares) external {
+        _checkOwner();
+        _rewards.issue(account, numShares);
+    }
+
+    /**
+     * @notice Allocate rewards to the pool in the denominated currency
+     * @param amount the amount of tokens (native or ERC20) to allocate
+     */
+    function yieldRewards(uint256 amount) external payable {
+        _rewards.allocate(_currency.capture(msg.sender, amount));
+    }
+
+    function createRewardCurve(CurveParams memory curve) external {
+        _checkOwnerOrRoles(ROLE_MANAGER);
+        _rewards.curves[curve.id] = curve;
+    }
+
+    function transferRewardsFor(address account) public {
+        uint256 amount = _rewards.claimRewards(account);
+        _currency.transfer(account, amount);
+    }
+
+    function slash(address account) external {
+        _rewards.burn(account);
+        // Now what?
     }
 
     ////////////////////////
     // Informational
     ////////////////////////
 
-    function estimatedRefund(address account) public view returns (uint256) {
-        return _state.subscriptions[account].estimatedRefund();
+    // function estimatedRefund(address account) public view returns (uint256) {
+    //     return _state.subscriptions[account].estimatedRefund();
+    // }
+
+    function subscriptionOf(address account) external view returns (SubscriberView memory subscription) {
+        return SubscriberView({
+            tierId: _state.subscriptions[account].tierId,
+            secondsPurchased: _state.subscriptions[account].secondsPurchased,
+            secondsGranted: _state.subscriptions[account].secondsGranted,
+            tokenId: _state.subscriptions[account].tokenId,
+            totalPurchased: _state.subscriptions[account].totalPurchased,
+            expiresAt: _state.subscriptions[account].expiresAt(),
+            estimatedRefund: _state.subscriptions[account].estimatedRefund()
+        });
     }
 
-    /**
-     * @notice The creators withdrawable balance
-     * @return balance the number of tokens available for withdraw
-     */
-    function creatorBalance() public view returns (uint256 balance) {
-        return _currency.balance(); // TODO: subtract pool funds
-    }
+    /// Views
 
-    function subscriptionOf(address account) external view returns (Subscription memory subscription) {
-        // TODO: return SubscriptionView with paired down details and expires, etc
-        return _state.subscriptions[account];
-    }
-
-    /**
-     * @notice The ERC-20 address used for purchases, or 0x0 for native
-     * @return erc20 address or 0x0 for native
-     */
-    function erc20Address() public view returns (address erc20) {
-        return Currency.unwrap(_currency);
+    function contractDetail() external view returns (ContractView memory detail) {
+        return ContractView({
+            tierCount: _state.tierCount,
+            subCount: _state.subCount,
+            supplyCap: _state.supplyCap,
+            transferRecipient: _transferRecipient,
+            currency: Currency.unwrap(_currency),
+            creatorBalance: _currency.balance() // TODO: subtract pool funds
+        });
     }
 
     function tierDetail(uint16 tierId) external view returns (TierLib.State memory tier) {
         return _state.tiers[tierId];
     }
 
-    function detail() external view returns (bool) {
-        // TODO: tierCount, subCount, supplyCap, recipient, etc
-        return false;
+    function stpVersion() external pure returns (uint8 version) {
+        return 2;
     }
 
     /// @inheritdoc ISubscriptionTokenV2
-    function tierCount() external view override returns (uint16 count) {
-        return _state.tierCount;
+    function tierBalanceOf(uint16 tierId, address account) external view returns (uint256 numSeconds) {
+        Subscription memory sub = _state.subscriptions[account];
+        if (sub.tierId != tierId) return 0;
+        return sub.remainingSeconds();
     }
 
-    /**
-     * @notice Fetch the current transfer recipient address
-     * @return recipient the address or 0x0 address for none
-     */
-    function transferRecipient() external view returns (address recipient) {
-        return _transferRecipient;
-    }
+    //////////////////////
+    // Overrides
+    //////////////////////
 
     /**
      * @notice Fetch the metadata URI for a given token
@@ -484,22 +490,6 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         return _name;
     }
 
-    /// @inheritdoc ISubscriptionTokenV2
-    function stpVersion() external pure returns (uint8 version) {
-        return 2;
-    }
-
-    /// @inheritdoc ISubscriptionTokenV2
-    function tierBalanceOf(uint16 tierId, address account) external view returns (uint256 numSeconds) {
-        Subscription memory sub = _state.subscriptions[account];
-        if (sub.tierId != tierId) return 0;
-        return sub.remainingSeconds();
-    }
-
-    //////////////////////
-    // Overrides
-    //////////////////////
-
     /**
      * @notice Override the default balanceOf behavior to account for time remaining
      * @param account the account to fetch the balance of
@@ -510,17 +500,13 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal override {
+        if (_state.subscriptions[to].tokenId != 0 || to == address(0)) revert InvalidTransfer();
         if (from == address(0)) return;
 
-        // TODO
-        // uint16 tierId = _subscriptions[from].tierId;
-        // if (tierId != 0) if (!_state.tiers[tierId].params.transferrable) revert TierLib.TierTransferDisabled();
-
-        // if (_subscriptions[to].tokenId != 0 || to == address(0)) revert InvalidTransfer();
-
-        // _subscriptions[to] = _subscriptions[from];
-
-        // delete _subscriptions[from];
+        uint16 tierId = _state.subscriptions[from].tierId;
+        if (tierId != 0) if (!_state.tiers[tierId].params.transferrable) revert TierLib.TierTransferDisabled();
+        _state.subscriptions[to] = _state.subscriptions[from];
+        delete _state.subscriptions[from];
     }
 
     function locked(uint256 tokenId) public view override returns (bool) {

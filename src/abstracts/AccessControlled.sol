@@ -15,9 +15,6 @@ abstract contract AccessControlled {
     /// @dev Not authorized error
     error NotAuthorized();
 
-    /// @dev Invalid role mask error
-    error InvalidRoleMask(uint8 role);
-
     address private _owner;
     address private _pendingOwner;
 

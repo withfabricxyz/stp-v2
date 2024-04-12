@@ -72,9 +72,6 @@ interface ISubscriptionTokenV2 {
     /// @dev Emitted when a subscriber is revoked time by the creator
     event GrantRevoke(address indexed account, uint256 indexed tokenId, uint256 secondsRevoked, uint256 expiresAt);
 
-    /// @dev Emitted when the creator refunds a subscribers remaining time
-    event Refund(address indexed account, uint256 indexed tokenId, uint256 tokensTransferred, uint256 timeReclaimed);
-
     /// @dev Emitted when the creator tops up the contract balance on refund
     event TopUp(uint256 tokensIn);
 
@@ -112,41 +109,13 @@ interface ISubscriptionTokenV2 {
     function mint(uint256 numTokens) external payable;
 
     /**
-     * @notice Mint or renew a subscription for sender, with referral rewards for a referrer
-     * @param numTokens the amount of ERC20 tokens or native tokens to transfer
-     * @param referralCode the referral code to use
-     * @param referrer the referrer address and reward recipient
-     */
-    function mintWithReferral(uint256 numTokens, uint256 referralCode, address referrer) external payable;
-
-    /**
      * @notice Mint or renew a subscription for a specific account. Intended for automated renewals.
      * @param account the account to mint or renew time for
      * @param numTokens the amount of ERC20 tokens or native tokens to transfer
      */
     function mintFor(address account, uint256 numTokens) external payable;
 
-    /**
-     * @notice Mint or renew a subscription for a specific account, with referral details
-     * @param account the account to mint or renew time for
-     * @param numTokens the amount of ERC20 tokens or native tokens to transfer
-     * @param referralCode the referral code to use for rewards
-     * @param referrer the referrer address and reward recipient
-     */
-    function mintWithReferralFor(
-        address account,
-        uint256 numTokens,
-        uint256 referralCode,
-        address referrer
-    ) external payable;
-
     //~~~~~~~~~~~ V2 ~~~~~~~~~~~~//
-
-    /**
-     * @notice Fetch the current version of the contract
-     * @return version the current version
-     */
-    function stpVersion() external pure returns (uint8 version);
 
     //////////////////
     // ADMIN
@@ -188,29 +157,6 @@ interface ISubscriptionTokenV2 {
      * @return balance the balance of the account in the specified tier
      */
     function tierBalanceOf(uint16 tierId, address account) external view returns (uint256 balance);
-
-    // /**
-    //  * @notice Get the details of a specific tier
-    //  * @param tierId the tier id filter
-    //  * @return tier the tier
-    //  */
-    // function tierDetails(uint16 tierId) external view returns (Tier memory tier);
-
-    /**
-     * @notice Get the number of tiers
-     * @return count the number of tiers
-     */
-    function tierCount() external view returns (uint16 count);
-
-    // /**
-    //  * @notice Get the current supply and supply cap of a tier
-    //  * @param tierId the tier id to pause
-    //  * @return currentSupply the current supply of the tier
-    //  * @return maxSupply the maximum supply of the tier
-    //  */
-    // function tierSupply(uint16 tierId) external view returns (uint32 currentSupply, uint32 maxSupply);
-
-    function subscriptionOf(address account) external view returns (Subscription memory subscription);
 
     // function feeDetails() external view returns (FeeParams memory);
     // function setDefaultTier(uint16 tierId) external; ???

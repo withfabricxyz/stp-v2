@@ -19,7 +19,7 @@ contract MintingTest is BaseTest {
     function testMint() public {
         mint(alice, 0.001 ether);
         assertTrue(stp.balanceOf(alice) > 0);
-        Subscription memory sub = stp.subscriptionOf(alice);
+        SubscriberView memory sub = stp.subscriptionOf(alice);
         assertEq(sub.tokenId, 1);
         assertEq(sub.tierId, 1);
         assertEq(sub.secondsPurchased, 30 days);
@@ -30,12 +30,12 @@ contract MintingTest is BaseTest {
         vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidAccount.selector));
         stp.mintFor{value: 0.001 ether}(address(0), 0.001 ether);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.Purchase(bob, 1, 0.001 ether, 30 days, 0, block.timestamp + 30 days);
+        emit SubscriptionLib.Purchase(bob, 1, 0.001 ether, 30 days, block.timestamp + 30 days);
         stp.mintFor{value: 0.001 ether}(bob, 0.001 ether);
         assertEq(address(stp).balance, 0.001 ether);
         assertEq(stp.balanceOf(bob), 30 days);
         assertEq(stp.balanceOf(alice), 0);
-        Subscription memory sub = stp.subscriptionOf(bob);
+        SubscriberView memory sub = stp.subscriptionOf(bob);
         assertEq(stp.ownerOf(sub.tokenId), bob);
     }
 
@@ -48,7 +48,7 @@ contract MintingTest is BaseTest {
         tierParams.initialMintPrice = 0.01 ether;
         stp = reinitStp();
         mint(alice, 0.011 ether);
-        Subscription memory sub = stp.subscriptionOf(alice);
+        SubscriberView memory sub = stp.subscriptionOf(alice);
         assertEq(sub.secondsPurchased, 30 days);
         mint(alice, 0.001 ether);
         sub = stp.subscriptionOf(alice);

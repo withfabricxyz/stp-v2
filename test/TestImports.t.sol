@@ -20,12 +20,14 @@ import {Currency, CurrencyLib} from "src/libraries/CurrencyLib.sol";
 import {GateLib} from "src/libraries/GateLib.sol";
 import {RewardCurveLib} from "src/libraries/RewardCurveLib.sol";
 import {RewardLib} from "src/libraries/RewardLib.sol";
+import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
 
 import {SubscriberLib} from "src/libraries/SubscriberLib.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
 import {DeployParams, FactoryFeeConfig} from "src/types/Factory.sol";
 import {FeeParams, Gate, GateType, InitParams, Subscription, Subscription, Tier} from "src/types/Index.sol";
-import {CurveParams, Holder, PoolState, RewardParams, RewardPoolParams} from "src/types/Rewards.sol";
+import {CurveParams, Holder, RewardParams, RewardPoolParams} from "src/types/Rewards.sol";
+import {SubscriberView} from "src/types/Views.sol";
 
 contract TestERC1155Token is ERC1155 {
     constructor() ERC1155("test") {
@@ -142,7 +144,7 @@ abstract contract BaseTest is Test {
     }
 
     function mint(address account, uint256 amount) internal prank(account) {
-        if (stp.erc20Address() != address(0)) {
+        if (stp.contractDetail().currency != address(0)) {
             token().approve(address(stp), amount);
             stp.mint(amount);
         } else {
@@ -164,11 +166,11 @@ abstract contract BaseTest is Test {
     }
 
     function withdraw() internal prank(creator) {
-        stp.transferFunds(creator, stp.creatorBalance());
+        stp.transferFunds(creator, stp.contractDetail().creatorBalance);
     }
 
     function token() internal view returns (TestERC20Token) {
-        return TestERC20Token(stp.erc20Address());
+        return TestERC20Token(stp.contractDetail().currency);
     }
 
     function createERC20Sub() public virtual returns (SubscriptionTokenV2) {

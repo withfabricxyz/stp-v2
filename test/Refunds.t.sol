@@ -18,11 +18,11 @@ contract RefundsTests is BaseTest {
 
     function testRefund() public {
         mint(alice, 0.001 ether);
-        Subscription memory sub = stp.subscriptionOf(alice);
-        assertEq(stp.estimatedRefund(alice), 0.001 ether);
+        SubscriberView memory sub = stp.subscriptionOf(alice);
+        assertEq(stp.subscriptionOf(alice).estimatedRefund, 0.001 ether);
         vm.startPrank(creator);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.Refund(alice, sub.tokenId, 0.001 ether, 30 days);
+        emit SubscriptionLib.Refund(alice, sub.tokenId, 0.001 ether, 30 days);
         stp.refund(alice, 0);
         assertEq(address(stp).balance, 0);
         vm.stopPrank();
@@ -31,10 +31,10 @@ contract RefundsTests is BaseTest {
     function testPartialRefund() public {
         mint(alice, 0.001 ether);
         vm.warp(block.timestamp + 15 days);
-        assertEq(0.001 ether / 2, stp.estimatedRefund(alice));
+        assertEq(0.001 ether / 2, stp.subscriptionOf(alice).estimatedRefund);
         vm.startPrank(creator);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.Refund(alice, 1, 0.001 ether / 2, 15 days);
+        emit SubscriptionLib.Refund(alice, 1, 0.001 ether / 2, 15 days);
         stp.refund(alice, 0);
         vm.stopPrank();
     }

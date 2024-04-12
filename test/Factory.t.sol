@@ -70,7 +70,7 @@ contract FactoryTest is BaseTest {
         assertEq(nft.name(), "Meow Sub");
         assertEq(nft.symbol(), "MEOW");
         assertEq(nft.contractURI(), "curi");
-        assertEq(nft.erc20Address(), address(0));
+        assertEq(nft.contractDetail().currency, address(0));
     }
 
     function testDeployZeroAddr() public {

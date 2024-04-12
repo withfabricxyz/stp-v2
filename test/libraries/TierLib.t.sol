@@ -20,8 +20,9 @@ contract TierTestShim {
         TierLib.checkJoin(state, account, numTokens);
     }
 
-    function checkRenewal(Tier memory tier, Subscription memory sub, uint256 numTokens) external view {
-        TierLib.checkRenewal(tier, sub, numTokens);
+    function checkRenewal(Tier memory tier, Subscription memory sub, uint256 numTokens) external {
+        state = TierLib.State({id: 1, subCount: 0, params: tier});
+        TierLib.checkRenewal(state, sub, numTokens);
     }
 }
 
