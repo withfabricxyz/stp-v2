@@ -15,13 +15,15 @@ import {ISubscriptionTokenV2} from "./interfaces/ISubscriptionTokenV2.sol";
 import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
 
 import {ReferralLib} from "./libraries/ReferralLib.sol";
+
+import {RewardCurveLib} from "./libraries/RewardCurveLib.sol";
 import {SubscriberLib} from "./libraries/SubscriberLib.sol";
 import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
 import {TierLib} from "./libraries/TierLib.sol";
 import {FeeParams, InitParams, Subscription, Tier, Tier} from "./types/Index.sol";
 
 import {SubscribeParams} from "./types/Params.sol";
-import {CurveParams, RewardParams} from "./types/Rewards.sol";
+import {CurveDetailView, CurveParams, PoolDetailView, RewardParams} from "./types/Rewards.sol";
 import {ContractView, SubscriberView} from "./types/Views.sol";
 
 import {RewardLib} from "./libraries/RewardLib.sol";
@@ -46,9 +48,10 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     using SubscriptionLib for SubscriptionLib.State;
     using ReferralLib for ReferralLib.State;
     using RewardLib for RewardLib.State;
+    using RewardCurveLib for CurveParams;
 
-    uint16 public constant ROLE_MANAGER = 1;
-    uint16 public constant ROLE_AGENT = 2;
+    uint16 private constant ROLE_MANAGER = 1;
+    uint16 private constant ROLE_AGENT = 2;
 
     /// @dev Maximum protocol fee basis points (12.5%)
     uint16 private constant _MAX_FEE_BIPS = 1250;
@@ -65,11 +68,10 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     /// @dev The symbol of the token
     string private _symbol;
 
+    RewardParams public rewardParams;
+
     /// @dev The fee parameters (collector, bips)
     FeeParams public feeParams;
-
-    /// @dev The reward pool parameters (pollAddress (0 = disabled), and the bips)
-    RewardParams public rewardParams;
 
     /// @dev The denomination of the token (0 for native)
     Currency private _currency;
@@ -102,37 +104,36 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         InitParams memory params,
         Tier memory tier,
         RewardParams memory rewards,
+        CurveParams memory curve,
         FeeParams memory fees
     ) public initializer {
         // Validate core params
         if (params.owner == address(0)) revert InvalidOwner();
-        if (bytes(params.name).length == 0) revert InvalidName();
-        if (bytes(params.symbol).length == 0) revert InvalidSymbol();
-        if (bytes(params.contractUri).length == 0) revert InvalidContractUri();
+        if (bytes(params.name).length == 0 || bytes(params.symbol).length == 0 || bytes(params.contractUri).length == 0)
+        {
+            revert InvalidTokenParams();
+        }
+        // if (bytes(params.symbol).length == 0) revert InvalidSymbol();
+        // if (bytes(params.contractUri).length == 0) revert InvalidContractUri();
 
         // Validate fee params
-        if (fees.bips > _MAX_FEE_BIPS) revert InvalidFeeParams();
-        if (fees.collector != address(0) && fees.bips == 0) revert InvalidFeeParams();
+        // if (fees.bips > _MAX_FEE_BIPS) revert InvalidFeeParams();
+        // if (fees.collector != address(0) && fees.bips == 0) revert InvalidFeeParams();
+        if (fees.bips > _MAX_FEE_BIPS || (fees.collector != address(0) && fees.bips == 0)) revert InvalidFeeParams();
 
         // Validate reward params
-        if (rewards.bips > _MAX_BIPS) revert InvalidRewardParams();
-        if (rewards.poolAddress == address(0) && rewards.bips > 0) revert InvalidRewardParams();
+        // if (rewards.bips > _MAX_BIPS) revert InvalidRewardParams();
+        // if (rewards.poolAddress == address(0) && rewards.bips > 0) revert InvalidRewardParams();
+
+        _rewards.createCurve(curve);
 
         _state.createTier(tier);
         _state.supplyCap = params.globalSupplyCap;
 
-        _rewards.curves[0] = CurveParams({
-            id: 0,
-            numPeriods: 6,
-            formulaBase: 2,
-            periodSeconds: 0,
-            startTimestamp: uint48(block.timestamp),
-            minMultiplier: 0
-        });
-
         _setOwner(params.owner);
         feeParams = fees;
         rewardParams = rewards;
+        // rewardParams = rewards;
         _name = params.name;
         _symbol = params.symbol;
         contractURI = params.contractUri;
@@ -238,7 +239,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      */
     function updateMetadata(string memory uri) external {
         _checkOwnerOrRoles(ROLE_MANAGER);
-        if (bytes(uri).length == 0) revert InvalidContractUri();
+        if (bytes(uri).length == 0) revert InvalidTokenParams();
         emit BatchMetadataUpdate(1, _state.subCount);
         contractURI = uri;
     }
@@ -373,9 +374,11 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
 
     function _transferRewards(address account, uint256 amount, uint8 curveId) private returns (uint256) {
         // TODO: Determine if we should issue rewards (fetch curveId, bps)
-        if (rewardParams.poolAddress == address(0)) return amount;
+        // if (rewardParams.poolAddress == address(0)) return amount;
 
-        uint256 rewards = (amount * rewardParams.bips) / _MAX_BIPS;
+        // tier = _state.subscriptions[account].tierId;
+        uint256 rewards = (amount * 0) / _MAX_BIPS;
+        // uint256 rewards = (amount * rewardParams.bips) / _MAX_BIPS;
         if (rewards == 0) return amount;
 
         _rewards.issueWithCurve(account, rewards, curveId);
@@ -406,7 +409,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
 
     function createRewardCurve(CurveParams memory curve) external {
         _checkOwnerOrRoles(ROLE_MANAGER);
-        _rewards.curves[curve.id] = curve;
+        _rewards.createCurve(curve);
     }
 
     function transferRewardsFor(address account) public {
@@ -415,6 +418,12 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     }
 
     function slash(address account) external {
+        if (
+            !rewardParams.slashable
+                || _state.subscriptions[account].expiresAt() + rewardParams.slashGracePeriod > block.timestamp
+        ) revert InvalidAccount();
+        // TODO: check expired + grace period
+        // TODO: check slashability
         _rewards.burn(account);
         // Now what?
     }
@@ -422,20 +431,29 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     ////////////////////////
     // Informational
     ////////////////////////
+    function poolDetail() external view returns (PoolDetailView memory) {
+        return PoolDetailView({
+            totalShares: _rewards.totalShares,
+            currencyAddress: Currency.unwrap(_currency),
+            numCurves: 1,
+            balance: _rewards.balance()
+        });
+    }
 
-    // function estimatedRefund(address account) public view returns (uint256) {
-    //     return _state.subscriptions[account].estimatedRefund();
-    // }
+    function curveDetail(uint8 curve) external view returns (CurveDetailView memory) {
+        return CurveDetailView({currentMultiplier: _rewards.curves[curve].currentMultiplier(), flattenTimestamp: 0});
+    }
 
     function subscriptionOf(address account) external view returns (SubscriberView memory subscription) {
+        Subscription memory sub = _state.subscriptions[account];
         return SubscriberView({
-            tierId: _state.subscriptions[account].tierId,
-            secondsPurchased: _state.subscriptions[account].secondsPurchased,
-            secondsGranted: _state.subscriptions[account].secondsGranted,
-            tokenId: _state.subscriptions[account].tokenId,
-            totalPurchased: _state.subscriptions[account].totalPurchased,
-            expiresAt: _state.subscriptions[account].expiresAt(),
-            estimatedRefund: _state.subscriptions[account].estimatedRefund()
+            tierId: sub.tierId,
+            secondsPurchased: sub.secondsPurchased,
+            secondsGranted: sub.secondsGranted,
+            tokenId: sub.tokenId,
+            totalPurchased: sub.totalPurchased,
+            expiresAt: sub.expiresAt(),
+            estimatedRefund: sub.estimatedRefund()
         });
     }
 
@@ -448,7 +466,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
             supplyCap: _state.supplyCap,
             transferRecipient: _transferRecipient,
             currency: Currency.unwrap(_currency),
-            creatorBalance: _currency.balance() // TODO: subtract pool funds
+            creatorBalance: _currency.balance() - _rewards.balance() // TODO: subtract pool funds
         });
     }
 
@@ -503,6 +521,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         if (_state.subscriptions[to].tokenId != 0 || to == address(0)) revert InvalidTransfer();
         if (from == address(0)) return;
 
+        // TODO: update holdings (rewards are transferred)
         uint16 tierId = _state.subscriptions[from].tierId;
         if (tierId != 0) if (!_state.tiers[tierId].params.transferrable) revert TierLib.TierTransferDisabled();
         _state.subscriptions[to] = _state.subscriptions[from];

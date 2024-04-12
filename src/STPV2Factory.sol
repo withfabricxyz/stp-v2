@@ -92,37 +92,37 @@ contract STPV2Factory is Ownable2Step {
         _salt = block.chainid << 128;
     }
 
-    /**
-     * @notice Deploy a new Clone of a RewardPool contract
-     *
-     * @param poolParams the initialization parameters for the pool
-     * @param curveParams the curve parameters for the pool
-     */
-    function deployRewardPool(
-        RewardPoolParams memory poolParams,
-        CurveParams memory curveParams
-    ) public returns (address deployment) {
-        deployment = LibClone.clone(_rewardPoolImplementation);
-        RewardPool(payable(deployment)).initialize(poolParams, curveParams);
-        emit RewardPoolDeployment(deployment);
-    }
+    // /**
+    //  * @notice Deploy a new Clone of a RewardPool contract
+    //  *
+    //  * @param poolParams the initialization parameters for the pool
+    //  * @param curveParams the curve parameters for the pool
+    //  */
+    // function deployRewardPool(
+    //     RewardPoolParams memory poolParams,
+    //     CurveParams memory curveParams
+    // ) public returns (address deployment) {
+    //     deployment = LibClone.clone(_rewardPoolImplementation);
+    //     RewardPool(payable(deployment)).initialize(poolParams, curveParams);
+    //     emit RewardPoolDeployment(deployment);
+    // }
 
-    function deploySubscriptionWithPool(
-        DeployParams memory params,
-        RewardPoolParams memory poolParams,
-        CurveParams memory curveParams
-    ) public payable returns (address subscriptionAddress, address poolAddress) {
-        poolAddress = deployRewardPool(poolParams, curveParams);
+    // function deploySubscriptionWithPool(
+    //     DeployParams memory params,
+    //     RewardPoolParams memory poolParams,
+    //     CurveParams memory curveParams
+    // ) public payable returns (address subscriptionAddress, address poolAddress) {
+    //     poolAddress = deployRewardPool(poolParams, curveParams);
 
-        // get the address of the subscription
-        address predictedAddress =
-            LibClone.predictDeterministicAddress(_stpImplementation, bytes32(_salt + 1), address(this));
-        RewardPool(payable(poolAddress)).setRoles(predictedAddress, 1); // TODO Const RewardPool.ROLE_MINTER
+    //     // get the address of the subscription
+    //     address predictedAddress =
+    //         LibClone.predictDeterministicAddress(_stpImplementation, bytes32(_salt + 1), address(this));
+    //     RewardPool(payable(poolAddress)).setRoles(predictedAddress, 1); // TODO Const RewardPool.ROLE_MINTER
 
-        // set the reward pool address
-        params.rewardParams.poolAddress = poolAddress;
-        subscriptionAddress = deploySubscription(params);
-    }
+    //     // set the reward pool address
+    //     params.rewardParams.poolAddress = poolAddress;
+    //     subscriptionAddress = deploySubscription(params);
+    // }
 
     /**
      * @notice Deploy a new Clone of a SubscriptionTokenV2 contract
@@ -154,7 +154,7 @@ contract STPV2Factory is Ownable2Step {
         // });
 
         SubscriptionTokenV2(payable(deployment)).initialize(
-            params.initParams, params.tierParams, params.rewardParams, subFees
+            params.initParams, params.tierParams, params.rewardParams, params.curveParams, subFees
         );
         emit SubscriptionDeployment(deployment, params.feeConfigId);
 

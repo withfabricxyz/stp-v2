@@ -12,6 +12,7 @@ library RewardLib {
     using RewardLib for State;
 
     struct State {
+        uint8 numCurves;
         uint256 totalShares;
         uint256 totalRewardEgress;
         uint256 totalRewardIngress;
@@ -42,6 +43,11 @@ library RewardLib {
     error AllocationWithoutShares();
 
     error NoSharesToBurn();
+
+    function createCurve(State storage state, CurveParams memory curve) internal {
+        curve.validate();
+        state.curves[state.numCurves++] = curve;
+    }
 
     /// @dev Issue shares to a holder
     function issue(State storage state, address holder, uint256 numShares) internal {
@@ -90,5 +96,9 @@ library RewardLib {
         state.pointsPerShare = (state.totalRewardIngress * pointsMultiplier) / state.totalShares;
         delete state.holders[account];
         emit SharesBurned(account, numShares);
+    }
+
+    function balance(State storage state) internal view returns (uint256) {
+        return state.totalRewardIngress - state.totalRewardEgress;
     }
 }

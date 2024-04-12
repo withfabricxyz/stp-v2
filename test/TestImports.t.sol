@@ -119,7 +119,10 @@ abstract contract BaseTest is Test {
 
     FeeParams internal feeParams = FeeParams({collector: address(0), bips: 0});
 
-    RewardParams internal rewardParams = RewardParams({bips: 0, poolAddress: address(0)});
+    RewardParams internal rewardParams = RewardParams({slashGracePeriod: 7 days, slashable: true});
+
+    CurveParams internal curveParams =
+        CurveParams({id: 0, numPeriods: 6, periodSeconds: 86_400, startTimestamp: 0, minMultiplier: 0, formulaBase: 2});
 
     InitParams internal initParams = InitParams({
         name: "Meow Sub",
@@ -139,7 +142,7 @@ abstract contract BaseTest is Test {
             bytes32(uint256(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffbf601132)),
             bytes32(0)
         );
-        stp.initialize(initParams, tierParams, rewardParams, feeParams);
+        stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
         return stp;
     }
 

@@ -26,6 +26,11 @@ library SubscriberLib {
         return purchase > grant ? purchase : grant;
     }
 
+    /// @dev Check if a subscription is active
+    function checkActive(Subscription memory sub) internal view {
+        if (sub.expiresAt() <= block.timestamp) revert SubscriptionNotActive();
+    }
+
     /// @dev The amount of purchased time remaining for a given subscription
     function purchasedTimeRemaining(Subscription memory sub) internal view returns (uint48) {
         uint256 _expiresAt = sub.purchaseOffset + sub.secondsPurchased;

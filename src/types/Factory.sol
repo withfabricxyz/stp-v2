@@ -20,6 +20,7 @@ struct DeployParams {
     Tier tierParams;
     /// @dev the reward parameters for the collection
     RewardParams rewardParams;
+    CurveParams curveParams;
 }
 
 struct RewardDeployParams {

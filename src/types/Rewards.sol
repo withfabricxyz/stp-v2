@@ -39,10 +39,10 @@ struct CurveParams {
 }
 
 struct RewardParams {
-    /// @dev The address of the pool
-    address poolAddress;
-    /// @dev The number of tokens in the pool
-    uint16 bips;
+    /// @dev slashGracePeriod
+    uint32 slashGracePeriod;
+    /// @dev whether the pool is slashable
+    bool slashable;
 }
 
 struct IssueParams {

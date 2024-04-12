@@ -11,6 +11,7 @@ interface ISubscriptionTokenV2 {
 
     // TODO: Doc
     error InvalidOwner();
+    error InvalidTokenParams();
     error InvalidName();
     error InvalidSymbol();
     error InvalidContractUri();

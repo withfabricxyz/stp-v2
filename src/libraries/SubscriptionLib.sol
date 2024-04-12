@@ -69,8 +69,10 @@ library SubscriptionLib {
     }
 
     function updateTier(State storage state, uint16 tierId, Tier memory tierParams) internal {
-        tierParams.validate();
         if (state.tiers[tierId].id == 0) revert TierLib.TierNotFound(tierId);
+        if (state.tiers[tierId].subCount > tierParams.maxSupply) revert TierLib.TierInvalidSupplyCap();
+        tierParams.validate();
+
         state.tiers[tierId].params = tierParams;
         emit TierUpdated(tierId);
     }
@@ -144,7 +146,7 @@ library SubscriptionLib {
             tokenId = state.mint(account);
             sub.tokenId = tokenId;
         }
-
+        // TODO: Figure out the tier id like purchase
         sub.tierId = tierId;
         if (block.timestamp > sub.grantOffset + sub.secondsGranted) {
             sub.grantOffset = uint48(block.timestamp - sub.secondsGranted);
