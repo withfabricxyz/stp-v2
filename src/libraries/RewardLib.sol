@@ -34,6 +34,8 @@ library RewardLib {
 
     event SharesBurned(address indexed account, uint256 numShares);
 
+    event CurveCreated(uint8 curveId);
+
     /////////////////////
     // ERRORS
     /////////////////////
@@ -47,6 +49,7 @@ library RewardLib {
     function createCurve(State storage state, CurveParams memory curve) internal {
         curve.validate();
         state.curves[state.numCurves++] = curve;
+        emit CurveCreated(state.numCurves - 1);
     }
 
     /// @dev Issue shares to a holder

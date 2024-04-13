@@ -14,9 +14,9 @@ struct SubscriberView {
     /// @dev The number of seconds granted by the creator
     uint48 secondsGranted;
     /// @dev The tokenId for the subscription
-    uint256 tokenId;
+    uint64 tokenId;
     /// @dev The number of tokens transferred
-    uint256 totalPurchased;
+    // uint256 totalPurchased;
     /// @dev The expiration timestamp of the subscription
     uint48 expiresAt;
     /// @dev The time the subscription was created

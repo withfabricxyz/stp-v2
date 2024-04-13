@@ -30,20 +30,20 @@ library SubscriptionLib {
     /// @dev Emitted when time is purchased (new nft or renewed)
     event Purchase(
         address indexed account,
-        uint256 indexed tokenId,
+        uint64 indexed tokenId,
         uint256 tokensTransferred,
-        uint256 timePurchased,
-        uint256 expiresAt
+        uint48 timePurchased,
+        uint48 expiresAt
     );
 
     /// @dev Emitted when the creator refunds a subscribers remaining time
-    event Refund(address indexed account, uint256 indexed tokenId, uint256 tokensTransferred, uint256 timeReclaimed);
+    event Refund(address indexed account, uint64 indexed tokenId, uint256 tokensTransferred, uint48 timeReclaimed);
 
-    event Grant(address indexed account, uint256 indexed tokenId, uint256 secondsGranted, uint256 expiresAt);
+    event Grant(address indexed account, uint64 indexed tokenId, uint48 secondsGranted, uint48 expiresAt);
 
-    event GrantRevoke(uint256 indexed tokenId, uint48 time, uint48 expiresAt);
+    event GrantRevoke(uint64 indexed tokenId, uint48 time, uint48 expiresAt);
 
-    event SwitchTier(uint256 indexed tokenId, uint16 oldTier, uint16 newTier);
+    event SwitchTier(uint64 indexed tokenId, uint16 oldTier, uint16 newTier);
 
     event TierCreated(uint16 tierId);
 
@@ -86,7 +86,7 @@ library SubscriptionLib {
         emit SwitchTier(sub.tokenId, tierId, 0);
     }
 
-    function mint(State storage state, address account) internal returns (uint256 tokenId) {
+    function mint(State storage state, address account) internal returns (uint64 tokenId) {
         if (state.supplyCap != 0 && state.subCount >= state.supplyCap) revert GlobalSupplyLimitExceeded();
         tokenId = ++state.subCount;
         state.subscriptions[account].tokenId = tokenId;
@@ -107,8 +107,7 @@ library SubscriptionLib {
         uint256 tokensForTime = numTokens;
         if (subTierId != resolvedTier) {
             tierState.checkJoin(account, numTokens);
-            tierState.subCount += 1;
-            sub.tierId = resolvedTier;
+            state.switchTier(account, resolvedTier);
             tokensForTime -= tierState.params.initialMintPrice;
         }
 
@@ -117,7 +116,6 @@ library SubscriptionLib {
         if (block.timestamp > sub.purchaseOffset + sub.secondsPurchased) {
             sub.purchaseOffset = uint48(block.timestamp - sub.secondsPurchased);
         }
-        sub.totalPurchased += numTokens;
         sub.secondsPurchased += numSeconds;
 
         emit Purchase(account, sub.tokenId, numTokens, numSeconds, sub.expiresAt());
@@ -126,35 +124,29 @@ library SubscriptionLib {
     function refund(State storage state, address account, uint256 numTokens) internal {
         Subscription storage sub = state.subscriptions[account];
         uint48 refundedTime = sub.purchasedTimeRemaining();
-        if (numTokens == 0 || numTokens > sub.totalPurchased) revert InvalidRefund();
-        sub.totalPurchased -= numTokens;
         sub.secondsPurchased -= refundedTime;
         emit Refund(account, sub.tokenId, numTokens, refundedTime);
     }
 
-    function grant(
-        State storage state,
-        address account,
-        uint48 numSeconds,
-        uint16 tierId
-    ) internal returns (uint256 tokenId) {
-        if (numSeconds == 0) revert SubscriptionGrantInvalidTime();
-
+    function switchTier(State storage state, address account, uint16 tierId) internal {
         Subscription storage sub = state.subscriptions[account];
-        tokenId = sub.tokenId;
-        if (tokenId == 0) {
-            tokenId = state.mint(account);
-            sub.tokenId = tokenId;
-        }
-        // TODO: Figure out the tier id like purchase
+        uint16 subTierId = sub.tierId;
+        if (subTierId == tierId) return;
+        if (subTierId != 0) state.tiers[subTierId].subCount -= 1;
+        state.tiers[tierId].subCount += 1;
+        emit SwitchTier(sub.tokenId, subTierId, tierId);
         sub.tierId = tierId;
+    }
+
+    function grant(State storage state, address account, uint48 numSeconds, uint16 tierId) internal {
+        if (numSeconds == 0) revert SubscriptionGrantInvalidTime();
+        Subscription storage sub = state.subscriptions[account];
+        state.switchTier(account, tierId);
         if (block.timestamp > sub.grantOffset + sub.secondsGranted) {
             sub.grantOffset = uint48(block.timestamp - sub.secondsGranted);
         }
         sub.secondsGranted += numSeconds;
-        // sub.grantTime(numSeconds);
-
-        emit Grant(account, tokenId, numSeconds, sub.expiresAt());
+        emit Grant(account, sub.tokenId, numSeconds, sub.expiresAt());
     }
 
     function revokeTime(State storage state, address account) internal {

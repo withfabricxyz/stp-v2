@@ -8,17 +8,11 @@ import {Subscription, Tier} from "../types/Index.sol";
 library SubscriberLib {
     using SubscriberLib for Subscription;
 
-    event GrantRevoke(uint256 indexed tokenId, uint48 time, uint48 expiresAt);
-
-    event SwitchTier(uint256 indexed tokenId, uint16 oldTier, uint16 newTier);
-
     error SubscriptionNotActive();
 
     error SubscriptionGrantInvalidTime();
 
     error SubscriptionNotFound(address account);
-
-    error DeactivationFailure();
 
     function expiresAt(Subscription memory sub) internal pure returns (uint48) {
         uint48 purchase = sub.purchaseOffset + sub.secondsPurchased;
@@ -53,10 +47,11 @@ library SubscriberLib {
 
     // TODO: Lot's of testing?
     function estimatedRefund(Subscription memory sub) internal view returns (uint256) {
-        uint48 secondsLeft = purchasedTimeRemaining(sub);
-        if (secondsLeft == 0) return 0;
-        uint256 divisor = uint256(sub.secondsPurchased / secondsLeft);
-        if (divisor == 0) return 0;
-        return sub.totalPurchased / divisor;
+        return 0;
+        // uint48 secondsLeft = purchasedTimeRemaining(sub);
+        // if (secondsLeft == 0) return 0;
+        // uint256 divisor = uint256(sub.secondsPurchased / secondsLeft);
+        // if (divisor == 0) return 0;
+        // return sub.totalPurchased / divisor;
     }
 }

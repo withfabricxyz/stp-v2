@@ -39,8 +39,10 @@ struct Tier {
     uint48 startTimestamp;
     /// @dev The end timestamp for the tier (0 for never)
     uint48 endTimestamp;
-    /// @dev The secondary reward multiplier for the tier (0 to disable rewards for the tier)
-    uint8 rewardMultiplier;
+    /// @dev The reward curve id to use
+    uint8 rewardCurveId;
+    /// @dev The reward bps
+    uint16 rewardBasisPoints;
     /// @dev Whether the tier is paused (can subs mint or renew?)
     bool paused;
     /// @dev A flag to indicate if tokens can be transferred
@@ -89,10 +91,10 @@ struct Subscription {
     /// @dev A time offset used to adjust expiration for purchases
     uint48 purchaseOffset;
     /// @dev The tokenId for the subscription
-    uint256 tokenId;
-    /// @dev The number of tokens transferred
-    uint256 totalPurchased;
+    uint64 tokenId;
 }
+// /// @dev The number of tokens transferred
+// uint256 totalPurchased;
 
 struct MintParams {
     /// @dev The tokenId to mint

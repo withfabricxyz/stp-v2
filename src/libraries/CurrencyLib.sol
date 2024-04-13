@@ -32,7 +32,7 @@ library CurrencyLib {
             if (msg.value != amount) revert InvalidCapture();
         } else {
             if (msg.value > 0) revert InvalidCapture();
-            // Note: We support tokens which take fees, but do not support rebasing tokens
+            // Calculate the captured amount (in case of a token with a fee on transfer, etc.)
             uint256 preBalance = currency.balance();
             Currency.unwrap(currency).safeTransferFrom(from, address(this), amount);
             capturedAmount = currency.balance() - preBalance;

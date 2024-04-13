@@ -22,7 +22,7 @@ struct SubscribeParams {
     uint256 purchaseValue;
 }
 
-struct RewardPoolParams {
+struct RewardInitParams {
     /// @dev the grace period of inactivity before a sub is slashable
     uint32 slashGracePeriod;
     /// @dev whether the pool is slashable

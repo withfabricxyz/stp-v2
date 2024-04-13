@@ -158,12 +158,12 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param numTokens the amount of ERC20 tokens or native tokens to transfer
      */
     function mintFor(address account, uint256 numTokens) public payable {
-        _purchase(account, numTokens, 0);
+        _purchase(account, 0, numTokens);
     }
 
     // TODO: All possible mint configurations
     function mintAdvanced(SubscribeParams calldata params) external payable {
-        (uint256 tokenId, uint256 change) = _purchase(params.recipient, params.purchaseValue, params.tierId);
+        (uint256 tokenId, uint256 change) = _purchase(params.recipient, params.tierId, params.purchaseValue);
 
         // Referral Payout
         if (params.referrer != address(0)) {
@@ -189,7 +189,6 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         _checkOwner();
         // _checkCreatorBalance(numTokens); // TODO: check creator balance
         _state.refund(account, numTokens);
-        // TODO: check creator balance
         _currency.transfer(account, numTokens);
     }
 
@@ -260,7 +259,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      */
     function setGlobalSupplyCap(uint64 supplyCap) external {
         _checkOwnerOrRoles(ROLE_MANAGER);
-        if (_state.supplyCap > supplyCap) revert GlobalSupplyLimitExceeded();
+        if (_state.subCount > supplyCap) revert GlobalSupplyLimitExceeded();
         _state.supplyCap = supplyCap;
         emit GlobalSupplyCapChange(supplyCap);
     }
@@ -289,8 +288,8 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
 
     function _purchase(
         address account,
-        uint256 numTokens,
-        uint16 tierId
+        uint16 tierId,
+        uint256 numTokens
     ) private returns (uint256 tokenId, uint256 change) {
         if (account == address(0)) revert InvalidAccount();
 
@@ -306,9 +305,19 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         // Purchase the subscription (switching tiers if necessary)
         _state.purchase(account, tokensIn, tierId);
 
-        // Transfer fees and rewards
-        tokensIn = _transferFees(tokensIn);
-        tokensIn = _transferRewards(account, tokensIn, 0);
+        // Transfer fees
+        uint16 bips = feeParams.bips;
+        if (bips > 0) {
+            uint256 fee = (tokensIn * bips) / _MAX_BIPS;
+            if (fee > 0) {
+                _currency.transfer(feeParams.collector, fee);
+                emit FeeTransfer(feeParams.collector, fee);
+                tokensIn -= fee;
+            }
+        }
+
+        // Transfer rewards if tier has rewards
+        tokensIn = _transferRewards(account, tokensIn, _state.subscriptions[account].tierId);
 
         return (tokenId, tokensIn);
     }
@@ -362,26 +371,26 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     ////////////////////////
 
     /// @dev Allocate tokens to the fee collector
-    function _transferFees(uint256 amount) private returns (uint256) {
-        if (feeParams.bips == 0) return amount;
-        uint256 fee = (amount * feeParams.bips) / _MAX_BIPS;
-        if (fee == 0) return amount;
+    // function _transferFees(uint256 amount) private returns (uint256) {
+    //     if (feeParams.bips == 0) return amount;
+    //     uint256 fee = (amount * feeParams.bips) / _MAX_BIPS;
+    //     if (fee == 0) return amount;
 
-        _currency.transfer(feeParams.collector, fee);
-        emit FeeTransfer(feeParams.collector, fee);
-        return amount - fee;
-    }
+    //     _currency.transfer(feeParams.collector, fee);
+    //     emit FeeTransfer(feeParams.collector, fee);
+    //     return amount - fee;
+    // }
 
-    function _transferRewards(address account, uint256 amount, uint8 curveId) private returns (uint256) {
-        // TODO: Determine if we should issue rewards (fetch curveId, bps)
-        // if (rewardParams.poolAddress == address(0)) return amount;
+    function _transferRewards(address account, uint256 amount, uint16 tierId) private returns (uint256) {
+        uint16 bps = _state.tiers[tierId].params.rewardBasisPoints;
+        uint8 curve = _state.tiers[tierId].params.rewardCurveId;
 
         // tier = _state.subscriptions[account].tierId;
-        uint256 rewards = (amount * 0) / _MAX_BIPS;
+        uint256 rewards = (amount * bps) / _MAX_BIPS;
         // uint256 rewards = (amount * rewardParams.bips) / _MAX_BIPS;
         if (rewards == 0) return amount;
 
-        _rewards.issueWithCurve(account, rewards, curveId);
+        _rewards.issueWithCurve(account, rewards, curve);
         _rewards.allocate(rewards);
 
         return amount - rewards;
@@ -422,10 +431,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
             !rewardParams.slashable
                 || _state.subscriptions[account].expiresAt() + rewardParams.slashGracePeriod > block.timestamp
         ) revert InvalidAccount();
-        // TODO: check expired + grace period
-        // TODO: check slashability
         _rewards.burn(account);
-        // Now what?
     }
 
     ////////////////////////
@@ -451,9 +457,9 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
             secondsPurchased: sub.secondsPurchased,
             secondsGranted: sub.secondsGranted,
             tokenId: sub.tokenId,
-            totalPurchased: sub.totalPurchased,
+            // totalPurchased: 0,
             expiresAt: sub.expiresAt(),
-            estimatedRefund: sub.estimatedRefund()
+            estimatedRefund: 0
         });
     }
 
@@ -523,9 +529,13 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
 
         // TODO: update holdings (rewards are transferred)
         uint16 tierId = _state.subscriptions[from].tierId;
-        if (tierId != 0) if (!_state.tiers[tierId].params.transferrable) revert TierLib.TierTransferDisabled();
+        if (tierId != 0 && !_state.tiers[tierId].params.transferrable) revert TierLib.TierTransferDisabled();
+
         _state.subscriptions[to] = _state.subscriptions[from];
         delete _state.subscriptions[from];
+
+        _rewards.holders[to] = _rewards.holders[from];
+        delete _rewards.holders[from];
     }
 
     function locked(uint256 tokenId) public view override returns (bool) {

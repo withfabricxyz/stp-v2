@@ -39,7 +39,8 @@ contract TierLibTest is Test {
             paused: false,
             transferrable: true,
             maxSupply: 0,
-            rewardMultiplier: 0,
+            rewardCurveId: 0,
+            rewardBasisPoints: 0,
             initialMintPrice: 0.01 ether,
             pricePerPeriod: 0.005 ether,
             maxCommitmentSeconds: 24 * 2_592_000,
@@ -120,7 +121,7 @@ contract TierLibTest is Test {
             tierId: 1,
             purchaseOffset: 0,
             secondsPurchased: 0,
-            totalPurchased: 0,
+            // totalPurchased: 0,
             grantOffset: 0,
             secondsGranted: 0
         });
