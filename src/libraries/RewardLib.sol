@@ -48,8 +48,8 @@ library RewardLib {
 
     function createCurve(State storage state, CurveParams memory curve) internal {
         curve.validate();
+        emit CurveCreated(state.numCurves);
         state.curves[state.numCurves++] = curve;
-        emit CurveCreated(state.numCurves - 1);
     }
 
     /// @dev Issue shares to a holder

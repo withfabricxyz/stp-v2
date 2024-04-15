@@ -22,7 +22,7 @@ import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
 import {TierLib} from "./libraries/TierLib.sol";
 import {FeeParams, InitParams, Subscription, Tier, Tier} from "./types/Index.sol";
 
-import {SubscribeParams} from "./types/Params.sol";
+import {MintParams} from "./types/Params.sol";
 import {CurveDetailView, CurveParams, PoolDetailView, RewardParams} from "./types/Rewards.sol";
 import {ContractView, SubscriberView} from "./types/Views.sol";
 
@@ -162,7 +162,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     }
 
     // TODO: All possible mint configurations
-    function mintAdvanced(SubscribeParams calldata params) external payable {
+    function mintAdvanced(MintParams calldata params) external payable {
         (uint256 tokenId, uint256 change) = _purchase(params.recipient, params.tierId, params.purchaseValue);
 
         // Referral Payout
@@ -187,7 +187,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      */
     function refund(address account, uint256 numTokens) external {
         _checkOwner();
-        // _checkCreatorBalance(numTokens); // TODO: check creator balance
+        _checkCreatorBalance(numTokens);
         _state.refund(account, numTokens);
         _currency.transfer(account, numTokens);
     }
@@ -218,7 +218,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     /////////////////////////
 
     function transferFunds(address to, uint256 amount) external {
-        // _checkCreatorBalance(numTokens); // TODO: check creator balance
+        _checkCreatorBalance(amount);
         if (to != _transferRecipient) _checkOwner();
         emit Withdraw(to, amount);
         _currency.transfer(to, amount);
@@ -296,7 +296,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         uint256 tokensIn = _currency.capture(msg.sender, numTokens);
 
         // Mint a new token if necessary
-        uint256 tokenId = _state.subscriptions[account].tokenId;
+        tokenId = _state.subscriptions[account].tokenId;
         if (tokenId == 0) {
             tokenId = _state.mint(account);
             _safeMint(account, tokenId);
@@ -381,6 +381,10 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     //     return amount - fee;
     // }
 
+    function _checkCreatorBalance(uint256 amount) private view {
+        if (amount > _currency.balance() - _rewards.balance()) revert InsufficientBalance();
+    }
+
     function _transferRewards(address account, uint256 amount, uint16 tierId) private returns (uint256) {
         uint16 bps = _state.tiers[tierId].params.rewardBasisPoints;
         uint8 curve = _state.tiers[tierId].params.rewardCurveId;
@@ -429,7 +433,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     function slash(address account) external {
         if (
             !rewardParams.slashable
-                || _state.subscriptions[account].expiresAt() + rewardParams.slashGracePeriod > block.timestamp
+                || _state.subscriptions[account].expiresAt + rewardParams.slashGracePeriod > block.timestamp
         ) revert InvalidAccount();
         _rewards.burn(account);
     }
@@ -450,17 +454,8 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         return CurveDetailView({currentMultiplier: _rewards.curves[curve].currentMultiplier(), flattenTimestamp: 0});
     }
 
-    function subscriptionOf(address account) external view returns (SubscriberView memory subscription) {
-        Subscription memory sub = _state.subscriptions[account];
-        return SubscriberView({
-            tierId: sub.tierId,
-            secondsPurchased: sub.secondsPurchased,
-            secondsGranted: sub.secondsGranted,
-            tokenId: sub.tokenId,
-            // totalPurchased: 0,
-            expiresAt: sub.expiresAt(),
-            estimatedRefund: 0
-        });
+    function subscriptionOf(address account) external view returns (Subscription memory subscription) {
+        return _state.subscriptions[account];
     }
 
     /// Views
@@ -472,7 +467,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
             supplyCap: _state.supplyCap,
             transferRecipient: _transferRecipient,
             currency: Currency.unwrap(_currency),
-            creatorBalance: _currency.balance() - _rewards.balance() // TODO: subtract pool funds
+            creatorBalance: _currency.balance() - _rewards.balance()
         });
     }
 
@@ -523,11 +518,10 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         return _state.subscriptions[account].remainingSeconds();
     }
 
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal override {
+    function _beforeTokenTransfer(address from, address to, uint256) internal override {
         if (_state.subscriptions[to].tokenId != 0 || to == address(0)) revert InvalidTransfer();
         if (from == address(0)) return;
 
-        // TODO: update holdings (rewards are transferred)
         uint16 tierId = _state.subscriptions[from].tierId;
         if (tierId != 0 && !_state.tiers[tierId].params.transferrable) revert TierLib.TierTransferDisabled();
 

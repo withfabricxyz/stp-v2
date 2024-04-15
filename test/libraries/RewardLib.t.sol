@@ -25,20 +25,20 @@ contract RewardTestShim {
         });
     }
 
-    function issue(address holder, uint256 numShares) external {
-        RewardLib.issue(_state, holder, numShares);
+    function issue(address _holder, uint256 numShares) external {
+        RewardLib.issue(_state, _holder, numShares);
     }
 
-    function issueWithCurve(address holder, uint256 numShares, uint8 curveId) external {
-        RewardLib.issueWithCurve(_state, holder, numShares, curveId);
+    function issueWithCurve(address _holder, uint256 numShares, uint8 curveId) external {
+        RewardLib.issueWithCurve(_state, _holder, numShares, curveId);
     }
 
     function curve(uint8 id) external view returns (CurveParams memory params) {
         return _state.curves[id];
     }
 
-    function holder(address holder) external view returns (Holder memory) {
-        return _state.holders[holder];
+    function holder(address _holder) external view returns (Holder memory) {
+        return _state.holders[_holder];
     }
 
     function state() external view returns (PoolStatePartial memory) {

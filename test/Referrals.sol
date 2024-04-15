@@ -14,81 +14,58 @@ contract ReferralTests is BaseTest {
         reinitStp();
     }
 
-    // TODO
+    function testCreateAndDestroy() public prank(creator) {
+        vm.expectEmit(true, true, false, true, address(stp));
+        emit ReferralLib.ReferralSet(1, 500);
+        stp.setReferralCode(1, 500);
+        assertEq(stp.referralCodeBps(1), 500);
+        vm.expectEmit(true, true, false, true, address(stp));
+        emit ReferralLib.ReferralDestroyed(1);
+        stp.setReferralCode(1, 0);
+        assertEq(stp.referralCodeBps(1), 0);
+    }
 
-    // function testCreate() public prank(creator) {
-    //     vm.expectEmit(true, true, false, true, address(stp));
-    //     emit ISubscriptionTokenV2.ReferralCreated(1, 500);
-    //     stp.createReferralCode(1, 500);
-    //     uint16 bps = stp.referralCodeBps(1);
-    //     assertEq(bps, 500);
+    function testCreateInvalid() public prank(creator) {
+        vm.expectRevert(abi.encodeWithSelector(InvalidBasisPoints.selector));
+        stp.setReferralCode(1, 11_000);
+    }
 
-    //     vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidBps.selector));
-    //     stp.createReferralCode(2, 0);
-    // }
+    function testInvalidReferralCode() public {
+        uint256 balance = charlie.balance;
+        stp.mintAdvanced{value: 0.001 ether}(
+            MintParams({
+                tierId: 1,
+                numPeriods: 1,
+                recipient: bob,
+                referrer: charlie,
+                referralCode: 10,
+                purchaseValue: 0.001 ether
+            })
+        );
+        assertEq(charlie.balance, balance);
+    }
 
-    // function testCreateInvalid() public prank(creator) {
-    //     vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidBps.selector));
-    //     stp.createReferralCode(1, 11_000);
-    //     stp.createReferralCode(1, 500);
-    //     vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.ReferralExists.selector, 1));
-    //     stp.createReferralCode(1, 500);
-    // }
+    function testRewards() public {
+        vm.startPrank(creator);
+        stp.setReferralCode(1, 500);
+        vm.stopPrank();
 
-    // function testDelete() public prank(creator) {
-    //     stp.createReferralCode(1, 500);
-    //     vm.expectEmit(true, true, false, true, address(stp));
-    //     emit ISubscriptionTokenV2.ReferralDestroyed(1);
-    //     stp.deleteReferralCode(1);
-    //     uint16 bps = stp.referralCodeBps(1);
-    //     assertEq(bps, 0);
-    // }
+        uint256 balance = charlie.balance;
 
-    // function testInvalidReferralCode() public {
-    //     uint256 balance = charlie.balance;
-    //     vm.startPrank(alice);
-    //     stp.mintWithReferral{value: 1e17}(1e17, 1, charlie);
-    //     vm.stopPrank();
-    //     assertEq(charlie.balance, balance);
-    // }
-
-    // function testRewards() public {
-    //     vm.startPrank(creator);
-    //     stp.createReferralCode(1, 500);
-    //     vm.stopPrank();
-
-    //     uint256 balance = charlie.balance;
-    //     vm.startPrank(alice);
-
-    //     vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidAccount.selector));
-    //     stp.mintWithReferral{value: 1e17}(1e17, 1, address(0));
-
-    //     vm.expectEmit(true, true, false, true, address(stp));
-    //     emit ISubscriptionTokenV2.ReferralPayout(1, charlie, 1, 5e15);
-    //     stp.mintWithReferral{value: 1e17}(1e17, 1, charlie);
-    //     vm.stopPrank();
-    //     assertEq(charlie.balance, balance + 5e15);
-    //     assertEq(address(stp).balance, 1e17 - 5e15);
-    // }
-
-    // function testRewardsMintFor() public {
-    //     uint256 balance = charlie.balance;
-    //     vm.startPrank(alice);
-    //     stp.mintWithReferralFor{value: 1e17}(bob, 1e17, 1, charlie);
-    //     vm.stopPrank();
-    //     assertEq(charlie.balance, balance);
-    // }
-
-    // function testRewardsErc20() public erc20 {
-    //     vm.startPrank(creator);
-    //     stp.createReferralCode(1, 500);
-    //     vm.stopPrank();
-
-    //     uint256 balance = token().balanceOf(charlie);
-    //     vm.startPrank(alice);
-    //     token().approve(address(stp), 1e17);
-    //     stp.mintWithReferral(1e17, 1, charlie);
-    //     vm.stopPrank();
-    //     assertEq(token().balanceOf(charlie), balance + 5e15);
-    // }
+        vm.expectEmit(true, true, false, true, address(stp));
+        emit ISubscriptionTokenV2.ReferralPayout(1, charlie, 1, 5e15);
+        stp.mintAdvanced{value: 0.1 ether}(
+            MintParams({
+                tierId: 1,
+                numPeriods: 1,
+                recipient: bob,
+                referrer: charlie,
+                referralCode: 1,
+                purchaseValue: 0.1 ether
+            })
+        );
+        vm.stopPrank();
+        assertEq(charlie.balance, balance + 5e15);
+        assertEq(address(stp).balance, 1e17 - 5e15);
+    }
 }

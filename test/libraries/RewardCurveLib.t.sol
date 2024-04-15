@@ -14,7 +14,7 @@ contract RewardCurveTestShim {
         return RewardCurveLib.currentMultiplier(params);
     }
 
-    function flattensAt(CurveParams memory params) external view returns (uint48) {
+    function flattensAt(CurveParams memory params) external pure returns (uint48) {
         return RewardCurveLib.flattensAt(params);
     }
 }
@@ -23,7 +23,7 @@ contract RewardLibTest is BaseTest {
     RewardCurveTestShim public shim = new RewardCurveTestShim();
 
     // Call all methods iva RewardLib.method so the coverage tool can track them
-    function defaults() internal view returns (CurveParams memory) {
+    function defaults() internal pure returns (CurveParams memory) {
         return CurveParams({
             id: 0,
             numPeriods: 6,

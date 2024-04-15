@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 import {Subscription, Tier} from "../types/Index.sol";
 
-/// @dev The initialization parameters for a subscription token
+/// @dev Library for managing subscription state
 library SubscriberLib {
     using SubscriberLib for Subscription;
 
@@ -14,44 +14,50 @@ library SubscriberLib {
 
     error SubscriptionNotFound(address account);
 
-    function expiresAt(Subscription memory sub) internal pure returns (uint48) {
-        uint48 purchase = sub.purchaseOffset + sub.secondsPurchased;
-        uint48 grant = sub.grantOffset + sub.secondsGranted;
-        return purchase > grant ? purchase : grant;
-    }
-
-    /// @dev Check if a subscription is active
-    function checkActive(Subscription memory sub) internal view {
-        if (sub.expiresAt() <= block.timestamp) revert SubscriptionNotActive();
-    }
-
     /// @dev The amount of purchased time remaining for a given subscription
     function purchasedTimeRemaining(Subscription memory sub) internal view returns (uint48) {
-        uint256 _expiresAt = sub.purchaseOffset + sub.secondsPurchased;
-        if (_expiresAt <= block.timestamp) return 0;
-        return uint48(_expiresAt - block.timestamp);
+        if (sub.purchaseExpires <= block.timestamp) return 0;
+        return uint48(sub.purchaseExpires - block.timestamp);
+    }
+
+    function extend(Subscription storage sub, uint48 numSeconds) internal {
+        if (sub.expiresAt > block.timestamp) sub.expiresAt += numSeconds;
+        else sub.expiresAt = uint48(block.timestamp + numSeconds);
+    }
+
+    function extendPurchase(Subscription storage sub, uint48 numSeconds) internal {
+        sub.extend(numSeconds);
+        if (sub.purchaseExpires > block.timestamp) sub.purchaseExpires += numSeconds;
+        else sub.purchaseExpires = uint48(block.timestamp + numSeconds);
+    }
+
+    function extendGrant(Subscription storage sub, uint48 numSeconds) internal {
+        sub.extend(numSeconds);
+        if (sub.grantExpires > block.timestamp) sub.grantExpires += numSeconds;
+        else sub.grantExpires = uint48(block.timestamp + numSeconds);
+    }
+
+    function revokeTime(Subscription storage sub) internal returns (uint48) {
+        uint48 remaining = sub.grantedTimeRemaining();
+        sub.grantExpires = uint48(block.timestamp);
+        sub.expiresAt -= remaining;
+        return remaining;
+    }
+
+    function refundTime(Subscription storage sub) internal returns (uint48) {
+        uint48 refundedTime = sub.purchasedTimeRemaining();
+        sub.purchaseExpires = uint48(block.timestamp);
+        sub.expiresAt -= refundedTime;
+        return refundedTime;
     }
 
     /// @dev The amount of granted time remaining for a given subscription
     function grantedTimeRemaining(Subscription memory sub) internal view returns (uint48) {
-        uint256 _expiresAt = sub.grantOffset + sub.secondsGranted;
-        if (_expiresAt <= block.timestamp) return 0;
-        return uint48(_expiresAt - block.timestamp);
+        if (sub.grantExpires <= block.timestamp) return 0;
+        return uint48(sub.grantExpires - block.timestamp);
     }
 
-    function remainingSeconds(Subscription memory sub) internal view returns (uint256) {
-        return purchasedTimeRemaining(sub) + grantedTimeRemaining(sub);
-    }
-
-    // TODO: Consider how to do expiresAt properly
-
-    // TODO: Lot's of testing?
-    function estimatedRefund(Subscription memory sub) internal view returns (uint256) {
-        return 0;
-        // uint48 secondsLeft = purchasedTimeRemaining(sub);
-        // if (secondsLeft == 0) return 0;
-        // uint256 divisor = uint256(sub.secondsPurchased / secondsLeft);
-        // if (divisor == 0) return 0;
-        // return sub.totalPurchased / divisor;
+    function remainingSeconds(Subscription memory sub) internal view returns (uint48) {
+        return sub.expiresAt > block.timestamp ? sub.expiresAt - uint48(block.timestamp) : 0;
     }
 }

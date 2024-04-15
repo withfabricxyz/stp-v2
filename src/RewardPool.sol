@@ -3,8 +3,6 @@
 pragma solidity ^0.8.20;
 
 import {AccessControlled} from "./abstracts/AccessControlled.sol";
-
-import {TokenRecovery} from "./abstracts/TokenRecovery.sol";
 import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
 import {RewardCurveLib} from "./libraries/RewardCurveLib.sol";
 import {RewardLib} from "./libraries/RewardLib.sol";
@@ -21,10 +19,7 @@ import {
 import {Initializable} from "@solady/utils/Initializable.sol";
 import {Multicallable} from "@solady/utils/Multicallable.sol";
 
-contract RewardPool is
-    AccessControlled,
-    Initializable //}, TokenRecovery, Multicallable {
-{
+contract RewardPool is AccessControlled, Initializable {
     using CurrencyLib for Currency;
     using RewardCurveLib for CurveParams;
     using RewardLib for RewardLib.State;
@@ -65,7 +60,7 @@ contract RewardPool is
     /**
      * @notice Mint tokens to an account without payment (used for migrations, tips, etc)
      */
-    function adminMint(address account, uint256 numShares, uint48 slashPointExtension) external {
+    function adminMint(address account, uint256 numShares) external {
         _checkRoles(ROLE_CREATOR);
         _state.issue(account, numShares);
     }
@@ -81,8 +76,7 @@ contract RewardPool is
      * @param amount the amount of tokens (native or ERC20) to allocate
      */
     function yieldRewards(uint256 amount) public payable {
-        uint256 amount = _currency.capture(msg.sender, amount);
-        _state.allocate(amount);
+        _state.allocate(_currency.capture(msg.sender, amount));
     }
 
     function createCurve(CurveParams memory curve) external {

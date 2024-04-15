@@ -82,14 +82,17 @@ struct InitParams {
 struct Subscription {
     /// @dev The tier id of the subscription
     uint16 tierId;
-    /// @dev The number of seconds purchased
-    uint48 secondsPurchased;
-    /// @dev The number of seconds granted by the creator
-    uint48 secondsGranted;
-    /// @dev A time offset used to adjust expiration for grants
-    uint48 grantOffset;
-    /// @dev A time offset used to adjust expiration for purchases
-    uint48 purchaseOffset;
+    uint48 purchaseExpires;
+    uint48 grantExpires;
+    uint48 expiresAt;
+    // /// @dev The number of seconds purchased
+    // uint48 secondsPurchased;
+    // /// @dev The number of seconds granted by the creator
+    // uint48 secondsGranted;
+    // /// @dev A time offset used to adjust expiration for grants
+    // uint48 grantOffset;
+    // /// @dev A time offset used to adjust expiration for purchases
+    // uint48 purchaseOffset;
     /// @dev The tokenId for the subscription
     uint64 tokenId;
 }

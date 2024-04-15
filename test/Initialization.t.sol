@@ -49,34 +49,24 @@ contract InitializationTest is BaseTest {
         stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
     }
 
-    // function testInvalidRewards() public {
-    //     rewardParams.bips = 11_000;
-    //     vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidRewardParams.selector));
-    //     stp.initialize(initParams, tierParams, rewardParams, feeParams);
-
-    //     rewardParams.bips = 500;
-    //     vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidRewardParams.selector));
-    //     stp.initialize(initParams, tierParams, rewardParams, feeParams);
-    // }
-
     function testEmptyName() public {
         initParams.name = "";
 
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidName.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidTokenParams.selector));
         stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
     }
 
     function testEmptySymbol() public {
         initParams.symbol = "";
 
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidSymbol.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidTokenParams.selector));
         stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
     }
 
     function testEmptyContractURI() public {
         initParams.contractUri = "";
 
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidContractUri.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidTokenParams.selector));
         stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
     }
 }

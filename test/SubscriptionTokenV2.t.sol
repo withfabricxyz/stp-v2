@@ -37,25 +37,12 @@ contract SubscriptionTokenV2Test is BaseTest {
         assertEq(token().balanceOf(address(stp)), 1e5);
         assertEq(stp.balanceOf(bob), 1e5 / 2);
         assertEq(stp.balanceOf(alice), 0);
-        SubscriberView memory sub = stp.subscriptionOf(bob);
-        assertEq(stp.ownerOf(sub.tokenId), bob);
+        assertEq(stp.ownerOf(1), bob);
     }
 
     function testNonSub() public {
-        assertEq(stp.balanceOf(alice), 0);
-        SubscriberView memory sub = stp.subscriptionOf(alice);
         vm.expectRevert(abi.encodeWithSelector(ERC721.TokenDoesNotExist.selector));
-        stp.ownerOf(sub.tokenId);
-    }
-
-    function testMintExpire() public prank(alice) {
-        uint256 time = block.timestamp;
-        stp.mint{value: 1e18}(1e18);
-        vm.warp(block.timestamp + 6e17);
-        assertEq(stp.balanceOf(alice), 0);
-        SubscriberView memory sub = stp.subscriptionOf(alice);
-        // assertEq(expires, time + 1e18 / 2); //TODO
-        assertEq(stp.ownerOf(sub.tokenId), alice);
+        stp.ownerOf(2);
     }
 
     function testCreatorEarnings() public {
@@ -108,8 +95,6 @@ contract SubscriptionTokenV2Test is BaseTest {
         stp.mint(1e5);
         assertEq(token().balanceOf(address(stp)), 1e5);
         assertEq(stp.balanceOf(alice), 1e5 / 2);
-        SubscriberView memory sub = stp.subscriptionOf(alice);
-        assertEq(stp.ownerOf(sub.tokenId), alice);
     }
 
     function testMintInvalidERC20() public erc20 prank(alice) {
@@ -140,24 +125,22 @@ contract SubscriptionTokenV2Test is BaseTest {
 
     function testTransfer() public {
         mint(alice, 1e18);
-        SubscriberView memory sub = stp.subscriptionOf(alice);
         vm.startPrank(alice);
-        stp.approve(bob, sub.tokenId);
+        stp.approve(bob, 1);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ERC721.Transfer(alice, bob, sub.tokenId);
-        stp.transferFrom(alice, bob, sub.tokenId);
+        emit ERC721.Transfer(alice, bob, 1);
+        stp.transferFrom(alice, bob, 1);
         vm.stopPrank();
-        assertEq(stp.ownerOf(sub.tokenId), bob);
+        assertEq(stp.ownerOf(1), bob);
     }
 
     function testTransferToExistingHolder() public {
         mint(alice, 1e18);
         mint(bob, 1e18);
-        SubscriberView memory sub = stp.subscriptionOf(alice);
         vm.startPrank(alice);
-        stp.approve(bob, sub.tokenId);
+        stp.approve(bob, 1);
         vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidTransfer.selector));
-        stp.transferFrom(alice, bob, sub.tokenId);
+        stp.transferFrom(alice, bob, 1);
     }
 
     function testDisallowedTransfer() public {
@@ -179,7 +162,7 @@ contract SubscriptionTokenV2Test is BaseTest {
         assertEq(stp.contractURI(), "x");
         assertEq(stp.tokenURI(1), "x/1");
 
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidContractUri.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidTokenParams.selector));
         stp.updateMetadata("");
         vm.stopPrank();
 

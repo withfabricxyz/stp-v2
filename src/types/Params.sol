@@ -7,7 +7,7 @@ pragma solidity ^0.8.20;
  */
 
 /// @dev The advanced parameters for minting a subscription
-struct SubscribeParams {
+struct MintParams {
     /// @dev The tier id of the subscription
     uint16 tierId;
     /// @dev For pay-what-you-want tiers

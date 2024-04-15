@@ -119,11 +119,14 @@ contract TierLibTest is Test {
         Subscription memory sub = Subscription({
             tokenId: 1,
             tierId: 1,
-            purchaseOffset: 0,
-            secondsPurchased: 0,
+            // purchaseOffset: 0,
+            // secondsPurchased: 0,
             // totalPurchased: 0,
-            grantOffset: 0,
-            secondsGranted: 0
+            // grantOffset: 0,
+            // secondsGranted: 0
+            purchaseExpires: 0,
+            grantExpires: 0,
+            expiresAt: 0
         });
 
         // All good

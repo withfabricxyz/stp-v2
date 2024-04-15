@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import "./TestImports.t.sol";
 
 contract GrantsTest is BaseTest {
+    using SubscriberLib for Subscription;
+
     function setUp() public {
         deal(alice, 1e19);
         deal(bob, 1e19);
@@ -17,7 +19,7 @@ contract GrantsTest is BaseTest {
     function testGrant() public {
         vm.startPrank(creator);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.Grant(alice, 1, 90 days, block.timestamp + 90 days);
+        emit SubscriptionLib.Grant(1, 90 days, uint48(block.timestamp + 90 days));
         stp.grantTime(alice, 90 days, 1);
 
         vm.expectRevert(abi.encodeWithSelector(SubscriberLib.SubscriptionGrantInvalidTime.selector));
@@ -25,7 +27,9 @@ contract GrantsTest is BaseTest {
 
         vm.stopPrank();
         assertEq(stp.balanceOf(alice), 90 days);
-        assertEq(stp.subscriptionOf(alice).estimatedRefund, 0);
+        assertEq(stp.subscriptionOf(alice).grantedTimeRemaining(), 90 days);
+        assertEq(stp.subscriptionOf(alice).purchasedTimeRemaining(), 0);
+        assertEq(stp.subscriptionOf(alice).tierId, 1);
     }
 
     function testGrantDouble() public {
@@ -35,7 +39,8 @@ contract GrantsTest is BaseTest {
         stp.grantTime(alice, 90 days, 1);
         vm.stopPrank();
         assertEq(stp.balanceOf(alice), 90 days);
-        assertEq(stp.subscriptionOf(alice).estimatedRefund, 0);
+        assertEq(stp.subscriptionOf(alice).grantedTimeRemaining(), 90 days);
+        assertEq(stp.subscriptionOf(alice).expiresAt, block.timestamp + 90 days);
     }
 
     function testGrantMixed() public {
@@ -44,7 +49,7 @@ contract GrantsTest is BaseTest {
         vm.stopPrank();
         mint(alice, 1e5);
         assertEq(stp.balanceOf(alice), 90 days + 1e5 / 4);
-        assertEq(stp.subscriptionOf(alice).estimatedRefund, 1e5);
+        assertEq(stp.subscriptionOf(alice).purchasedTimeRemaining(), 1e5 / 4);
     }
 
     function testGrantRevoke() public {
@@ -67,6 +72,7 @@ contract GrantsTest is BaseTest {
         stp.revokeTime(alice);
         vm.stopPrank();
         assertEq(stp.balanceOf(alice), 1e5 / 4);
+        assertEq(stp.subscriptionOf(alice).grantedTimeRemaining(), 0);
     }
 
     function multicall() public prank(creator) {

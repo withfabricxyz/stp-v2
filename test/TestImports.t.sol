@@ -7,9 +7,14 @@ import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {ERC721} from "solady/tokens/ERC721.sol";
+
+import {Initializable} from "solady/utils/Initializable.sol";
+import {Multicallable} from "solady/utils/Multicallable.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 
 //////////// Project Imports ////////////
+
+import "src/types/Constants.sol";
 
 import {RewardPool} from "src/RewardPool.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
@@ -18,6 +23,8 @@ import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
 
 import {Currency, CurrencyLib} from "src/libraries/CurrencyLib.sol";
 import {GateLib} from "src/libraries/GateLib.sol";
+
+import {ReferralLib} from "src/libraries/ReferralLib.sol";
 import {RewardCurveLib} from "src/libraries/RewardCurveLib.sol";
 import {RewardLib} from "src/libraries/RewardLib.sol";
 import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
@@ -26,6 +33,8 @@ import {SubscriberLib} from "src/libraries/SubscriberLib.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
 import {DeployParams, FactoryFeeConfig} from "src/types/Factory.sol";
 import {FeeParams, Gate, GateType, InitParams, Subscription, Subscription, Tier} from "src/types/Index.sol";
+
+import {MintParams} from "src/types/Params.sol";
 import {CurveParams, Holder, RewardParams, RewardPoolParams} from "src/types/Rewards.sol";
 import {SubscriberView} from "src/types/Views.sol";
 
@@ -77,7 +86,7 @@ contract TestERC20Token is ERC20 {
 
 contract SelfDestruct {
     function destroy(address recipient) public payable {
-        // solc-ignore-next-line missing-receive
+        // solc-ignore-next-line
         selfdestruct(payable(recipient));
     }
 
@@ -194,10 +203,9 @@ abstract contract BaseTest is Test {
     ) public virtual returns (SubscriptionTokenV2 sub) {
         tierParams.periodDurationSeconds = uint32(minPurchase);
         tierParams.pricePerPeriod = minPurchase * 2;
+        tierParams.rewardBasisPoints = bips;
         feeParams.bips = feeBps;
         feeParams.collector = feeBps > 0 ? fees : address(0);
-        // poolParams.bips = bips;
-        // poolParams.numPeriods = 6;
         return reinitStp();
     }
 

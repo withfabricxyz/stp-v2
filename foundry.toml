@@ -6,7 +6,7 @@ solc = "0.8.24"
 
 optimizer_runs = 200
 
-ignored_warnings_from = ["test/TestHelpers.t.sol"]
+ignored_warnings_from = ["test/TestImports.t.sol"]
 
 remappings = [
   # '@openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/',
@@ -14,6 +14,9 @@ remappings = [
   '@openzeppelin/=lib/openzeppelin-contracts/',
   '@forge/=lib/forge-std/src/',
 ]
+
+# Much slower compile times when true, but helps with code size when true
+via_ir = false
 
 [invariant]
 runs = 256

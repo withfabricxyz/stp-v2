@@ -25,6 +25,7 @@ interface ISubscriptionTokenV2 {
     error InvalidRecovery();
     error TransferFailed();
     error GlobalSupplyLimitExceeded();
+    error InsufficientBalance();
 
     //////////////////
     // EVENTS

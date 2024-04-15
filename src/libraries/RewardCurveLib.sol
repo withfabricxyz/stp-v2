@@ -36,7 +36,7 @@ library RewardCurveLib {
     }
 
     /// @dev Calculate the timestamp at which the curve flattens (minMultiplier is reached)
-    function flattensAt(CurveParams memory curve) internal view returns (uint48) {
+    function flattensAt(CurveParams memory curve) internal pure returns (uint48) {
         return curve.startTimestamp + uint48((curve.numPeriods + 1) * curve.periodSeconds);
     }
 

@@ -11,9 +11,9 @@ contract Deploy is Script {
     function run() external {
         vm.startBroadcast();
 
-        SubscriptionTokenV2 stp = new SubscriptionTokenV2();
-        RewardPool pool = new RewardPool();
-        STPV2Factory factory = new STPV2Factory(address(stp), address(pool));
+        // SubscriptionTokenV2 stp = new SubscriptionTokenV2();
+        // RewardPool pool = new RewardPool();
+        // STPV2Factory factory = new STPV2Factory(address(stp), address(pool));
 
         vm.stopBroadcast();
     }

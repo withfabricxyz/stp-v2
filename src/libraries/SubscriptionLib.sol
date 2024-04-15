@@ -37,9 +37,9 @@ library SubscriptionLib {
     );
 
     /// @dev Emitted when the creator refunds a subscribers remaining time
-    event Refund(address indexed account, uint64 indexed tokenId, uint256 tokensTransferred, uint48 timeReclaimed);
+    event Refund(uint64 indexed tokenId, uint256 tokensTransferred, uint48 timeReclaimed);
 
-    event Grant(address indexed account, uint64 indexed tokenId, uint48 secondsGranted, uint48 expiresAt);
+    event Grant(uint64 indexed tokenId, uint48 secondsGranted, uint48 expiresAt);
 
     event GrantRevoke(uint64 indexed tokenId, uint48 time, uint48 expiresAt);
 
@@ -113,19 +113,16 @@ library SubscriptionLib {
 
         // Check the renewal and update the subscription
         uint48 numSeconds = tierState.checkRenewal(sub, tokensForTime);
-        if (block.timestamp > sub.purchaseOffset + sub.secondsPurchased) {
-            sub.purchaseOffset = uint48(block.timestamp - sub.secondsPurchased);
-        }
-        sub.secondsPurchased += numSeconds;
+        sub.extendPurchase(numSeconds);
 
-        emit Purchase(account, sub.tokenId, numTokens, numSeconds, sub.expiresAt());
+        emit Purchase(account, sub.tokenId, numTokens, numSeconds, sub.expiresAt);
     }
 
     function refund(State storage state, address account, uint256 numTokens) internal {
         Subscription storage sub = state.subscriptions[account];
-        uint48 refundedTime = sub.purchasedTimeRemaining();
-        sub.secondsPurchased -= refundedTime;
-        emit Refund(account, sub.tokenId, numTokens, refundedTime);
+        if (sub.tokenId == 0) revert InvalidRefund();
+        uint48 refundedTime = sub.refundTime();
+        emit Refund(sub.tokenId, numTokens, refundedTime);
     }
 
     function switchTier(State storage state, address account, uint16 tierId) internal {
@@ -134,6 +131,7 @@ library SubscriptionLib {
         if (subTierId == tierId) return;
         if (subTierId != 0) state.tiers[subTierId].subCount -= 1;
         state.tiers[tierId].subCount += 1;
+        // TODO: what should we do about time?
         emit SwitchTier(sub.tokenId, subTierId, tierId);
         sub.tierId = tierId;
     }
@@ -142,17 +140,13 @@ library SubscriptionLib {
         if (numSeconds == 0) revert SubscriptionGrantInvalidTime();
         Subscription storage sub = state.subscriptions[account];
         state.switchTier(account, tierId);
-        if (block.timestamp > sub.grantOffset + sub.secondsGranted) {
-            sub.grantOffset = uint48(block.timestamp - sub.secondsGranted);
-        }
-        sub.secondsGranted += numSeconds;
-        emit Grant(account, sub.tokenId, numSeconds, sub.expiresAt());
+        sub.extendGrant(numSeconds);
+        emit Grant(sub.tokenId, numSeconds, sub.expiresAt);
     }
 
     function revokeTime(State storage state, address account) internal {
         Subscription storage sub = state.subscriptions[account];
-        uint48 remaining = sub.grantedTimeRemaining();
-        sub.secondsGranted = 0;
-        emit GrantRevoke(sub.tokenId, remaining, uint48(sub.expiresAt()));
+        uint48 remaining = sub.revokeTime();
+        emit GrantRevoke(sub.tokenId, remaining, sub.expiresAt);
     }
 }

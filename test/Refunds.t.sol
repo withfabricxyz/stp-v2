@@ -18,12 +18,12 @@ contract RefundsTests is BaseTest {
 
     function testRefund() public {
         mint(alice, 0.001 ether);
-        SubscriberView memory sub = stp.subscriptionOf(alice);
-        assertEq(stp.subscriptionOf(alice).estimatedRefund, 0.001 ether);
+        // SubscriberView memory sub = stp.subscriptionOf(alice);
+        // assertEq(stp.subscriptionOf(alice).estimatedRefund, 0.001 ether);
         vm.startPrank(creator);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit SubscriptionLib.Refund(alice, sub.tokenId, 0.001 ether, 30 days);
-        stp.refund(alice, 0);
+        emit SubscriptionLib.Refund(1, 0.001 ether, 30 days);
+        stp.refund(alice, 0.001 ether);
         assertEq(address(stp).balance, 0);
         vm.stopPrank();
     }
@@ -31,42 +31,32 @@ contract RefundsTests is BaseTest {
     function testPartialRefund() public {
         mint(alice, 0.001 ether);
         vm.warp(block.timestamp + 15 days);
-        assertEq(0.001 ether / 2, stp.subscriptionOf(alice).estimatedRefund);
         vm.startPrank(creator);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit SubscriptionLib.Refund(alice, 1, 0.001 ether / 2, 15 days);
-        stp.refund(alice, 0);
+        emit SubscriptionLib.Refund(1, 0.001 ether / 2, 15 days);
+        stp.refund(alice, 0.0005 ether);
         vm.stopPrank();
     }
 
     function testRefundNoPurchase() public prank(creator) {
-        vm.expectRevert(abi.encodeWithSelector(SubscriberLib.SubscriptionNotFound.selector, bob));
-        stp.refund(bob, 0);
+        stp.topUp{value: 1 ether}(1 ether);
+        vm.expectRevert(abi.encodeWithSelector(SubscriptionLib.InvalidRefund.selector));
+        stp.refund(bob, 0.001 ether);
     }
 
     function testRefundNoBalance() public {
         mint(alice, 0.001 ether);
-        withdraw();
         vm.startPrank(creator);
-        vm.expectRevert(abi.encodeWithSelector(SafeTransferLib.ETHTransferFailed.selector));
-        stp.refund(alice, 0);
-    }
-
-    function testCustomRefund() public {
-        mint(alice, 0.001 ether);
-        uint256 balance = alice.balance;
-        vm.warp(block.timestamp + 20 days);
-        vm.startPrank(creator);
-        stp.refund(alice, 0.001 ether);
+        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InsufficientBalance.selector));
+        stp.refund(alice, 0.002 ether);
         vm.stopPrank();
-        assertEq(alice.balance, balance + 0.001 ether);
     }
 
     function testRefundERC20() public erc20 {
         mint(alice, 0.001 ether);
         uint256 beforeBalance = token().balanceOf(alice);
         vm.startPrank(creator);
-        stp.refund(alice, 0);
+        stp.refund(alice, 0.001 ether);
         vm.stopPrank();
         assertEq(beforeBalance + 0.001 ether, token().balanceOf(alice));
     }

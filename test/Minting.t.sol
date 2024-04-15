@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import "./TestImports.t.sol";
 
 contract MintingTest is BaseTest {
+    using SubscriberLib for Subscription;
+
     function setUp() public {
         tierParams.periodDurationSeconds = 30 days;
         tierParams.pricePerPeriod = 0.001 ether;
@@ -18,12 +20,21 @@ contract MintingTest is BaseTest {
 
     function testMint() public {
         mint(alice, 0.001 ether);
-        assertTrue(stp.balanceOf(alice) > 0);
-        SubscriberView memory sub = stp.subscriptionOf(alice);
-        assertEq(sub.tokenId, 1);
-        assertEq(sub.tierId, 1);
-        assertEq(sub.secondsPurchased, 30 days);
-        assertEq(sub.secondsGranted, 0);
+        assertEq(stp.balanceOf(alice), 30 days);
+        assertEq(stp.subscriptionOf(alice).tokenId, 1);
+        assertEq(stp.subscriptionOf(alice).tierId, 1);
+        assertEq(stp.subscriptionOf(alice).purchasedTimeRemaining(), 30 days);
+        assertEq(stp.subscriptionOf(alice).grantedTimeRemaining(), 0);
+        assertEq(stp.ownerOf(1), alice);
+    }
+
+    function testMintExpires() public {
+        uint256 time = block.timestamp;
+        mint(alice, 0.001 ether);
+        assertEq(stp.subscriptionOf(alice).expiresAt, time + 30 days);
+        vm.warp(block.timestamp + 31 days);
+        assertEq(stp.balanceOf(alice), 0);
+        assertEq(stp.subscriptionOf(alice).expiresAt, time + 30 days);
     }
 
     function testMintFor() public prank(alice) {
@@ -35,8 +46,21 @@ contract MintingTest is BaseTest {
         assertEq(address(stp).balance, 0.001 ether);
         assertEq(stp.balanceOf(bob), 30 days);
         assertEq(stp.balanceOf(alice), 0);
-        SubscriberView memory sub = stp.subscriptionOf(bob);
-        assertEq(stp.ownerOf(sub.tokenId), bob);
+        assertEq(stp.ownerOf(1), bob);
+    }
+
+    function testMintAdvanced() public prank(alice) {
+        stp.mintAdvanced{value: 0.001 ether}(
+            MintParams({
+                tierId: 1,
+                numPeriods: 1,
+                recipient: bob,
+                referrer: address(0),
+                referralCode: 0,
+                purchaseValue: 0.001 ether
+            })
+        );
+        assertEq(stp.balanceOf(bob), 30 days);
     }
 
     function testMintInvalid() public prank(alice) {
@@ -48,11 +72,9 @@ contract MintingTest is BaseTest {
         tierParams.initialMintPrice = 0.01 ether;
         stp = reinitStp();
         mint(alice, 0.011 ether);
-        SubscriberView memory sub = stp.subscriptionOf(alice);
-        assertEq(sub.secondsPurchased, 30 days);
+        assertEq(stp.subscriptionOf(alice).purchasedTimeRemaining(), 30 days);
         mint(alice, 0.001 ether);
-        sub = stp.subscriptionOf(alice);
-        assertEq(sub.secondsPurchased, 60 days);
+        assertEq(stp.subscriptionOf(alice).purchasedTimeRemaining(), 60 days);
     }
 
     function testMintERC20FeeTaking() public {
@@ -104,6 +126,4 @@ contract MintingTest is BaseTest {
         vm.expectRevert(abi.encodeWithSelector(TierLib.TierRenewalsPaused.selector));
         stp.mintFor{value: 0.001 ether}(alice, 0.001 ether);
     }
-
-    // Mint Params
 }
