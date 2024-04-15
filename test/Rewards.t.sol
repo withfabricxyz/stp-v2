@@ -4,32 +4,78 @@ pragma solidity ^0.8.20;
 import "./TestImports.t.sol";
 
 contract RewardsTest is BaseTest {
-// RewardPool pool;
+    function setUp() public {
+        tierParams.periodDurationSeconds = 30 days;
+        tierParams.pricePerPeriod = 0.001 ether;
+        tierParams.initialMintPrice = 0.1 ether;
+        tierParams.rewardCurveId = 0;
+        tierParams.rewardBasisPoints = 1000; // 10%
+        stp = reinitStp();
 
-// function setUp() public {
-//     pool = new RewardPool();
-//     vm.store(
-//         address(pool),
-//         bytes32(uint256(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffbf601132)),
-//         bytes32(0)
-//     );
+        deal(alice, 1e19);
+        deal(bob, 1e19);
+        deal(charlie, 1e19);
+        deal(creator, 1e19);
+        deal(fees, 1e19);
+    }
 
-//     pool.initialize(defaultPoolParams(), defaultCurveParams());
-//     pool.setRoles(address(this), 0xff); // allow admin mint
+    function testCurve() public prank(creator) {
+        stp.createRewardCurve(
+            CurveParams({numPeriods: 6, periodSeconds: 86_400, startTimestamp: 0, minMultiplier: 0, formulaBase: 2})
+        );
+        assertEq(stp.curveDetail(1).numPeriods, 6);
+        assertEq(stp.poolDetail().numCurves, 2);
+    }
 
-//     // rewardParams.poolAddress = address(pool);
-//     // rewardParams.bips = 5000;
-//     stp = reinitStp();
+    function testRewardTransfer() public {
+        mint(alice, 0.101 ether);
+        uint256 expectedRewards = 0.0101 ether;
+        assertEq(stp.poolDetail().balance, expectedRewards);
+        stp.transferRewardsFor(alice);
+        assertEq(stp.poolDetail().balance, 0 ether);
+    }
 
-//     pool.setRoles(address(stp), 1); // allow minter role to STP
+    function testYield() public {
+        mint(alice, 0.101 ether);
+        stp.yieldRewards{value: 1 ether}(1 ether);
+        assertEq(stp.poolDetail().balance, 1.0101 ether);
+    }
 
-//     deal(alice, 1e19);
-// }
+    // Should be grant?
+    function testIssue() public {
+        vm.expectRevert(AccessControlled.NotAuthorized.selector);
+        stp.issueRewardShares(alice, 100);
 
-// function testRewardTransfer() public {
-//     mint(alice, 0.0001 ether);
-//     mint(alice, 0.0001 ether);
-//     uint256 balance = pool.rewardBalanceOf(alice);
-//     assertEq(balance, 0.0001 ether);
-// }
+        vm.startPrank(creator);
+        stp.issueRewardShares(alice, 100);
+        assertEq(stp.poolDetail().totalShares, 100);
+        vm.stopPrank();
+    }
+
+    function testSlashingDisabled() public {
+        rewardParams.slashable = false;
+        stp = reinitStp();
+
+        mint(alice, 0.101 ether);
+        vm.expectRevert(ISubscriptionTokenV2.NotSlashable.selector);
+        stp.slash(alice);
+
+        vm.warp(block.timestamp + 60 days); // past the grace period
+        vm.expectRevert(ISubscriptionTokenV2.NotSlashable.selector);
+        stp.slash(alice);
+    }
+
+    function testSlashing() public {
+        rewardParams.slashable = true;
+        rewardParams.slashGracePeriod = 7 days;
+        stp = reinitStp();
+
+        mint(alice, 0.101 ether);
+        vm.expectRevert(ISubscriptionTokenV2.NotSlashable.selector);
+        stp.slash(alice);
+
+        vm.warp(block.timestamp + 60 days); // past the grace period
+        stp.slash(alice);
+        assertEq(stp.poolDetail().totalShares, 0);
+    }
 }

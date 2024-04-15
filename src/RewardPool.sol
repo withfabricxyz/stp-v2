@@ -43,7 +43,7 @@ contract RewardPool is AccessControlled, Initializable {
     function initialize(RewardPoolParams memory params, CurveParams memory curve) external initializer {
         _setOwner(msg.sender); // TODO: Creator?
         _currency = Currency.wrap(params.currencyAddress);
-        _state.curves[0] = curve;
+        _state.createCurve(curve);
     }
 
     //////////////////////////////
@@ -81,7 +81,7 @@ contract RewardPool is AccessControlled, Initializable {
 
     function createCurve(CurveParams memory curve) external {
         _checkRoles(ROLE_CREATOR); // TODO
-        _state.curves[curve.id] = curve;
+        _state.createCurve(curve);
     }
 
     // @inheritdoc IRewardPool

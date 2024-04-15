@@ -21,7 +21,7 @@ abstract contract ERC721 is IERC4906, IERC5192 {
 
     // /// @dev Cannot safely transfer to a contract that does not implement
     // /// the ERC721Receiver interface.
-    error TransferToNonERC721ReceiverImplementer();
+    // error TransferToNonERC721ReceiverImplementer();
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -141,24 +141,51 @@ abstract contract ERC721 is IERC4906, IERC5192 {
 
     function _safeMint(address to, uint256 id) internal virtual {
         _mint(to, id);
+        // if (_hasCode(to)) _checkOnERC721Received(from, to, id, data);
         _checkReceiver(address(0), to, id, "");
     }
 
     function _checkReceiver(address from, address to, uint256 id, bytes memory data) private {
-        if (
-            !(
-                to.code.length == 0
-                    || ERC721TokenReceiver(to).onERC721Received(to, from, id, data)
-                        == ERC721TokenReceiver.onERC721Received.selector
-            )
-        ) revert TransferToNonERC721ReceiverImplementer();
+        if (_hasCode(to)) _checkOnERC721Received(from, to, id, data);
     }
-}
 
-/// @notice A generic interface for a contract which properly accepts ERC721 tokens.
-/// @author Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC721.sol)
-abstract contract ERC721TokenReceiver {
-    function onERC721Received(address, address, uint256, bytes calldata) external virtual returns (bytes4) {
-        return ERC721TokenReceiver.onERC721Received.selector;
+    /// @dev Returns if `a` has bytecode of non-zero length.
+    function _hasCode(address a) private view returns (bool result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := extcodesize(a) // Can handle dirty upper bits.
+        }
+    }
+
+    /// @dev Perform a call to invoke {IERC721Receiver-onERC721Received} on `to`.
+    /// Reverts if the target does not support the function correctly.
+    function _checkOnERC721Received(address from, address to, uint256 id, bytes memory data) private {
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Prepare the calldata.
+            let m := mload(0x40)
+            let onERC721ReceivedSelector := 0x150b7a02
+            mstore(m, onERC721ReceivedSelector)
+            mstore(add(m, 0x20), caller()) // The `operator`, which is always `msg.sender`.
+            mstore(add(m, 0x40), shr(96, shl(96, from)))
+            mstore(add(m, 0x60), id)
+            mstore(add(m, 0x80), 0x80)
+            let n := mload(data)
+            mstore(add(m, 0xa0), n)
+            if n { pop(staticcall(gas(), 4, add(data, 0x20), n, add(m, 0xc0), n)) }
+            // Revert if the call reverts.
+            if iszero(call(gas(), to, 0, add(m, 0x1c), add(n, 0xa4), m, 0x20)) {
+                if returndatasize() {
+                    // Bubble up the revert if the call reverts.
+                    returndatacopy(m, 0x00, returndatasize())
+                    revert(m, returndatasize())
+                }
+            }
+            // Load the returndata and compare it.
+            if iszero(eq(mload(m), shl(224, onERC721ReceivedSelector))) {
+                mstore(0x00, 0xd1a57ed6) // `TransferToNonERC721ReceiverImplementer()`.
+                revert(0x1c, 0x04)
+            }
+        }
     }
 }

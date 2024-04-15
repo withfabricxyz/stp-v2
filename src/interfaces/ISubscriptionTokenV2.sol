@@ -26,6 +26,7 @@ interface ISubscriptionTokenV2 {
     error TransferFailed();
     error GlobalSupplyLimitExceeded();
     error InsufficientBalance();
+    error NotSlashable();
 
     //////////////////
     // EVENTS

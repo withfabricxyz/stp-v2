@@ -96,7 +96,9 @@ library RewardLib {
         uint256 numShares = state.holders[account].numShares;
         if (numShares == 0) revert NoSharesToBurn();
         state.totalShares -= numShares;
-        state.pointsPerShare = (state.totalRewardIngress * pointsMultiplier) / state.totalShares;
+        if (state.totalShares > 0) {
+            state.pointsPerShare = (state.totalRewardIngress * pointsMultiplier) / state.totalShares;
+        }
         delete state.holders[account];
         emit SharesBurned(account, numShares);
     }

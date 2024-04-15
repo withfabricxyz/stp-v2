@@ -24,14 +24,7 @@ contract RewardLibTest is BaseTest {
 
     // Call all methods iva RewardLib.method so the coverage tool can track them
     function defaults() internal pure returns (CurveParams memory) {
-        return CurveParams({
-            id: 0,
-            numPeriods: 6,
-            periodSeconds: 86_400,
-            startTimestamp: 0,
-            minMultiplier: 0,
-            formulaBase: 2
-        });
+        return CurveParams({numPeriods: 6, periodSeconds: 86_400, startTimestamp: 0, minMultiplier: 0, formulaBase: 2});
     }
 
     /// Curve Tests ///

@@ -113,17 +113,9 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         {
             revert InvalidTokenParams();
         }
-        // if (bytes(params.symbol).length == 0) revert InvalidSymbol();
-        // if (bytes(params.contractUri).length == 0) revert InvalidContractUri();
 
         // Validate fee params
-        // if (fees.bips > _MAX_FEE_BIPS) revert InvalidFeeParams();
-        // if (fees.collector != address(0) && fees.bips == 0) revert InvalidFeeParams();
         if (fees.bips > _MAX_FEE_BIPS || (fees.collector != address(0) && fees.bips == 0)) revert InvalidFeeParams();
-
-        // Validate reward params
-        // if (rewards.bips > _MAX_BIPS) revert InvalidRewardParams();
-        // if (rewards.poolAddress == address(0) && rewards.bips > 0) revert InvalidRewardParams();
 
         _rewards.createCurve(curve);
 
@@ -434,7 +426,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         if (
             !rewardParams.slashable
                 || _state.subscriptions[account].expiresAt + rewardParams.slashGracePeriod > block.timestamp
-        ) revert InvalidAccount();
+        ) revert NotSlashable();
         _rewards.burn(account);
     }
 
@@ -445,13 +437,13 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         return PoolDetailView({
             totalShares: _rewards.totalShares,
             currencyAddress: Currency.unwrap(_currency),
-            numCurves: 1,
+            numCurves: _rewards.numCurves,
             balance: _rewards.balance()
         });
     }
 
-    function curveDetail(uint8 curve) external view returns (CurveDetailView memory) {
-        return CurveDetailView({currentMultiplier: _rewards.curves[curve].currentMultiplier(), flattenTimestamp: 0});
+    function curveDetail(uint8 curve) external view returns (CurveParams memory) {
+        return _rewards.curves[curve];
     }
 
     function subscriptionOf(address account) external view returns (Subscription memory subscription) {
@@ -520,16 +512,16 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
 
     function _beforeTokenTransfer(address from, address to, uint256) internal override {
         if (_state.subscriptions[to].tokenId != 0 || to == address(0)) revert InvalidTransfer();
-        if (from == address(0)) return;
+        if (from != address(0)) {
+            uint16 tierId = _state.subscriptions[from].tierId;
+            if (tierId != 0 && !_state.tiers[tierId].params.transferrable) revert TierLib.TierTransferDisabled();
 
-        uint16 tierId = _state.subscriptions[from].tierId;
-        if (tierId != 0 && !_state.tiers[tierId].params.transferrable) revert TierLib.TierTransferDisabled();
+            _state.subscriptions[to] = _state.subscriptions[from];
+            delete _state.subscriptions[from];
 
-        _state.subscriptions[to] = _state.subscriptions[from];
-        delete _state.subscriptions[from];
-
-        _rewards.holders[to] = _rewards.holders[from];
-        delete _rewards.holders[from];
+            _rewards.holders[to] = _rewards.holders[from];
+            delete _rewards.holders[from];
+        }
     }
 
     function locked(uint256 tokenId) public view override returns (bool) {

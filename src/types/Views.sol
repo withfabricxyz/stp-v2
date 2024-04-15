@@ -9,18 +9,14 @@ pragma solidity ^0.8.20;
 struct SubscriberView {
     /// @dev The tier id of the subscription
     uint16 tierId;
-    /// @dev The number of seconds purchased
-    uint48 secondsPurchased;
-    /// @dev The number of seconds granted by the creator
-    uint48 secondsGranted;
     /// @dev The tokenId for the subscription
     uint64 tokenId;
-    /// @dev The number of tokens transferred
-    // uint256 totalPurchased;
     /// @dev The expiration timestamp of the subscription
     uint48 expiresAt;
-    /// @dev The time the subscription was created
-    uint256 estimatedRefund;
+    /// @dev The number of reward shares held
+    uint256 rewardShares;
+    /// @dev The claimable reward balance
+    uint256 rewardBalance;
 }
 
 struct ContractView {
@@ -37,5 +33,3 @@ struct ContractView {
     /// @dev The creator balance
     uint256 creatorBalance;
 }
-/// @dev The reward pool balance
-// uint256 rewardPoolBalance;

@@ -24,8 +24,6 @@ struct RewardPoolParams {
 
 /// @dev The curve parameters for reward pool share issuance
 struct CurveParams {
-    /// @dev the unique id for the curve within the pool
-    uint8 id;
     /// @dev the number of periods for which rewards are paid (acts as the exponent)
     uint8 numPeriods;
     /// @dev The base of the exponential formula for reward calculations

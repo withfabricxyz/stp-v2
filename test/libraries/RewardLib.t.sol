@@ -11,18 +11,21 @@ struct PoolStatePartial {
 // We need to create a shim contract to call the internal functions of RewardLib in order to get
 // foundry to generate the coverage report correctly
 contract RewardTestShim {
+    using RewardLib for RewardLib.State;
+
     RewardLib.State private _state;
 
     constructor() {
         // _state.currency = Currency.wrap(address(0));
-        _state.curves[0] = CurveParams({
-            id: 0,
-            numPeriods: 6,
-            periodSeconds: 86_400,
-            startTimestamp: uint48(block.timestamp),
-            minMultiplier: 0,
-            formulaBase: 2
-        });
+        _state.createCurve(
+            CurveParams({
+                numPeriods: 6,
+                periodSeconds: 86_400,
+                startTimestamp: uint48(block.timestamp),
+                minMultiplier: 0,
+                formulaBase: 2
+            })
+        );
     }
 
     function issue(address _holder, uint256 numShares) external {

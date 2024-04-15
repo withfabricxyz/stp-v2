@@ -132,7 +132,7 @@ abstract contract BaseTest is Test {
     RewardParams internal rewardParams = RewardParams({slashGracePeriod: 7 days, slashable: true});
 
     CurveParams internal curveParams =
-        CurveParams({id: 0, numPeriods: 6, periodSeconds: 86_400, startTimestamp: 0, minMultiplier: 0, formulaBase: 2});
+        CurveParams({numPeriods: 6, periodSeconds: 86_400, startTimestamp: 0, minMultiplier: 0, formulaBase: 2});
 
     InitParams internal initParams = InitParams({
         name: "Meow Sub",
@@ -210,8 +210,7 @@ abstract contract BaseTest is Test {
     }
 
     function defaultCurveParams() internal pure returns (CurveParams memory) {
-        return
-            CurveParams({id: 0, numPeriods: 6, periodSeconds: 2, startTimestamp: 0, minMultiplier: 0, formulaBase: 2});
+        return CurveParams({numPeriods: 6, periodSeconds: 2, startTimestamp: 0, minMultiplier: 0, formulaBase: 2});
     }
 
     function defaultPoolParams() internal pure returns (RewardPoolParams memory) {
