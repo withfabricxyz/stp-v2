@@ -16,7 +16,6 @@ import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 
 import "src/types/Constants.sol";
 
-import {RewardPool} from "src/RewardPool.sol";
 import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
 import {AccessControlled} from "src/abstracts/AccessControlled.sol";
 import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";

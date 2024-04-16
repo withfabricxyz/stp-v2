@@ -23,8 +23,7 @@ contract MintingTest is BaseTest {
         assertEq(stp.balanceOf(alice), 30 days);
         assertEq(stp.subscriptionOf(alice).tokenId, 1);
         assertEq(stp.subscriptionOf(alice).tierId, 1);
-        assertEq(stp.subscriptionOf(alice).purchasedTimeRemaining(), 30 days);
-        assertEq(stp.subscriptionOf(alice).grantedTimeRemaining(), 0);
+        assertEq(stp.subscriptionOf(alice).expiresAt, block.timestamp + 30 days);
         assertEq(stp.ownerOf(1), alice);
     }
 
@@ -38,7 +37,7 @@ contract MintingTest is BaseTest {
     }
 
     function testMintFor() public prank(alice) {
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidAccount.selector));
+        vm.expectRevert(abi.encodeWithSelector(ERC721.TransferToZeroAddress.selector));
         stp.mintFor{value: 0.001 ether}(address(0), 0.001 ether);
         vm.expectEmit(true, true, false, true, address(stp));
         emit SubscriptionLib.Purchase(bob, 1, 0.001 ether, 30 days, uint48(block.timestamp + 30 days));
@@ -51,14 +50,7 @@ contract MintingTest is BaseTest {
 
     function testMintAdvanced() public prank(alice) {
         stp.mintAdvanced{value: 0.001 ether}(
-            MintParams({
-                tierId: 1,
-                numPeriods: 1,
-                recipient: bob,
-                referrer: address(0),
-                referralCode: 0,
-                purchaseValue: 0.001 ether
-            })
+            MintParams({tierId: 1, recipient: bob, referrer: address(0), referralCode: 0, purchaseValue: 0.001 ether})
         );
         assertEq(stp.balanceOf(bob), 30 days);
     }
@@ -72,9 +64,9 @@ contract MintingTest is BaseTest {
         tierParams.initialMintPrice = 0.01 ether;
         stp = reinitStp();
         mint(alice, 0.011 ether);
-        assertEq(stp.subscriptionOf(alice).purchasedTimeRemaining(), 30 days);
+        assertEq(stp.subscriptionOf(alice).expiresAt, block.timestamp + 30 days);
         mint(alice, 0.001 ether);
-        assertEq(stp.subscriptionOf(alice).purchasedTimeRemaining(), 60 days);
+        assertEq(stp.subscriptionOf(alice).expiresAt, block.timestamp + 60 days);
     }
 
     function testMintERC20FeeTaking() public {
@@ -114,6 +106,19 @@ contract MintingTest is BaseTest {
         vm.startPrank(charlie);
         vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.GlobalSupplyLimitExceeded.selector));
         stp.mint{value: 0.001 ether}(0.001 ether);
+    }
+
+    // Price per period is whatever you want (including free)
+    function testFreeMint() public {
+        tierParams.pricePerPeriod = 0;
+        stp = reinitStp();
+
+        vm.startPrank(alice);
+        stp.mint(0);
+        assertEq(stp.balanceOf(alice), 30 days);
+        stp.mint{value: 5 ether}(5 ether);
+        assertEq(stp.balanceOf(alice), 60 days);
+        vm.stopPrank();
     }
 
     function testTierJoinChecks() public {}

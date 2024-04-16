@@ -9,8 +9,6 @@ import {Initializable} from "@solady/utils/Initializable.sol";
 import {LibString} from "@solady/utils/LibString.sol";
 import {Multicallable} from "@solady/utils/Multicallable.sol";
 
-import {RewardPool} from "./RewardPool.sol";
-import {IRewardPool} from "./interfaces/IRewardPool.sol";
 import {ISubscriptionTokenV2} from "./interfaces/ISubscriptionTokenV2.sol";
 import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
 
@@ -27,18 +25,12 @@ import {CurveDetailView, CurveParams, PoolDetailView, RewardParams} from "./type
 import {ContractView, SubscriberView} from "./types/Views.sol";
 
 import {RewardLib} from "./libraries/RewardLib.sol";
+import "./types/Constants.sol";
 
 /**
  * @title Subscription Token Protocol Version 2
  * @author Fabric Inc.
  * @notice An NFT contract which allows users to mint time and access token gated content while time remains.
- * @dev The balanceOf function returns the number of seconds remaining in the subscription. Token gated systems leverage
- *      the balanceOf function to determine if a user has the token, and if no time remains, the balance is 0. NFT
- * holders
- *      can mint additional time. The creator/owner of the contract can withdraw the funds at any point. There are
- *      additional functionalities for granting time, refunding accounts, fees, rewards, etc. This contract is designed
- * to be used with
- *      Clones, but is not designed to be upgradeable. Added functionality will come with new versions.
  */
 contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initializable, ISubscriptionTokenV2 {
     using LibString for uint256;
@@ -50,14 +42,12 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     using RewardLib for RewardLib.State;
     using RewardCurveLib for CurveParams;
 
+    /// @dev The manager role can do most things, except calls that involve money (except tier management with
+    /// rewardbps)
     uint16 private constant ROLE_MANAGER = 1;
+
+    /// @dev The agent can only grant and revoke time
     uint16 private constant ROLE_AGENT = 2;
-
-    /// @dev Maximum protocol fee basis points (12.5%)
-    uint16 private constant _MAX_FEE_BIPS = 1250;
-
-    /// @dev Maximum basis points (100%)
-    uint16 private constant _MAX_BIPS = 10_000;
 
     /// @dev The metadata URI for the contract (tokenUri is derived from this)
     string public contractURI;
@@ -68,10 +58,11 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     /// @dev The symbol of the token
     string private _symbol;
 
-    RewardParams public rewardParams;
+    /// @dev The reward parameters (slash params)
+    RewardParams private _rewardParams;
 
     /// @dev The fee parameters (collector, bips)
-    FeeParams public feeParams;
+    FeeParams private _feeParams;
 
     /// @dev The denomination of the token (0 for native)
     Currency private _currency;
@@ -82,7 +73,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     /// @dev Referral codes and rewards
     ReferralLib.State private _referrals;
 
-    /// @dev The reward pool state
+    /// @dev The reward pool state (holders, balances, etc)
     RewardLib.State private _rewards;
 
     /// @dev The address of the account which can receive transfers via sponsored calls
@@ -115,21 +106,20 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         }
 
         // Validate fee params
-        if (fees.bips > _MAX_FEE_BIPS || (fees.collector != address(0) && fees.bips == 0)) revert InvalidFeeParams();
+        if (fees.bips > MAX_FEE_BPS || (fees.collector != address(0) && fees.bips == 0)) revert InvalidFeeParams();
 
-        _rewards.createCurve(curve);
-
-        _state.createTier(tier);
-        _state.supplyCap = params.globalSupplyCap;
-
-        _setOwner(params.owner);
-        feeParams = fees;
-        rewardParams = rewards;
-        // rewardParams = rewards;
+        contractURI = params.contractUri;
         _name = params.name;
         _symbol = params.symbol;
-        contractURI = params.contractUri;
         _currency = Currency.wrap(params.erc20TokenAddr);
+        _state.supplyCap = params.globalSupplyCap;
+
+        _feeParams = fees;
+        _rewardParams = rewards;
+
+        _rewards.createCurve(curve);
+        _state.createTier(tier);
+        _setOwner(params.owner);
     }
 
     /////////////////////////
@@ -138,6 +128,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
 
     /**
      * @notice Mint or renew a subscription for sender
+     * @dev This is backwards compatible with the original mint function (default tier or subscribers current tier)
      * @param numTokens the amount of ERC20 tokens or native tokens to transfer
      */
     function mint(uint256 numTokens) external payable {
@@ -146,6 +137,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
 
     /**
      * @notice Mint or renew a subscription for a specific account. Intended for automated renewals.
+     * @dev This is backwards compatible with the original mint function (default tier or subscribers current tier)
      * @param account the account to mint or renew time for
      * @param numTokens the amount of ERC20 tokens or native tokens to transfer
      */
@@ -153,11 +145,15 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         _purchase(account, 0, numTokens);
     }
 
-    // TODO: All possible mint configurations
+    /**
+     * @notice Mint a subscription with advanced settings
+     * @dev This is the advanced minting function, which allows for setting a specific tier, referral code, and referrer
+     * @param params the minting parameters
+     */
     function mintAdvanced(MintParams calldata params) external payable {
         (uint256 tokenId, uint256 change) = _purchase(params.recipient, params.tierId, params.purchaseValue);
 
-        // Referral Payout
+        // Referral Payout (A percentage of the remaining tokens after fees and rewards)
         if (params.referrer != address(0)) {
             uint256 payout = _referrals.computeReferralReward(params.referralCode, change);
             if (payout > 0) {
@@ -269,6 +265,12 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         _state.createTier(params);
     }
 
+    /**
+     * @notice Update an existing tier
+     * @dev This will overwrite all existing tier parameters, so care should be taken with single field intents
+     * @param tierId the id of the tier to update
+     * @param params the new tier parameters
+     */
     function updateTier(uint16 tierId, Tier memory params) external {
         _checkOwnerOrRoles(ROLE_MANAGER);
         _state.updateTier(tierId, params);
@@ -278,42 +280,11 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     // Sponsored Calls
     /////////////////////////
 
-    function _purchase(
-        address account,
-        uint16 tierId,
-        uint256 numTokens
-    ) private returns (uint256 tokenId, uint256 change) {
-        if (account == address(0)) revert InvalidAccount();
-
-        uint256 tokensIn = _currency.capture(msg.sender, numTokens);
-
-        // Mint a new token if necessary
-        tokenId = _state.subscriptions[account].tokenId;
-        if (tokenId == 0) {
-            tokenId = _state.mint(account);
-            _safeMint(account, tokenId);
-        }
-
-        // Purchase the subscription (switching tiers if necessary)
-        _state.purchase(account, tokensIn, tierId);
-
-        // Transfer fees
-        uint16 bips = feeParams.bips;
-        if (bips > 0) {
-            uint256 fee = (tokensIn * bips) / _MAX_BIPS;
-            if (fee > 0) {
-                _currency.transfer(feeParams.collector, fee);
-                emit FeeTransfer(feeParams.collector, fee);
-                tokensIn -= fee;
-            }
-        }
-
-        // Transfer rewards if tier has rewards
-        tokensIn = _transferRewards(account, tokensIn, _state.subscriptions[account].tierId);
-
-        return (tokenId, tokensIn);
-    }
-
+    /**
+     * @notice Deactivate a sub, kicking them out of their tier to the 0 tier
+     * @dev The intent here is to help with supply capped tiers and subscription lapses
+     * @param account the account to deactivate
+     */
     function deactivateSubscription(address account) external {
         _state.deactivateSubscription(account);
     }
@@ -327,11 +298,11 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      * @param newCollector the new fee collector address
      */
     function updateFeeRecipient(address newCollector) external {
-        if (msg.sender != feeParams.collector) revert Unauthorized();
+        if (msg.sender != _feeParams.collector) revert Unauthorized();
 
         // Give tokens back to creator and set fee rate to 0
-        if (newCollector == address(0)) feeParams.bips = 0;
-        feeParams.collector = newCollector;
+        if (newCollector == address(0)) _feeParams.bips = 0;
+        _feeParams.collector = newCollector;
         emit FeeCollectorChange(newCollector);
     }
 
@@ -362,30 +333,56 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     // Core Internal Logic
     ////////////////////////
 
-    /// @dev Allocate tokens to the fee collector
-    // function _transferFees(uint256 amount) private returns (uint256) {
-    //     if (feeParams.bips == 0) return amount;
-    //     uint256 fee = (amount * feeParams.bips) / _MAX_BIPS;
-    //     if (fee == 0) return amount;
+    /// @dev Purchase a subscription, minting a token if necessary, switching tiers if necessary
+    function _purchase(
+        address account,
+        uint16 tierId,
+        uint256 numTokens
+    ) private returns (uint256 tokenId, uint256 change) {
+        uint256 tokensIn = 0;
+        if (numTokens > 0) tokensIn = _currency.capture(msg.sender, numTokens);
 
-    //     _currency.transfer(feeParams.collector, fee);
-    //     emit FeeTransfer(feeParams.collector, fee);
-    //     return amount - fee;
-    // }
+        // Mint a new token if necessary
+        tokenId = _state.subscriptions[account].tokenId;
+        if (tokenId == 0) {
+            tokenId = _state.mint(account);
+            _safeMint(account, tokenId);
+        }
 
+        // Purchase the subscription (switching tiers if necessary)
+        _state.purchase(account, tokensIn, tierId);
+
+        // Transfer fees
+        uint16 bips = _feeParams.bips;
+        if (bips > 0) {
+            uint256 fee = (tokensIn * bips) / MAX_BPS;
+            if (fee > 0) {
+                _currency.transfer(_feeParams.collector, fee);
+                emit FeeTransfer(_feeParams.collector, fee);
+                tokensIn -= fee;
+            }
+        }
+
+        // Transfer rewards if tier has rewards
+        tokensIn = _issueAndAllocateRewards(account, tokensIn, _state.subscriptions[account].tierId);
+
+        emit MetadataUpdate(tokenId);
+        return (tokenId, tokensIn);
+    }
+
+    /// @dev Ensure the contract has a creator balance to cover the transfer, without dipping into rewards
     function _checkCreatorBalance(uint256 amount) private view {
         if (amount > _currency.balance() - _rewards.balance()) revert InsufficientBalance();
     }
 
-    function _transferRewards(address account, uint256 amount, uint16 tierId) private returns (uint256) {
+    /// @dev Issue rewards to an account and allocate funds to the pool (if configured)
+    function _issueAndAllocateRewards(address account, uint256 amount, uint16 tierId) private returns (uint256) {
         uint16 bps = _state.tiers[tierId].params.rewardBasisPoints;
         uint8 curve = _state.tiers[tierId].params.rewardCurveId;
-
-        // tier = _state.subscriptions[account].tierId;
-        uint256 rewards = (amount * bps) / _MAX_BIPS;
-        // uint256 rewards = (amount * rewardParams.bips) / _MAX_BIPS;
+        uint256 rewards = (amount * bps) / MAX_BPS;
         if (rewards == 0) return amount;
 
+        // It's possible for 0 shares to be issued if the curve is not set, or the multipler is 0
         _rewards.issueWithCurve(account, rewards, curve);
         _rewards.allocate(rewards);
 
@@ -412,20 +409,33 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         _rewards.allocate(_currency.capture(msg.sender, amount));
     }
 
+    /**
+     * @notice Create a new reward curve
+     * @param curve the curve parameters. The id is set automatically (monotonic)
+     */
     function createRewardCurve(CurveParams memory curve) external {
         _checkOwnerOrRoles(ROLE_MANAGER);
         _rewards.createCurve(curve);
     }
 
+    /**
+     * @notice Transfer rewards for a given account, if any are available
+     * @dev Permissionless to allow the creator or agents to transfer rewards on behalf of users
+     * @param account the account of the reward holder
+     */
     function transferRewardsFor(address account) public {
-        uint256 amount = _rewards.claimRewards(account);
-        _currency.transfer(account, amount);
+        _currency.transfer(account, _rewards.claimRewards(account));
     }
 
+    /**
+     * @notice Slash the reward shares for a given account if the subscription has expired and the grace period ended.
+     * @dev This rebalances share value and is intended to incentivize users to renew subscriptions.
+     * @param account the account to slash
+     */
     function slash(address account) external {
         if (
-            !rewardParams.slashable
-                || _state.subscriptions[account].expiresAt + rewardParams.slashGracePeriod > block.timestamp
+            !_rewardParams.slashable
+                || _state.subscriptions[account].expiresAt + _rewardParams.slashGracePeriod > block.timestamp
         ) revert NotSlashable();
         _rewards.burn(account);
     }
@@ -433,25 +443,35 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     ////////////////////////
     // Informational
     ////////////////////////
-    function poolDetail() external view returns (PoolDetailView memory) {
-        return PoolDetailView({
-            totalShares: _rewards.totalShares,
-            currencyAddress: Currency.unwrap(_currency),
-            numCurves: _rewards.numCurves,
-            balance: _rewards.balance()
+
+    /**
+     * @notice Get details about a given reward curve
+     * @param curveId the curve id to fetch
+     * @return curve the curve details
+     */
+    function curveDetail(uint8 curveId) external view returns (CurveParams memory curve) {
+        return _rewards.curves[curveId];
+    }
+
+    /**
+     * @notice Get details about a particular subscription
+     * @param account the account to fetch the subscription for
+     * @return subscription the relevant information for a subscription
+     */
+    function subscriptionOf(address account) external view returns (SubscriberView memory subscription) {
+        return SubscriberView({
+            tierId: _state.subscriptions[account].tierId,
+            tokenId: _state.subscriptions[account].tokenId,
+            expiresAt: _state.subscriptions[account].expiresAt,
+            rewardShares: _rewards.holders[account].numShares,
+            rewardBalance: _rewards.rewardBalanceOf(account)
         });
     }
 
-    function curveDetail(uint8 curve) external view returns (CurveParams memory) {
-        return _rewards.curves[curve];
-    }
-
-    function subscriptionOf(address account) external view returns (Subscription memory subscription) {
-        return _state.subscriptions[account];
-    }
-
-    /// Views
-
+    /**
+     * @notice Get details about the contract state
+     * @return detail the contract details
+     */
     function contractDetail() external view returns (ContractView memory detail) {
         return ContractView({
             tierCount: _state.tierCount,
@@ -459,14 +479,30 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
             supplyCap: _state.supplyCap,
             transferRecipient: _transferRecipient,
             currency: Currency.unwrap(_currency),
-            creatorBalance: _currency.balance() - _rewards.balance()
+            creatorBalance: _currency.balance() - _rewards.balance(),
+            numCurves: _rewards.numCurves,
+            rewardShares: _rewards.totalShares,
+            rewardBalance: _rewards.balance(),
+            rewardSlashGracePeriod: _rewardParams.slashGracePeriod,
+            rewardSlashable: _rewardParams.slashable,
+            feeBps: _feeParams.bips,
+            feeCollector: _feeParams.collector
         });
     }
 
+    /**
+     * @notice Get details about a given tier
+     * @param tierId the tier id to fetch
+     * @return tier the tier details
+     */
     function tierDetail(uint16 tierId) external view returns (TierLib.State memory tier) {
         return _state.tiers[tierId];
     }
 
+    /**
+     * @notice Get the version of the protocol
+     * @return version the protocol version
+     */
     function stpVersion() external pure returns (uint8 version) {
         return 2;
     }
@@ -483,22 +519,30 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
     //////////////////////
 
     /**
+     * @notice Fetch the name of the token
+     * @return name the name of the token
+     */
+    function name() public view override returns (string memory) {
+        return _name;
+    }
+
+    /**
+     * @notice Fetch the symbol of the token
+     * @return symbol the symbol of the token
+     */
+    function symbol() public view override returns (string memory) {
+        return _symbol;
+    }
+
+    /**
      * @notice Fetch the metadata URI for a given token
-     * @dev If _tokenURI ends with a / then the tokenId is appended
+     * @dev The metadata host must be able to resolve the token ID as a path part (contractURI/${tokenId})
      * @param tokenId the tokenId to fetch the metadata URI for
      * @return uri the URI for the token
      */
     function tokenURI(uint256 tokenId) public view override returns (string memory uri) {
         // _requireOwned(tokenId); // TODO
         return string(abi.encodePacked(contractURI, "/", tokenId.toString()));
-    }
-
-    function symbol() public view override returns (string memory) {
-        return _symbol;
-    }
-
-    function name() public view override returns (string memory) {
-        return _name;
     }
 
     /**
@@ -510,6 +554,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         return _state.subscriptions[account].remainingSeconds();
     }
 
+    /// @dev Prevent burning, handle soulbound tiers, and transfer subscription/reward state
     function _beforeTokenTransfer(address from, address to, uint256) internal override {
         if (_state.subscriptions[to].tokenId != 0 || to == address(0)) revert InvalidTransfer();
         if (from != address(0)) {
@@ -524,6 +569,9 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         }
     }
 
+    /**
+     * @notice Check if a token is locked
+     */
     function locked(uint256 tokenId) public view override returns (bool) {
         uint16 tierId = _state.subscriptions[ownerOf(tokenId)].tierId;
         if (tierId == 0) return false;

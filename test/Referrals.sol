@@ -33,14 +33,7 @@ contract ReferralTests is BaseTest {
     function testInvalidReferralCode() public {
         uint256 balance = charlie.balance;
         stp.mintAdvanced{value: 0.001 ether}(
-            MintParams({
-                tierId: 1,
-                numPeriods: 1,
-                recipient: bob,
-                referrer: charlie,
-                referralCode: 10,
-                purchaseValue: 0.001 ether
-            })
+            MintParams({tierId: 1, recipient: bob, referrer: charlie, referralCode: 10, purchaseValue: 0.001 ether})
         );
         assertEq(charlie.balance, balance);
     }
@@ -55,14 +48,7 @@ contract ReferralTests is BaseTest {
         vm.expectEmit(true, true, false, true, address(stp));
         emit ISubscriptionTokenV2.ReferralPayout(1, charlie, 1, 5e15);
         stp.mintAdvanced{value: 0.1 ether}(
-            MintParams({
-                tierId: 1,
-                numPeriods: 1,
-                recipient: bob,
-                referrer: charlie,
-                referralCode: 1,
-                purchaseValue: 0.1 ether
-            })
+            MintParams({tierId: 1, recipient: bob, referrer: charlie, referralCode: 1, purchaseValue: 0.1 ether})
         );
         vm.stopPrank();
         assertEq(charlie.balance, balance + 5e15);

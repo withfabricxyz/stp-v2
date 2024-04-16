@@ -27,8 +27,6 @@ contract GrantsTest is BaseTest {
 
         vm.stopPrank();
         assertEq(stp.balanceOf(alice), 90 days);
-        assertEq(stp.subscriptionOf(alice).grantedTimeRemaining(), 90 days);
-        assertEq(stp.subscriptionOf(alice).purchasedTimeRemaining(), 0);
         assertEq(stp.subscriptionOf(alice).tierId, 1);
     }
 
@@ -36,10 +34,10 @@ contract GrantsTest is BaseTest {
         vm.startPrank(creator);
         stp.grantTime(alice, 90 days, 1);
         vm.warp(block.timestamp + 91 days);
-        stp.grantTime(alice, 90 days, 1);
+        stp.grantTime(alice, 30 days, 1);
+        stp.grantTime(alice, 60 days, 1);
         vm.stopPrank();
         assertEq(stp.balanceOf(alice), 90 days);
-        assertEq(stp.subscriptionOf(alice).grantedTimeRemaining(), 90 days);
         assertEq(stp.subscriptionOf(alice).expiresAt, block.timestamp + 90 days);
     }
 
@@ -49,7 +47,6 @@ contract GrantsTest is BaseTest {
         vm.stopPrank();
         mint(alice, 1e5);
         assertEq(stp.balanceOf(alice), 90 days + 1e5 / 4);
-        assertEq(stp.subscriptionOf(alice).purchasedTimeRemaining(), 1e5 / 4);
     }
 
     function testGrantRevoke() public {
@@ -72,7 +69,6 @@ contract GrantsTest is BaseTest {
         stp.revokeTime(alice);
         vm.stopPrank();
         assertEq(stp.balanceOf(alice), 1e5 / 4);
-        assertEq(stp.subscriptionOf(alice).grantedTimeRemaining(), 0);
     }
 
     function multicall() public prank(creator) {

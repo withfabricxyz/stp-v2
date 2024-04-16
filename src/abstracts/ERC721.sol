@@ -5,7 +5,8 @@ import "../interfaces/IERC4906.sol";
 import "../interfaces/IERC5192.sol";
 
 /// @notice Modern, minimalist, and gas efficient ERC-721 implementation.
-/// @author Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC721.sol), Modified by Fabric
+/// @author Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC721.sol)
+/// @dev Modified by Fabric
 abstract contract ERC721 is IERC4906, IERC5192 {
     /// @dev Only the token owner or an approved account can manage the token.
     error TokenNotAuthorized();
@@ -18,10 +19,6 @@ abstract contract ERC721 is IERC4906, IERC5192 {
 
     // /// @dev Cannot mint or transfer to the zero address.
     error TransferToZeroAddress();
-
-    // /// @dev Cannot safely transfer to a contract that does not implement
-    // /// the ERC721Receiver interface.
-    // error TransferToNonERC721ReceiverImplementer();
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -141,7 +138,6 @@ abstract contract ERC721 is IERC4906, IERC5192 {
 
     function _safeMint(address to, uint256 id) internal virtual {
         _mint(to, id);
-        // if (_hasCode(to)) _checkOnERC721Received(from, to, id, data);
         _checkReceiver(address(0), to, id, "");
     }
 

@@ -2,9 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import {RewardPool} from "./RewardPool.sol";
 import {SubscriptionTokenV2} from "./SubscriptionTokenV2.sol";
-
 import {FeeParams, InitParams, Tier} from "./types/Index.sol";
 import {CurveParams, RewardParams, RewardPoolParams} from "./types/Rewards.sol";
 import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";

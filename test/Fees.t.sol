@@ -17,17 +17,17 @@ contract FeesTest is BaseTest {
     }
 
     function testPool() public {
-        (address recipient, uint16 bps) = stp.feeParams();
+        // (address recipient, uint16 bps) = stp.feeParams();
 
-        assertEq(bps, 500);
-        assertEq(recipient, fees);
+        assertEq(500, stp.contractDetail().feeBps);
+        assertEq(fees, stp.contractDetail().feeCollector);
 
         uint256 expectedFee = (1e18 * 500) / 10_000;
         // uint256 balance = creator.balance;
 
         vm.startPrank(alice);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.FeeTransfer(recipient, expectedFee);
+        emit ISubscriptionTokenV2.FeeTransfer(fees, expectedFee);
         stp.mint{value: 1e18}(1e18);
         vm.stopPrank();
     }
@@ -47,8 +47,7 @@ contract FeesTest is BaseTest {
         stp.updateFeeRecipient(address(0));
         vm.stopPrank();
 
-        (address recipient, uint16 bps) = stp.feeParams();
-        assertEq(recipient, address(0));
-        assertEq(bps, 0);
+        assertEq(stp.contractDetail().feeCollector, address(0));
+        assertEq(stp.contractDetail().feeBps, 0);
     }
 }

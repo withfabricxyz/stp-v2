@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.20;
 
+import {IERC4906} from "../interfaces/IERC4906.sol";
 import {Subscription, Tier} from "../types/Index.sol";
 
 /// @dev Library for managing subscription state
@@ -13,11 +14,6 @@ library SubscriberLib {
     error SubscriptionGrantInvalidTime();
 
     error SubscriptionNotFound(address account);
-
-    function extend(Subscription storage sub, uint48 numSeconds) internal {
-        if (sub.expiresAt > block.timestamp) sub.expiresAt += numSeconds;
-        else sub.expiresAt = uint48(block.timestamp + numSeconds);
-    }
 
     function extendPurchase(Subscription storage sub, uint48 numSeconds) internal {
         sub.extend(numSeconds);
@@ -34,14 +30,14 @@ library SubscriberLib {
     function revokeTime(Subscription storage sub) internal returns (uint48) {
         uint48 remaining = sub.grantedTimeRemaining();
         sub.grantExpires = uint48(block.timestamp);
-        sub.expiresAt -= remaining;
+        sub.retract(remaining);
         return remaining;
     }
 
     function refundTime(Subscription storage sub) internal returns (uint48) {
         uint48 refundedTime = sub.purchasedTimeRemaining();
         sub.purchaseExpires = uint48(block.timestamp);
-        sub.expiresAt -= refundedTime;
+        sub.retract(refundedTime);
         return refundedTime;
     }
 
@@ -59,5 +55,16 @@ library SubscriberLib {
 
     function remainingSeconds(Subscription memory sub) internal view returns (uint48) {
         return sub.expiresAt > block.timestamp ? sub.expiresAt - uint48(block.timestamp) : 0;
+    }
+
+    function extend(Subscription storage sub, uint48 numSeconds) internal {
+        if (sub.expiresAt > block.timestamp) sub.expiresAt += numSeconds;
+        else sub.expiresAt = uint48(block.timestamp + numSeconds);
+        emit IERC4906.MetadataUpdate(sub.tokenId);
+    }
+
+    function retract(Subscription storage sub, uint48 numSeconds) internal {
+        sub.expiresAt -= numSeconds;
+        emit IERC4906.MetadataUpdate(sub.tokenId);
     }
 }

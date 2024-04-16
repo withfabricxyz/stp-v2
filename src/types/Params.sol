@@ -10,8 +10,6 @@ pragma solidity ^0.8.20;
 struct MintParams {
     /// @dev The tier id of the subscription
     uint16 tierId;
-    /// @dev For pay-what-you-want tiers
-    uint8 numPeriods;
     /// @dev The address of the recipient (token holder)
     address recipient;
     /// @dev The address of the referrer (reward recipient)

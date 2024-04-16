@@ -10,10 +10,6 @@ contract TierTestShim {
         TierLib.validate(tier);
     }
 
-    function mintPrice(Tier memory tier, uint256 numPeriods, bool firstMint) external pure returns (uint256) {
-        return TierLib.mintPrice(tier, numPeriods, firstMint);
-    }
-
     function checkJoin(Tier memory tier, uint32 subCount, address account, uint256 numTokens) external {
         state = TierLib.State({id: 1, subCount: subCount, params: tier});
 
@@ -72,22 +68,6 @@ contract TierLibTest is Test {
         shim.validate(tier);
     }
 
-    function testPrice() public {
-        Tier memory tier = defaults();
-        assertEq(shim.mintPrice(tier, 1, false), 0.005 ether);
-        assertEq(shim.mintPrice(tier, 12, false), 0.005 * 12 ether);
-        assertEq(shim.mintPrice(tier, 12, true), 0.005 * 12 ether + 0.01 ether);
-    }
-
-    function testFreeMint() public {
-        Tier memory tier = defaults();
-        tier.pricePerPeriod = 0;
-        tier.initialMintPrice = 0;
-        assertEq(shim.mintPrice(tier, 1, false), 0);
-        assertEq(shim.mintPrice(tier, 12, false), 0);
-        assertEq(shim.mintPrice(tier, 12, true), 0);
-    }
-
     function testJoinChecks() public {
         Tier memory tier = defaults();
 
@@ -116,18 +96,8 @@ contract TierLibTest is Test {
     function testRenewChecks() public {
         Tier memory tier = defaults();
 
-        Subscription memory sub = Subscription({
-            tokenId: 1,
-            tierId: 1,
-            // purchaseOffset: 0,
-            // secondsPurchased: 0,
-            // totalPurchased: 0,
-            // grantOffset: 0,
-            // secondsGranted: 0
-            purchaseExpires: 0,
-            grantExpires: 0,
-            expiresAt: 0
-        });
+        Subscription memory sub =
+            Subscription({tokenId: 1, tierId: 1, purchaseExpires: 0, grantExpires: 0, expiresAt: 0});
 
         // All good
         shim.checkRenewal(tier, sub, 0.005 ether);

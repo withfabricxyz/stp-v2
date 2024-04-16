@@ -17,11 +17,14 @@ contract InitializationTest is BaseTest {
 
     function testDefaults() public {
         stp = reinitStp();
-        assertEq(initParams.contractUri, stp.contractURI());
-        assertEq(initParams.erc20TokenAddr, stp.contractDetail().currency);
         assertEq(initParams.owner, stp.owner());
         assertEq(initParams.name, stp.name());
         assertEq(initParams.symbol, stp.symbol());
+        assertEq(initParams.contractUri, stp.contractURI());
+
+        // More
+        assertEq(initParams.erc20TokenAddr, stp.contractDetail().currency);
+        assertEq(initParams.globalSupplyCap, stp.contractDetail().supplyCap);
     }
 
     function testOwnerZero() public {

@@ -64,6 +64,7 @@ library RewardLib {
 
     /// @dev Issue shares to a holder
     function issue(State storage state, address holder, uint256 numShares) internal {
+        if (numShares == 0) return;
         state.totalShares += numShares;
         state.holders[holder].numShares += numShares;
         state.holders[holder].pointsCorrection -= int256(state.pointsPerShare * numShares);

@@ -32,4 +32,15 @@ struct ContractView {
     address currency;
     /// @dev The creator balance
     uint256 creatorBalance;
+    /// @dev The total reward curves
+    uint8 numCurves;
+    /// @dev The number of issued shares
+    uint256 rewardShares;
+    /// @dev The current reward balance
+    uint256 rewardBalance;
+    uint32 rewardSlashGracePeriod;
+    /// @dev whether the pool is slashable
+    bool rewardSlashable;
+    uint16 feeBps;
+    address feeCollector;
 }

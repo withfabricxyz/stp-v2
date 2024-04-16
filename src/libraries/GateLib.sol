@@ -10,7 +10,6 @@ interface ExternalGate {
     function tierBalanceOf(uint16 tierId, address account) external view returns (uint256);
 }
 
-/// @title GateLib
 /// @notice Library for token gating tiers
 library GateLib {
     /////////////////////

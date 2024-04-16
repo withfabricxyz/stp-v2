@@ -96,7 +96,7 @@ library TierLib {
         if (numTokens < tier.pricePerPeriod) revert TierInvalidRenewalPrice(tier.pricePerPeriod);
 
         numSeconds = tokensToSeconds(tier, numTokens);
-        uint48 totalFutureSeconds = sub.purchasedTimeRemaining() + numSeconds;
+        uint48 totalFutureSeconds = sub.remainingSeconds() + numSeconds;
 
         if (tier.maxCommitmentSeconds > 0 && totalFutureSeconds > tier.maxCommitmentSeconds) {
             revert MaxCommitmentExceeded();
@@ -107,16 +107,10 @@ library TierLib {
         }
     }
 
-    function tokensToSeconds(Tier memory tier, uint256 numTokens) internal pure returns (uint48) {
-        // TODO: numPeriods + remainder
+    function tokensToSeconds(Tier memory tier, uint256 numTokens) private pure returns (uint48) {
+        // Pay what you want tiers result in the full period duration (regardless of price paid)
+        if (tier.pricePerPeriod == 0) return tier.periodDurationSeconds;
+        // TODO: Precision loss here?
         return uint48(numTokens / (tier.pricePerPeriod / tier.periodDurationSeconds));
-    }
-
-    function mintPrice(Tier memory tier, uint256 numPeriods, bool firstMint) internal pure returns (uint256) {
-        return tier.pricePerPeriod * numPeriods + (firstMint ? tier.initialMintPrice : 0);
-    }
-
-    function tokensPerSecond(Tier memory tier) internal pure returns (uint256) {
-        return tier.pricePerPeriod / tier.periodDurationSeconds;
     }
 }

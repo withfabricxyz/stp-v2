@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.20;
 
+import {IERC5192} from "src/interfaces/IERC5192.sol";
 import {SubscriberLib} from "src/libraries/SubscriberLib.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
 import {Subscription, Tier} from "src/types/Index.sol";
@@ -129,8 +130,13 @@ library SubscriptionLib {
         if (subTierId != 0) state.tiers[subTierId].subCount -= 1;
         state.tiers[tierId].subCount += 1;
         // TODO: what should we do about time?
-        emit SwitchTier(sub.tokenId, subTierId, tierId);
+        // sub.adjustPurchase(oldtier, newtier)
         sub.tierId = tierId;
+        emit SwitchTier(sub.tokenId, subTierId, tierId);
+
+        // Soulbound events
+        if (state.tiers[tierId].params.transferrable) emit IERC5192.Locked(sub.tokenId);
+        else emit IERC5192.Unlocked(sub.tokenId);
     }
 
     function grant(State storage state, address account, uint48 numSeconds, uint16 tierId) internal {

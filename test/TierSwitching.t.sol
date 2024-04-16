@@ -62,14 +62,7 @@ contract TierSwitchingTest is BaseTest {
         vm.expectEmit(true, true, false, true, address(stp));
         emit SubscriptionLib.SwitchTier(1, 1, 2);
         stp.mintAdvanced{value: 0.002 ether}(
-            MintParams({
-                tierId: 2,
-                numPeriods: 1,
-                recipient: alice,
-                referrer: address(0),
-                referralCode: 0,
-                purchaseValue: 0.002 ether
-            })
+            MintParams({tierId: 2, recipient: alice, referrer: address(0), referralCode: 0, purchaseValue: 0.002 ether})
         );
 
         // TODO: Check on timing

@@ -24,21 +24,21 @@ contract RewardsTest is BaseTest {
             CurveParams({numPeriods: 6, periodSeconds: 86_400, startTimestamp: 0, minMultiplier: 0, formulaBase: 2})
         );
         assertEq(stp.curveDetail(1).numPeriods, 6);
-        assertEq(stp.poolDetail().numCurves, 2);
+        assertEq(stp.contractDetail().numCurves, 2);
     }
 
     function testRewardTransfer() public {
         mint(alice, 0.101 ether);
         uint256 expectedRewards = 0.0101 ether;
-        assertEq(stp.poolDetail().balance, expectedRewards);
+        assertEq(stp.contractDetail().rewardBalance, expectedRewards);
         stp.transferRewardsFor(alice);
-        assertEq(stp.poolDetail().balance, 0 ether);
+        assertEq(stp.contractDetail().rewardBalance, 0 ether);
     }
 
     function testYield() public {
         mint(alice, 0.101 ether);
         stp.yieldRewards{value: 1 ether}(1 ether);
-        assertEq(stp.poolDetail().balance, 1.0101 ether);
+        assertEq(stp.contractDetail().rewardBalance, 1.0101 ether);
     }
 
     // Should be grant?
@@ -48,7 +48,7 @@ contract RewardsTest is BaseTest {
 
         vm.startPrank(creator);
         stp.issueRewardShares(alice, 100);
-        assertEq(stp.poolDetail().totalShares, 100);
+        assertEq(stp.contractDetail().rewardShares, 100);
         vm.stopPrank();
     }
 
@@ -76,6 +76,6 @@ contract RewardsTest is BaseTest {
 
         vm.warp(block.timestamp + 60 days); // past the grace period
         stp.slash(alice);
-        assertEq(stp.poolDetail().totalShares, 0);
+        assertEq(stp.contractDetail().rewardShares, 0);
     }
 }
