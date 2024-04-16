@@ -67,6 +67,8 @@ contract RewardTestShim {
     function state() external view returns (PoolStatePartial memory) {
         return PoolStatePartial({totalShares: _state.totalShares, totalRewardIngress: _state.totalRewardIngress});
     }
+
+    function test() public {}
 }
 
 contract RewardLibTest is BaseTest {

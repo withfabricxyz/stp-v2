@@ -16,9 +16,9 @@ import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 
 import "src/types/Constants.sol";
 
-import {SubscriptionTokenV2} from "src/SubscriptionTokenV2.sol";
+import {STPV2} from "src/STPV2.sol";
 import {AccessControlled} from "src/abstracts/AccessControlled.sol";
-import {ISubscriptionTokenV2} from "src/interfaces/ISubscriptionTokenV2.sol";
+import {ISTPV2} from "src/interfaces/ISTPV2.sol";
 
 import {Currency, CurrencyLib} from "src/libraries/CurrencyLib.sol";
 import {GateLib} from "src/libraries/GateLib.sol";
@@ -34,7 +34,7 @@ import {DeployParams, FactoryFeeConfig} from "src/types/Factory.sol";
 import {FeeParams, Gate, GateType, InitParams, Subscription, Subscription, Tier} from "src/types/Index.sol";
 
 import {MintParams} from "src/types/Params.sol";
-import {CurveParams, Holder, RewardParams, RewardPoolParams} from "src/types/Rewards.sol";
+import {CurveParams, Holder, RewardParams} from "src/types/Rewards.sol";
 import {SubscriberView} from "src/types/Views.sol";
 
 contract TestERC1155Token is ERC1155 {
@@ -142,10 +142,10 @@ abstract contract BaseTest is Test {
         globalSupplyCap: 0
     });
 
-    SubscriptionTokenV2 internal stp;
+    STPV2 internal stp;
 
-    function reinitStp() public returns (SubscriptionTokenV2) {
-        stp = new SubscriptionTokenV2();
+    function reinitStp() public returns (STPV2) {
+        stp = new STPV2();
         vm.store(
             address(stp),
             bytes32(uint256(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffbf601132)),
@@ -185,7 +185,7 @@ abstract contract BaseTest is Test {
         return TestERC20Token(stp.contractDetail().currency);
     }
 
-    function createERC20Sub() public virtual returns (SubscriptionTokenV2) {
+    function createERC20Sub() public virtual returns (STPV2) {
         TestERC20Token _token = new TestERC20Token("FIAT", "FIAT", 18);
         _token.transfer(alice, 1e20);
         _token.transfer(bob, 1e20);
@@ -195,11 +195,7 @@ abstract contract BaseTest is Test {
         return reinitStp();
     }
 
-    function createETHSub(
-        uint256 minPurchase,
-        uint16 feeBps,
-        uint16 bips
-    ) public virtual returns (SubscriptionTokenV2 sub) {
+    function createETHSub(uint256 minPurchase, uint16 feeBps, uint16 bips) public virtual returns (STPV2 sub) {
         tierParams.periodDurationSeconds = uint32(minPurchase);
         tierParams.pricePerPeriod = minPurchase * 2;
         tierParams.rewardBasisPoints = bips;
@@ -210,19 +206,6 @@ abstract contract BaseTest is Test {
 
     function defaultCurveParams() internal pure returns (CurveParams memory) {
         return CurveParams({numPeriods: 6, periodSeconds: 2, startTimestamp: 0, minMultiplier: 0, formulaBase: 2});
-    }
-
-    function defaultPoolParams() internal pure returns (RewardPoolParams memory) {
-        return RewardPoolParams({
-            // name: "name",
-            // symbol: "symbol",
-            currencyAddress: address(0),
-            slashGracePeriod: 0,
-            // transferUnlockDate: 0,
-            // acceptMultipliers: true,
-            // trustedMintOnly: true,
-            slashable: false
-        });
     }
 
     function testIgnore() internal {}

@@ -26,6 +26,15 @@ contract RefundsTests is BaseTest {
         vm.stopPrank();
     }
 
+    function testFundPast() public {
+        mint(alice, 0.001 ether);
+        vm.warp(block.timestamp + 31 days);
+        vm.startPrank(creator);
+        stp.refund(alice, 0.001 ether);
+        assertEq(address(stp).balance, 0);
+        vm.stopPrank();
+    }
+
     function testPartialRefund() public {
         mint(alice, 0.001 ether);
         vm.warp(block.timestamp + 15 days);
@@ -45,7 +54,7 @@ contract RefundsTests is BaseTest {
     function testRefundNoBalance() public {
         mint(alice, 0.001 ether);
         vm.startPrank(creator);
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InsufficientBalance.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISTPV2.InsufficientBalance.selector));
         stp.refund(alice, 0.002 ether);
         vm.stopPrank();
     }

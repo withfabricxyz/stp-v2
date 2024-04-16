@@ -9,12 +9,6 @@ import {Subscription, Tier} from "../types/Index.sol";
 library SubscriberLib {
     using SubscriberLib for Subscription;
 
-    error SubscriptionNotActive();
-
-    error SubscriptionGrantInvalidTime();
-
-    error SubscriptionNotFound(address account);
-
     function extendPurchase(Subscription storage sub, uint48 numSeconds) internal {
         sub.extend(numSeconds);
         if (sub.purchaseExpires > block.timestamp) sub.purchaseExpires += numSeconds;

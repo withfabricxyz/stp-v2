@@ -7,7 +7,7 @@ contract InitializationTest is BaseTest {
     InitParams private params;
 
     function setUp() public {
-        stp = new SubscriptionTokenV2();
+        stp = new STPV2();
         vm.store(
             address(stp),
             bytes32(uint256(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffbf601132)),
@@ -30,21 +30,21 @@ contract InitializationTest is BaseTest {
     function testOwnerZero() public {
         initParams.owner = address(0);
 
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidOwner.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISTPV2.InvalidOwner.selector));
         stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
     }
 
     function testFeeBps() public {
         feeParams.bips = 1500;
 
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidFeeParams.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISTPV2.InvalidFeeParams.selector));
         stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
     }
 
     function testFeeRequirement() public {
         feeParams.collector = fees;
 
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidFeeParams.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISTPV2.InvalidFeeParams.selector));
         stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
     }
 
@@ -58,21 +58,21 @@ contract InitializationTest is BaseTest {
     function testEmptyName() public {
         initParams.name = "";
 
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidTokenParams.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISTPV2.InvalidTokenParams.selector));
         stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
     }
 
     function testEmptySymbol() public {
         initParams.symbol = "";
 
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidTokenParams.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISTPV2.InvalidTokenParams.selector));
         stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
     }
 
     function testEmptyContractURI() public {
         initParams.contractUri = "";
 
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidTokenParams.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISTPV2.InvalidTokenParams.selector));
         stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
     }
 }

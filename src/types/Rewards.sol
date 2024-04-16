@@ -13,15 +13,6 @@ struct Holder {
     int256 pointsCorrection;
 }
 
-struct RewardPoolParams {
-    /// @dev the address of the currency contract
-    address currencyAddress;
-    /// @dev the grace period of inactivity before a sub is slashable
-    uint32 slashGracePeriod;
-    /// @dev whether the pool is slashable
-    bool slashable;
-}
-
 /// @dev The curve parameters for reward pool share issuance
 struct CurveParams {
     /// @dev the number of periods for which rewards are paid (acts as the exponent)
@@ -63,16 +54,4 @@ struct PoolDetailView {
     address currencyAddress;
     uint256 totalShares;
     uint256 balance;
-}
-
-struct CurveDetailView {
-    // uint8 id;
-    uint256 currentMultiplier;
-    uint48 flattenTimestamp;
-}
-
-struct HolderDetailView {
-    uint256 numShares;
-    uint256 rewardsWithdrawn;
-    uint256 rewardBalance;
 }

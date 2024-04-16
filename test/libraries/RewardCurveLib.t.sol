@@ -17,6 +17,8 @@ contract RewardCurveTestShim {
     function flattensAt(CurveParams memory params) external pure returns (uint48) {
         return RewardCurveLib.flattensAt(params);
     }
+
+    function test() public {}
 }
 
 contract RewardLibTest is BaseTest {

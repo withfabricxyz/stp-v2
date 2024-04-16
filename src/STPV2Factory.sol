@@ -2,13 +2,14 @@
 
 pragma solidity ^0.8.20;
 
-import {SubscriptionTokenV2} from "./SubscriptionTokenV2.sol";
+import {ISTPV2} from "./interfaces/ISTPV2.sol";
+
+import "./types/Constants.sol";
 import {FeeParams, InitParams, Tier} from "./types/Index.sol";
-import {CurveParams, RewardParams, RewardPoolParams} from "./types/Rewards.sol";
+import {CurveParams, RewardParams} from "./types/Rewards.sol";
 import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {LibClone} from "@solady/utils/LibClone.sol";
-
-import {DeployParams, FactoryFeeConfig, RewardDeployParams} from "src/types/Factory.sol";
+import {DeployParams, FactoryFeeConfig} from "src/types/Factory.sol";
 
 /**
  *
@@ -19,9 +20,6 @@ import {DeployParams, FactoryFeeConfig, RewardDeployParams} from "src/types/Fact
  *
  */
 contract STPV2Factory is Ownable2Step {
-    /// @dev The maximum fee that can be charged for a subscription contract
-    uint16 private constant _MAX_FEE_BIPS = 1250;
-
     /////////////////
     // Errors
     /////////////////
@@ -77,53 +75,16 @@ contract STPV2Factory is Ownable2Step {
     /// @dev Configured fee ids and their config
     mapping(uint256 => FactoryFeeConfig) private _feeConfigs;
 
-    uint256 private _salt;
-
     /**
      * @notice Construct a new Factory contract
-     * @param stpImplementation the SubscriptionTokenV2 implementation address
-     * @param rewardPoolImplementation the RewardPool implementation address
+     * @param stpImplementation the STPV2 implementation address
      */
-    constructor(address stpImplementation, address rewardPoolImplementation) Ownable(msg.sender) {
+    constructor(address stpImplementation) Ownable(msg.sender) {
         _stpImplementation = stpImplementation;
-        _rewardPoolImplementation = rewardPoolImplementation;
-        _salt = block.chainid << 128;
     }
 
-    // /**
-    //  * @notice Deploy a new Clone of a RewardPool contract
-    //  *
-    //  * @param poolParams the initialization parameters for the pool
-    //  * @param curveParams the curve parameters for the pool
-    //  */
-    // function deployRewardPool(
-    //     RewardPoolParams memory poolParams,
-    //     CurveParams memory curveParams
-    // ) public returns (address deployment) {
-    //     deployment = LibClone.clone(_rewardPoolImplementation);
-    //     RewardPool(payable(deployment)).initialize(poolParams, curveParams);
-    //     emit RewardPoolDeployment(deployment);
-    // }
-
-    // function deploySubscriptionWithPool(
-    //     DeployParams memory params,
-    //     RewardPoolParams memory poolParams,
-    //     CurveParams memory curveParams
-    // ) public payable returns (address subscriptionAddress, address poolAddress) {
-    //     poolAddress = deployRewardPool(poolParams, curveParams);
-
-    //     // get the address of the subscription
-    //     address predictedAddress =
-    //         LibClone.predictDeterministicAddress(_stpImplementation, bytes32(_salt + 1), address(this));
-    //     RewardPool(payable(poolAddress)).setRoles(predictedAddress, 1); // TODO Const RewardPool.ROLE_MINTER
-
-    //     // set the reward pool address
-    //     params.rewardParams.poolAddress = poolAddress;
-    //     subscriptionAddress = deploySubscription(params);
-    // }
-
     /**
-     * @notice Deploy a new Clone of a SubscriptionTokenV2 contract
+     * @notice Deploy a new Clone of a STPV2 contract
      *
      * @param params the initialization parameters for the contract (@see DeloyParams)
      */
@@ -135,7 +96,7 @@ contract STPV2Factory is Ownable2Step {
         _transferDeployFee(fees);
 
         // Clone the implementation
-        address deployment = LibClone.cloneDeterministic(_stpImplementation, bytes32(++_salt));
+        address deployment = LibClone.clone(_stpImplementation);
 
         // Set the owner to the sender if it is not set
         if (params.initParams.owner == address(0)) params.initParams.owner = msg.sender;
@@ -151,7 +112,7 @@ contract STPV2Factory is Ownable2Step {
         //     rewardBips: params.rewardBips
         // });
 
-        SubscriptionTokenV2(payable(deployment)).initialize(
+        ISTPV2(payable(deployment)).initialize(
             params.initParams, params.tierParams, params.rewardParams, params.curveParams, subFees
         );
         emit SubscriptionDeployment(deployment, params.feeConfigId);
@@ -165,7 +126,7 @@ contract STPV2Factory is Ownable2Step {
      * @param config the fee configuration
      */
     function createFee(uint256 id, FactoryFeeConfig memory config) external onlyOwner {
-        if (config.basisPoints == 0 || config.basisPoints > _MAX_FEE_BIPS) revert FeeBipsInvalid();
+        if (config.basisPoints == 0 || config.basisPoints > MAX_FEE_BPS) revert FeeBipsInvalid();
         if (config.collector == address(0)) revert FeeCollectorInvalid();
         if (_feeConfigs[id].collector != address(0)) revert FeeExists(id);
         _feeConfigs[id] = config;

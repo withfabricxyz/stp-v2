@@ -21,10 +21,6 @@ contract GrantsTest is BaseTest {
         vm.expectEmit(true, true, false, true, address(stp));
         emit SubscriptionLib.Grant(1, 90 days, uint48(block.timestamp + 90 days));
         stp.grantTime(alice, 90 days, 1);
-
-        vm.expectRevert(abi.encodeWithSelector(SubscriberLib.SubscriptionGrantInvalidTime.selector));
-        stp.grantTime(alice, 0, 1);
-
         vm.stopPrank();
         assertEq(stp.balanceOf(alice), 90 days);
         assertEq(stp.subscriptionOf(alice).tierId, 1);

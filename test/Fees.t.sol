@@ -27,7 +27,7 @@ contract FeesTest is BaseTest {
 
         vm.startPrank(alice);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.FeeTransfer(fees, expectedFee);
+        emit ISTPV2.FeeTransfer(fees, expectedFee);
         stp.mint{value: 1e18}(1e18);
         vm.stopPrank();
     }
@@ -35,9 +35,9 @@ contract FeesTest is BaseTest {
     function testFeeCollectorUpdate() public {
         vm.startPrank(fees);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.FeeCollectorChange(charlie);
+        emit ISTPV2.FeeCollectorChange(charlie);
         stp.updateFeeRecipient(charlie);
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.Unauthorized.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISTPV2.Unauthorized.selector));
         stp.updateFeeRecipient(charlie);
         vm.stopPrank();
     }

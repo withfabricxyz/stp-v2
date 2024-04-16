@@ -20,6 +20,8 @@ contract TierTestShim {
         state = TierLib.State({id: 1, subCount: 0, params: tier});
         TierLib.checkRenewal(state, sub, numTokens);
     }
+
+    function test() public {}
 }
 
 contract TierLibTest is Test {

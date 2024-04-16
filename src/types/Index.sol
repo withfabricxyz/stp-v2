@@ -3,11 +3,11 @@ pragma solidity ^0.8.20;
 
 /// @dev The type of gate to use for a tier
 enum GateType {
+    NONE,
     ERC20,
     ERC721,
     ERC1155,
-    STPV2,
-    NONE
+    STPV2
 }
 
 /// @title Gate

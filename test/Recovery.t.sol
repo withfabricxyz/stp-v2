@@ -13,7 +13,7 @@ contract RecoveryTests is BaseTest {
 
     function testRecoverERC20Self() public erc20 prank(creator) {
         address addr = stp.contractDetail().currency;
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidRecovery.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISTPV2.InvalidRecovery.selector));
         stp.recoverCurrency(addr, alice, 1e17);
     }
 
@@ -24,12 +24,11 @@ contract RecoveryTests is BaseTest {
         assertEq(token.balanceOf(alice), 1e17);
     }
 
-    // TODO
     function testRecoverNative() public erc20 prank(creator) {
         SelfDestruct attack = new SelfDestruct();
 
-        // vm.expectRevert(abi.encodeWithSelector(CurrencyLib.NativeTransferFailed.selector));
-        // stp.recoverCurrency(address(0), bob, 1e18);
+        vm.expectRevert(abi.encodeWithSelector(SafeTransferLib.ETHTransferFailed.selector));
+        stp.recoverCurrency(address(0), bob, 1e18);
 
         deal(address(attack), 1e18);
         attack.destroy(address(stp));

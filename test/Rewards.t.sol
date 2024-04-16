@@ -57,11 +57,11 @@ contract RewardsTest is BaseTest {
         stp = reinitStp();
 
         mint(alice, 0.101 ether);
-        vm.expectRevert(ISubscriptionTokenV2.NotSlashable.selector);
+        vm.expectRevert(ISTPV2.NotSlashable.selector);
         stp.slash(alice);
 
         vm.warp(block.timestamp + 60 days); // past the grace period
-        vm.expectRevert(ISubscriptionTokenV2.NotSlashable.selector);
+        vm.expectRevert(ISTPV2.NotSlashable.selector);
         stp.slash(alice);
     }
 
@@ -71,7 +71,7 @@ contract RewardsTest is BaseTest {
         stp = reinitStp();
 
         mint(alice, 0.101 ether);
-        vm.expectRevert(ISubscriptionTokenV2.NotSlashable.selector);
+        vm.expectRevert(ISTPV2.NotSlashable.selector);
         stp.slash(alice);
 
         vm.warp(block.timestamp + 60 days); // past the grace period

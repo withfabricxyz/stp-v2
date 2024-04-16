@@ -22,9 +22,6 @@ library CurrencyLib {
     /// @notice Thrown when approval is invalid
     error InvalidApproval();
 
-    /// @dev wrap 0 address as a native currency
-    Currency public constant NATIVE = Currency.wrap(address(0));
-
     /// @dev capture native or ERC20 tokens
     function capture(Currency currency, address from, uint256 amount) internal returns (uint256 capturedAmount) {
         capturedAmount = amount;
@@ -52,14 +49,8 @@ library CurrencyLib {
         return Currency.unwrap(currency).balanceOf(address(this));
     }
 
-    /// @dev approve an ERC20 token (note, this is intended for sending tokens to another contract in a single txn)
-    function approve(Currency currency, address spender, uint256 amount) internal {
-        if (currency.isNative()) revert InvalidApproval();
-        Currency.unwrap(currency).safeApprove(spender, amount);
-    }
-
-    /// @dev is the currency the native token, eg: ETH
+    /// @dev is the currency the native token, eg: ETH (0x0 address indicates such)
     function isNative(Currency currency) internal pure returns (bool) {
-        return Currency.unwrap(currency) == Currency.unwrap(NATIVE);
+        return Currency.unwrap(currency) == address(0);
     }
 }

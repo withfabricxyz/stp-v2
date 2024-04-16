@@ -2,9 +2,10 @@
 
 pragma solidity ^0.8.20;
 
-import {Subscription, Tier} from "src/types/Index.sol";
+import {FeeParams, InitParams, Subscription, Tier} from "src/types/Index.sol";
+import {CurveParams, RewardParams} from "src/types/Rewards.sol";
 
-interface ISubscriptionTokenV2 {
+interface ISTPV2 {
     //////////////////
     // ERRORS
     //////////////////
@@ -21,7 +22,6 @@ interface ISubscriptionTokenV2 {
     error Unauthorized();
     error InvalidRecovery();
     error TransferFailed();
-    error GlobalSupplyLimitExceeded();
     error InsufficientBalance();
     error NotSlashable();
 
@@ -97,6 +97,14 @@ interface ISubscriptionTokenV2 {
 
     /// @dev Emitted when the transfer recipient is updated
     event TransferRecipientChange(address indexed recipient);
+
+    function initialize(
+        InitParams memory params,
+        Tier memory tier,
+        RewardParams memory rewards,
+        CurveParams memory curve,
+        FeeParams memory fees
+    ) external;
 
     //////////////////
     // MINTING

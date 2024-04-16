@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "./TestImports.t.sol";
 
-contract SubscriptionTokenV2RolesTest is BaseTest {
+contract RolesTest is BaseTest {
     address internal agent = 0xb4c79DAb8F259C7aEe6E5B2aA729821864227e7C;
 
     function setUp() public {

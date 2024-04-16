@@ -70,6 +70,14 @@ contract TierSwitchingTest is BaseTest {
         assertTrue(stp.locked(1));
     }
 
+    function testInvalidTier() public prank(alice) {
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierNotFound.selector, 20));
+        stp.mintAdvanced{value: 0.002 ether}(
+            MintParams({tierId: 20, recipient: alice, referrer: address(0), referralCode: 0, purchaseValue: 0.002 ether})
+        );
+    }
+
+    // TODO: Time adjustment
     function testDowngrade() public {}
 
     function testGrantShift() public {}

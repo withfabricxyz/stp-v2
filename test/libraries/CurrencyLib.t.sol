@@ -17,14 +17,12 @@ contract MockCurrencyLib {
         return CurrencyLib.balance(currency);
     }
 
-    function approve(Currency currency, address spender, uint256 amount) public {
-        CurrencyLib.approve(currency, spender, amount);
-    }
-
     /// @dev is the currency the native token, eg: ETH
     function isNative(Currency currency) public pure returns (bool) {
         return CurrencyLib.isNative(currency);
     }
+
+    function test() public {}
 }
 
 contract CurrencyLibTest is Test {
@@ -67,9 +65,6 @@ contract CurrencyLibTest is Test {
         assertEq(shim.balance(eth), 1e9);
         shim.transfer(eth, alice, 1e9);
         assertEq(shim.balance(eth), 0);
-
-        vm.expectRevert(abi.encodeWithSelector(CurrencyLib.InvalidApproval.selector));
-        shim.approve(eth, alice, 1e18);
     }
 
     function testUsdc() public {
@@ -89,13 +84,6 @@ contract CurrencyLibTest is Test {
         assertEq(shim.balance(usdc), 1e5);
         shim.transfer(usdc, alice, 1e5);
         assertEq(shim.balance(eth), 0);
-
-        // Verify approvals
-        testToken.transfer(address(shim), 1e5);
-        shim.approve(usdc, alice, 1e18);
-        vm.startPrank(alice);
-        testToken.transferFrom(address(shim), alice, 1e5);
-        vm.stopPrank();
     }
 
     function testFeeTaking() public {

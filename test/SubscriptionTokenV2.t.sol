@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "./TestImports.t.sol";
 
-contract SubscriptionTokenV2Test is BaseTest {
+contract STPV2Test is BaseTest {
     function setUp() public {
         tierParams.periodDurationSeconds = 4;
         tierParams.pricePerPeriod = 8;
@@ -59,7 +59,7 @@ contract SubscriptionTokenV2Test is BaseTest {
         assertEq(stp.contractDetail().creatorBalance, 2e18);
 
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.Withdraw(creator, 2e18);
+        emit ISTPV2.Withdraw(creator, 2e18);
         stp.transferFunds(creator, stp.contractDetail().creatorBalance);
         assertEq(stp.contractDetail().creatorBalance, 0);
 
@@ -112,7 +112,7 @@ contract SubscriptionTokenV2Test is BaseTest {
         vm.startPrank(creator);
         assertEq(stp.contractDetail().creatorBalance, 2e18);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.Withdraw(creator, 2e18);
+        emit ISTPV2.Withdraw(creator, 2e18);
         stp.transferFunds(creator, stp.contractDetail().creatorBalance);
         assertEq(stp.contractDetail().creatorBalance, 0);
 
@@ -139,7 +139,7 @@ contract SubscriptionTokenV2Test is BaseTest {
         mint(bob, 1e18);
         vm.startPrank(alice);
         stp.approve(bob, 1);
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidTransfer.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISTPV2.InvalidTransfer.selector));
         stp.transferFrom(alice, bob, 1);
     }
 
@@ -162,7 +162,7 @@ contract SubscriptionTokenV2Test is BaseTest {
         assertEq(stp.contractURI(), "x");
         assertEq(stp.tokenURI(1), "x/1");
 
-        vm.expectRevert(abi.encodeWithSelector(ISubscriptionTokenV2.InvalidTokenParams.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISTPV2.InvalidTokenParams.selector));
         stp.updateMetadata("");
         vm.stopPrank();
 

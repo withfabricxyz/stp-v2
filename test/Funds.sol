@@ -13,14 +13,14 @@ contract FundsTest is BaseTest {
 
     function testTopUp() public prank(creator) {
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.TopUp(1 ether);
+        emit ISTPV2.TopUp(1 ether);
         stp.topUp{value: 1 ether}(1 ether);
     }
 
     function testTransferRecipient() public {
         vm.startPrank(creator);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.TransferRecipientChange(alice);
+        emit ISTPV2.TransferRecipientChange(alice);
         stp.setTransferRecipient(alice);
         vm.stopPrank();
 

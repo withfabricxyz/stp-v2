@@ -9,7 +9,7 @@ import {Initializable} from "@solady/utils/Initializable.sol";
 import {LibString} from "@solady/utils/LibString.sol";
 import {Multicallable} from "@solady/utils/Multicallable.sol";
 
-import {ISubscriptionTokenV2} from "./interfaces/ISubscriptionTokenV2.sol";
+import {ISTPV2} from "./interfaces/ISTPV2.sol";
 import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
 
 import {ReferralLib} from "./libraries/ReferralLib.sol";
@@ -21,7 +21,7 @@ import {TierLib} from "./libraries/TierLib.sol";
 import {FeeParams, InitParams, Subscription, Tier, Tier} from "./types/Index.sol";
 
 import {MintParams} from "./types/Params.sol";
-import {CurveDetailView, CurveParams, PoolDetailView, RewardParams} from "./types/Rewards.sol";
+import {CurveParams, PoolDetailView, RewardParams} from "./types/Rewards.sol";
 import {ContractView, SubscriberView} from "./types/Views.sol";
 
 import {RewardLib} from "./libraries/RewardLib.sol";
@@ -32,7 +32,7 @@ import "./types/Constants.sol";
  * @author Fabric Inc.
  * @notice An NFT contract which allows users to mint time and access token gated content while time remains.
  */
-contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initializable, ISubscriptionTokenV2 {
+contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2 {
     using LibString for uint256;
     using TierLib for Tier;
     using SubscriberLib for Subscription;
@@ -247,7 +247,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
      */
     function setGlobalSupplyCap(uint64 supplyCap) external {
         _checkOwnerOrRoles(ROLE_MANAGER);
-        if (_state.subCount > supplyCap) revert GlobalSupplyLimitExceeded();
+        if (_state.subCount > supplyCap) revert SubscriptionLib.GlobalSupplyLimitExceeded();
         _state.supplyCap = supplyCap;
         emit GlobalSupplyCapChange(supplyCap);
     }
@@ -507,7 +507,7 @@ contract SubscriptionTokenV2 is ERC721, AccessControlled, Multicallable, Initial
         return 2;
     }
 
-    /// @inheritdoc ISubscriptionTokenV2
+    /// @inheritdoc ISTPV2
     function tierBalanceOf(uint16 tierId, address account) external view returns (uint256 numSeconds) {
         Subscription memory sub = _state.subscriptions[account];
         if (sub.tierId != tierId) return 0;

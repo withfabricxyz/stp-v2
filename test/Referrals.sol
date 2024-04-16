@@ -9,8 +9,6 @@ contract ReferralTests is BaseTest {
         deal(bob, 1e19);
         deal(creator, 1e19);
         deal(fees, 1e19);
-        // tierParams.periodDurationSeconds = 1;
-        // tierParams.pricePerPeriod = 2;
         reinitStp();
     }
 
@@ -46,7 +44,7 @@ contract ReferralTests is BaseTest {
         uint256 balance = charlie.balance;
 
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISubscriptionTokenV2.ReferralPayout(1, charlie, 1, 5e15);
+        emit ISTPV2.ReferralPayout(1, charlie, 1, 5e15);
         stp.mintAdvanced{value: 0.1 ether}(
             MintParams({tierId: 1, recipient: bob, referrer: charlie, referralCode: 1, purchaseValue: 0.1 ether})
         );

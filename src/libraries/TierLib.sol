@@ -78,7 +78,6 @@ library TierLib {
     }
 
     function checkJoin(State storage state, address account, uint256 numTokens) internal view {
-        if (state.id == 0) revert TierNotFound(state.id);
         if (block.timestamp < state.params.startTimestamp) revert TierNotStarted();
         if (state.params.maxSupply != 0 && state.subCount >= state.params.maxSupply) revert TierHasNoSupply(state.id);
         if (numTokens < state.params.initialMintPrice) revert TierInvalidMintPrice(state.params.initialMintPrice);

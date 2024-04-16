@@ -15,6 +15,8 @@ contract GateTestShim {
     function balanceOf(Gate memory gate, address account) external view returns (uint256) {
         return GateLib.balanceOf(gate, account);
     }
+
+    function test() public {}
 }
 
 contract GateLibTest is BaseTest {

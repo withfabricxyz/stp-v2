@@ -20,6 +20,8 @@ contract TestSubject is AccessControlled, Test {
     function checkOwnerCall() external view {
         _checkOwner();
     }
+
+    function test() public {}
 }
 
 contract AccessControlledTest is Test {

@@ -49,14 +49,14 @@ library GateLib {
     function balanceOf(Gate memory gate, address account) internal view returns (uint256) {
         ExternalGate eg = ExternalGate(gate.contractAddress);
 
-        if (gate.gateType == GateType.ERC20 || gate.gateType == GateType.ERC721) return eg.balanceOf(account);
-
-        if (gate.gateType == GateType.STPV2) {
+        if (gate.gateType == GateType.ERC20 || gate.gateType == GateType.ERC721) {
+            return eg.balanceOf(account);
+        } else if (gate.gateType == GateType.STPV2) {
             if (gate.componentId > 0) return eg.tierBalanceOf(uint16(gate.componentId), account);
             return eg.balanceOf(account);
+        } else if (gate.gateType == GateType.ERC1155) {
+            return eg.balanceOf(account, gate.componentId);
         }
-
-        if (gate.gateType == GateType.ERC1155) return eg.balanceOf(account, gate.componentId);
 
         return 0;
     }
