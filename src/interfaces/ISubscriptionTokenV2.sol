@@ -12,8 +12,6 @@ interface ISubscriptionTokenV2 {
     // TODO: Doc
     error InvalidOwner();
     error InvalidTokenParams();
-    error InvalidName();
-    error InvalidSymbol();
     error InvalidContractUri();
     error InvalidFeeParams();
     error InvalidBps();
@@ -21,7 +19,6 @@ interface ISubscriptionTokenV2 {
     error InvalidAccount();
     error InvalidTransfer();
     error Unauthorized();
-    error ReferralExists(uint256 code);
     error InvalidRecovery();
     error TransferFailed();
     error GlobalSupplyLimitExceeded();

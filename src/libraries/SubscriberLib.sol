@@ -14,12 +14,6 @@ library SubscriberLib {
 
     error SubscriptionNotFound(address account);
 
-    /// @dev The amount of purchased time remaining for a given subscription
-    function purchasedTimeRemaining(Subscription memory sub) internal view returns (uint48) {
-        if (sub.purchaseExpires <= block.timestamp) return 0;
-        return uint48(sub.purchaseExpires - block.timestamp);
-    }
-
     function extend(Subscription storage sub, uint48 numSeconds) internal {
         if (sub.expiresAt > block.timestamp) sub.expiresAt += numSeconds;
         else sub.expiresAt = uint48(block.timestamp + numSeconds);
@@ -49,6 +43,12 @@ library SubscriberLib {
         sub.purchaseExpires = uint48(block.timestamp);
         sub.expiresAt -= refundedTime;
         return refundedTime;
+    }
+
+    /// @dev The amount of purchased time remaining for a given subscription
+    function purchasedTimeRemaining(Subscription memory sub) internal view returns (uint48) {
+        if (sub.purchaseExpires <= block.timestamp) return 0;
+        return uint48(sub.purchaseExpires - block.timestamp);
     }
 
     /// @dev The amount of granted time remaining for a given subscription

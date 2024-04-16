@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.20;
 
-import {Currency, CurrencyLib} from "src/libraries/CurrencyLib.sol";
-
 import {SubscriberLib} from "src/libraries/SubscriberLib.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
 import {Subscription, Tier} from "src/types/Index.sol";
@@ -11,7 +9,6 @@ import {Subscription, Tier} from "src/types/Index.sol";
 library SubscriptionLib {
     using SubscriptionLib for State;
     using SubscriberLib for Subscription;
-    using CurrencyLib for Currency;
     using TierLib for Tier;
     using TierLib for TierLib.State;
 
