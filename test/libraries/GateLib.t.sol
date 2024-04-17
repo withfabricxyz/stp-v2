@@ -50,12 +50,36 @@ contract GateLibTest is BaseTest {
         gate.gateType = GateType.STPV2;
         vm.expectRevert(abi.encodeWithSelector(GateLib.GateInvalid.selector));
         shim.validate(gate);
+
+        gate.componentId = 0;
+        vm.expectRevert(abi.encodeWithSelector(GateLib.GateInvalid.selector));
+        shim.validate(gate);
     }
 
     function testNone() public {
         Gate memory gate = defaults();
         shim.checkAccount(gate, alice);
         assertEq(shim.balanceOf(gate, alice), 0);
+    }
+
+    function testReverts() public {
+        Gate memory gate = defaults();
+
+        gate.gateType = GateType.ERC20;
+        vm.expectRevert();
+        shim.balanceOf(gate, alice);
+
+        gate.gateType = GateType.ERC721;
+        vm.expectRevert();
+        shim.balanceOf(gate, alice);
+
+        gate.gateType = GateType.ERC1155;
+        vm.expectRevert();
+        shim.balanceOf(gate, alice);
+
+        gate.gateType = GateType.STPV2;
+        vm.expectRevert();
+        shim.balanceOf(gate, alice);
     }
 
     function testERC20() public {
@@ -102,17 +126,6 @@ contract GateLibTest is BaseTest {
 
         token.mint(alice, 1, 1);
         assertEq(shim.balanceOf(gate, alice), 1);
-    }
-
-    function testSTPv2NoTier() public {
-        stp = reinitStp();
-        Gate memory gate = defaults();
-        gate.gateType = GateType.STPV2;
-        gate.contractAddress = address(stp);
-
-        assertEq(shim.balanceOf(gate, alice), 0);
-        stp.mintFor{value: 1e15}(alice, 1e15);
-        assertGt(shim.balanceOf(gate, alice), 1);
     }
 
     function testSTPv2SpecificTier() public {
