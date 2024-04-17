@@ -99,7 +99,7 @@ contract MintingTest is BaseTest {
         stp.setGlobalSupplyCap(1);
 
         vm.expectEmit(true, true, false, true, address(stp));
-        emit ISTPV2.GlobalSupplyCapChange(2);
+        emit STPV2.GlobalSupplyCapChange(2);
         stp.setGlobalSupplyCap(2);
         vm.stopPrank();
 

@@ -21,6 +21,7 @@ contract FactoryTest is BaseTest {
     function defaultParams() internal view returns (DeployParams memory) {
         return DeployParams({
             feeConfigId: 0,
+            deployKey: "hello",
             initParams: initParams,
             tierParams: tierParams,
             rewardParams: rewardParams,
@@ -34,7 +35,7 @@ contract FactoryTest is BaseTest {
         DeployParams memory params = defaultParams();
 
         vm.expectEmit(false, false, false, true, address(factory));
-        emit STPV2Factory.SubscriptionDeployment(address(1), 0);
+        emit STPV2Factory.Deployment(address(1), 0, "hello");
         address deployment = factory.deploySubscription(params);
 
         STPV2 nft = STPV2(payable(deployment));
@@ -63,7 +64,7 @@ contract FactoryTest is BaseTest {
 
         vm.startPrank(alice);
         vm.expectEmit(false, false, false, true, address(factory));
-        emit STPV2Factory.SubscriptionDeployment(address(1), 1);
+        emit STPV2Factory.Deployment(address(1), 1, "hello");
         address deployment = factory.deploySubscription(params);
         STPV2 nft = STPV2(payable(deployment));
         assertEq(nft.contractDetail().feeCollector, bob);
@@ -77,7 +78,7 @@ contract FactoryTest is BaseTest {
 
         vm.startPrank(alice);
         vm.expectEmit(false, false, false, true, address(factory));
-        emit STPV2Factory.SubscriptionDeployment(address(1), 1); // ?
+        emit STPV2Factory.Deployment(address(1), 0, "hello"); // ?
         address deployment = factory.deploySubscription(params);
         STPV2 nft = STPV2(payable(deployment));
         assertEq(nft.contractDetail().feeCollector, bob);
@@ -142,12 +143,12 @@ contract FactoryTest is BaseTest {
         fee.deployFee = 1e12;
         fee.collector = address(this);
         factory.createFee(0, fee);
-        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.FeeTransferFailed.selector));
+        vm.expectRevert(abi.encodeWithSelector(SafeTransferLib.ETHTransferFailed.selector));
         factory.deploySubscription{value: 1e12}(defaultParams());
     }
 
     function testTransferAccept() public {
-        factory.transferOwnership(alice);
+        factory.setPendingOwner(alice);
         vm.startPrank(alice);
         factory.acceptOwnership();
         vm.stopPrank();

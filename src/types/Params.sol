@@ -19,10 +19,3 @@ struct MintParams {
     /// @dev The number of tokens being transferred
     uint256 purchaseValue;
 }
-
-struct RewardInitParams {
-    /// @dev the grace period of inactivity before a sub is slashable
-    uint32 slashGracePeriod;
-    /// @dev whether the pool is slashable
-    bool slashable;
-}

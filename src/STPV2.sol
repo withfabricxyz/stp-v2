@@ -2,37 +2,32 @@
 
 pragma solidity ^0.8.20;
 
-import {AccessControlled} from "./abstracts/AccessControlled.sol";
-
-import {ERC721} from "./abstracts/ERC721.sol";
 import {Initializable} from "@solady/utils/Initializable.sol";
 import {LibString} from "@solady/utils/LibString.sol";
 import {Multicallable} from "@solady/utils/Multicallable.sol";
 
-import {ISTPV2} from "./interfaces/ISTPV2.sol";
+import {AccessControlled} from "./abstracts/AccessControlled.sol";
+import {ERC721} from "./abstracts/ERC721.sol";
 import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
-
 import {ReferralLib} from "./libraries/ReferralLib.sol";
-
 import {RewardCurveLib} from "./libraries/RewardCurveLib.sol";
+
+import {RewardLib} from "./libraries/RewardLib.sol";
 import {SubscriberLib} from "./libraries/SubscriberLib.sol";
 import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
 import {TierLib} from "./libraries/TierLib.sol";
-import {FeeParams, InitParams, Subscription, Tier, Tier} from "./types/Index.sol";
-
-import {MintParams} from "./types/Params.sol";
-import {CurveParams, PoolDetailView, RewardParams} from "./types/Rewards.sol";
-import {ContractView, SubscriberView} from "./types/Views.sol";
-
-import {RewardLib} from "./libraries/RewardLib.sol";
 import "./types/Constants.sol";
+import {FeeParams, InitParams, Subscription, Tier, Tier} from "./types/Index.sol";
+import {MintParams} from "./types/Params.sol";
+import {CurveParams, RewardParams} from "./types/Rewards.sol";
+import {ContractView, SubscriberView} from "./types/Views.sol";
 
 /**
  * @title Subscription Token Protocol Version 2
  * @author Fabric Inc.
  * @notice An NFT contract which allows users to mint time and access token gated content while time remains.
  */
-contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2 {
+contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
     using LibString for uint256;
     using TierLib for Tier;
     using SubscriberLib for Subscription;
@@ -42,6 +37,62 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2
     using RewardLib for RewardLib.State;
     using RewardCurveLib for CurveParams;
 
+    //////////////////
+    // Errors
+    //////////////////
+
+    /// @notice Error when the owner is invalid
+    error InvalidOwner();
+
+    /// @notice Error when the token params are invalid
+    error InvalidTokenParams();
+
+    /// @notice Error when the fee params are invalid
+    error InvalidFeeParams();
+
+    /// @notice Error when the reward params are invalid
+    error InvalidRewardParams();
+
+    /// @notice Error when a transfer fails due to the recipient having a subscription
+    error TransferToExistingSubscriber();
+
+    /// @notice Error when the balance is insufficient for a transfer
+    error InsufficientBalance();
+
+    /// @notice Error when slashing fails due to constraints
+    error NotSlashable();
+
+    //////////////////
+    // Events
+    //////////////////
+
+    /// @dev Emitted when the owner withdraws available funds
+    event Withdraw(address indexed account, uint256 tokensTransferred);
+
+    /// @dev Emitted when the creator tops up the contract balance on refund
+    event TopUp(uint256 tokensIn);
+
+    /// @dev Emitted when the fees are transferred to the collector
+    event FeeTransfer(address indexed to, uint256 tokensTransferred);
+
+    /// @dev Emitted when the fee collector is updated
+    event FeeCollectorChange(address indexed collector);
+
+    /// @dev Emitted when a referral fee is paid out
+    event ReferralPayout(
+        uint256 indexed tokenId, address indexed referrer, uint256 indexed referralId, uint256 rewardAmount
+    );
+
+    /// @dev Emitted when the supply cap is updated
+    event GlobalSupplyCapChange(uint256 supplyCap);
+
+    /// @dev Emitted when the transfer recipient is updated
+    event TransferRecipientChange(address indexed recipient);
+
+    //////////////////
+    // State
+    //////////////////
+
     /// @dev The manager role can do most things, except calls that involve money (except tier management with
     /// rewardbps)
     uint16 private constant ROLE_MANAGER = 1;
@@ -50,7 +101,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2
     uint16 private constant ROLE_AGENT = 2;
 
     /// @dev The metadata URI for the contract (tokenUri is derived from this)
-    string public contractURI;
+    string private _contractURI;
 
     /// @dev The name of the token
     string private _name;
@@ -108,7 +159,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2
         // Validate fee params
         if (fees.bips > MAX_FEE_BPS || (fees.collector != address(0) && fees.bips == 0)) revert InvalidFeeParams();
 
-        contractURI = params.contractUri;
+        _contractURI = params.contractUri;
         _name = params.name;
         _symbol = params.symbol;
         _currency = Currency.wrap(params.erc20TokenAddr);
@@ -201,6 +252,15 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2
         _state.revokeTime(account);
     }
 
+    /**
+     * @notice Deactivate a sub, kicking them out of their tier to the 0 tier
+     * @dev The intent here is to help with supply capped tiers and subscription lapses
+     * @param account the account to deactivate
+     */
+    function deactivateSubscription(address account) external {
+        _state.deactivateSubscription(account);
+    }
+
     /////////////////////////
     // Creator Calls
     /////////////////////////
@@ -228,7 +288,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2
         _checkOwnerOrRoles(ROLE_MANAGER);
         if (bytes(uri).length == 0) revert InvalidTokenParams();
         emit BatchMetadataUpdate(1, _state.subCount);
-        contractURI = uri;
+        _contractURI = uri;
     }
 
     /**
@@ -274,19 +334,6 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2
     function updateTier(uint16 tierId, Tier memory params) external {
         _checkOwnerOrRoles(ROLE_MANAGER);
         _state.updateTier(tierId, params);
-    }
-
-    /////////////////////////
-    // Sponsored Calls
-    /////////////////////////
-
-    /**
-     * @notice Deactivate a sub, kicking them out of their tier to the 0 tier
-     * @dev The intent here is to help with supply capped tiers and subscription lapses
-     * @param account the account to deactivate
-     */
-    function deactivateSubscription(address account) external {
-        _state.deactivateSubscription(account);
     }
 
     /////////////////////////
@@ -506,7 +553,12 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2
         return 2;
     }
 
-    /// @inheritdoc ISTPV2
+    /**
+     * @notice Fetch the balance of a given account in a specific tier (0 if they are not in the tier)
+     * @param tierId the tier id to fetch the balance for
+     * @param account the account to fetch the balance of
+     * @return numSeconds the number of seconds remaining in the subscription
+     */
     function tierBalanceOf(uint16 tierId, address account) external view returns (uint256 numSeconds) {
         Subscription memory sub = _state.subscriptions[account];
         if (sub.tierId != tierId) return 0;
@@ -534,6 +586,14 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2
     }
 
     /**
+     * @notice Fetch the contract metadata URI
+     * @return uri the URI for the contract
+     */
+    function contractURI() public view returns (string memory uri) {
+        return _contractURI;
+    }
+
+    /**
      * @notice Fetch the metadata URI for a given token
      * @dev The metadata host must be able to resolve the token ID as a path part (contractURI/${tokenId})
      * @param tokenId the tokenId to fetch the metadata URI for
@@ -541,7 +601,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2
      */
     function tokenURI(uint256 tokenId) public view override returns (string memory uri) {
         ownerOf(tokenId); // revert if not found
-        return string(abi.encodePacked(contractURI, "/", tokenId.toString()));
+        return string(abi.encodePacked(_contractURI, "/", tokenId.toString()));
     }
 
     /**
@@ -570,6 +630,8 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2
 
     /**
      * @notice Check if a token is locked
+     * @param tokenId the token id to check
+     * @return locked true if the token is locked
      */
     function locked(uint256 tokenId) public view override returns (bool) {
         uint16 tierId = _state.subscriptions[ownerOf(tokenId)].tierId;

@@ -10,10 +10,10 @@ enum GateType {
     STPV2
 }
 
-/// @title Gate
 /// @notice A struct to represent a gate for a tier. A gate is metadata that is used to check if a subscriber
-/// is eligible to join a tier. The gate can be a contract that implements the IERC721/20 or IERC1155 interface, or
-/// it can be the subscription token itself.
+///         is eligible to join a tier. The gate can be a contract that implements the IERC721/20 or IERC1155 interface,
+/// or
+///         it can be the subscription token tier.
 struct Gate {
     /// @dev The type of gate to use
     GateType gateType;
@@ -25,9 +25,8 @@ struct Gate {
     uint256 balanceMin;
 }
 
-/// @title Tier
 /// @notice A struct to represent tier configuration. Active subscribers belong to a tier, and each tier
-/// has a set of constraints and properties to differentiate it from other tiers.
+///         has a set of constraints and properties to differentiate it from other tiers.
 struct Tier {
     /// @dev The minimimum subscription time for the tier
     uint32 periodDurationSeconds;
@@ -82,29 +81,24 @@ struct InitParams {
 struct Subscription {
     /// @dev The tier id of the subscription
     uint16 tierId;
+    /// @dev The purchase timestamp of the subscription (for managing renewals/refunds)
     uint48 purchaseExpires;
+    /// @dev The grant timestamp of the subscription (for managing grants/revokes)
     uint48 grantExpires;
+    /// @dev The expiration timestamp of the subscription
     uint48 expiresAt;
-    // /// @dev The number of seconds purchased
-    // uint48 secondsPurchased;
-    // /// @dev The number of seconds granted by the creator
-    // uint48 secondsGranted;
-    // /// @dev A time offset used to adjust expiration for grants
-    // uint48 grantOffset;
-    // /// @dev A time offset used to adjust expiration for purchases
-    // uint48 purchaseOffset;
     /// @dev The tokenId for the subscription
     uint64 tokenId;
 }
-// /// @dev The number of tokens transferred
-// uint256 totalPurchased;
 
 struct MintParams {
     /// @dev The tokenId to mint
     address account;
     /// @dev The tier id to mint
     uint16 tierId;
+    /// @dev The referrer address to provide send a referral reward to
     address referrer;
+    /// @dev The referral code to use
     uint256 referralCode;
     /// @dev The number of tokens to mint
     uint256 numTokens;

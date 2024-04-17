@@ -54,7 +54,7 @@ contract RefundsTests is BaseTest {
     function testRefundNoBalance() public {
         mint(alice, 0.001 ether);
         vm.startPrank(creator);
-        vm.expectRevert(abi.encodeWithSelector(ISTPV2.InsufficientBalance.selector));
+        vm.expectRevert(abi.encodeWithSelector(STPV2.InsufficientBalance.selector));
         stp.refund(alice, 0.002 ether);
         vm.stopPrank();
     }

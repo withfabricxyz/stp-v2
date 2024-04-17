@@ -2,24 +2,27 @@
 
 pragma solidity ^0.8.20;
 
-import {ISTPV2} from "./interfaces/ISTPV2.sol";
+import {LibClone} from "@solady/utils/LibClone.sol";
 
+import {STPV2} from "./STPV2.sol";
+
+import {AccessControlled} from "./abstracts/AccessControlled.sol";
+
+import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
 import "./types/Constants.sol";
 import {FeeParams, InitParams, Tier} from "./types/Index.sol";
 import {CurveParams, RewardParams} from "./types/Rewards.sol";
-import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {LibClone} from "@solady/utils/LibClone.sol";
 import {DeployParams, FactoryFeeConfig} from "src/types/Factory.sol";
 
 /**
  *
  * @title Fabric Subscription Token Factory Contract
  * @author Fabric Inc.
- *
  * @dev A factory which leverages Clones to deploy Fabric Subscription Token Contracts
- *
  */
-contract STPV2Factory is Ownable2Step {
+contract STPV2Factory is AccessControlled {
+    using CurrencyLib for Currency;
+
     /////////////////
     // Errors
     /////////////////
@@ -50,10 +53,7 @@ contract STPV2Factory is Ownable2Step {
     /////////////////
 
     /// @dev Emitted upon a successful subscription contract deployment
-    event SubscriptionDeployment(address indexed deployment, uint256 feeId);
-
-    /// @dev Emitted upon a successful reward pool deployment
-    event RewardPoolDeployment(address indexed deployment);
+    event Deployment(address indexed deployment, uint256 feeId, bytes deployKey);
 
     /// @dev Emitted when a new fee is created
     event FeeCreated(uint256 indexed id, address collector, uint16 bips, uint80 deployFee);
@@ -66,11 +66,11 @@ contract STPV2Factory is Ownable2Step {
 
     /////////////////
 
+    /// @dev The deploy fee currency (ETH)
+    Currency private immutable _deployFeeCurrency = Currency.wrap(address(0));
+
     /// @dev The STP contract implementation address
     address immutable _stpImplementation;
-
-    /// @dev The default RewardPool contract implementation address
-    address immutable _rewardPoolImplementation;
 
     /// @dev Configured fee ids and their config
     mapping(uint256 => FactoryFeeConfig) private _feeConfigs;
@@ -79,8 +79,9 @@ contract STPV2Factory is Ownable2Step {
      * @notice Construct a new Factory contract
      * @param stpImplementation the STPV2 implementation address
      */
-    constructor(address stpImplementation) Ownable(msg.sender) {
+    constructor(address stpImplementation) {
         _stpImplementation = stpImplementation;
+        _setOwner(msg.sender);
     }
 
     /**
@@ -90,7 +91,8 @@ contract STPV2Factory is Ownable2Step {
      */
     function deploySubscription(DeployParams memory params) public payable returns (address) {
         // If an invalid fee id is provided, use the default fee (0)
-        FactoryFeeConfig memory fees = _feeConfig(params.feeConfigId);
+        uint256 feeConfigId = _resolveFeeId(params.feeConfigId);
+        FactoryFeeConfig memory fees = _feeConfigs[feeConfigId];
 
         // Transfer the deploy fee to the collector
         _transferDeployFee(fees);
@@ -103,10 +105,10 @@ contract STPV2Factory is Ownable2Step {
 
         FeeParams memory subFees = FeeParams({collector: fees.collector, bips: fees.basisPoints});
 
-        ISTPV2(payable(deployment)).initialize(
+        STPV2(payable(deployment)).initialize(
             params.initParams, params.tierParams, params.rewardParams, params.curveParams, subFees
         );
-        emit SubscriptionDeployment(deployment, params.feeConfigId);
+        emit Deployment(deployment, feeConfigId, params.deployKey);
 
         return deployment;
     }
@@ -116,7 +118,8 @@ contract STPV2Factory is Ownable2Step {
      * @param id the id of the fee for future deployments
      * @param config the fee configuration
      */
-    function createFee(uint256 id, FactoryFeeConfig memory config) external onlyOwner {
+    function createFee(uint256 id, FactoryFeeConfig memory config) external {
+        _checkOwner();
         if (config.basisPoints == 0 || config.basisPoints > MAX_FEE_BPS) revert FeeBipsInvalid();
         if (config.collector == address(0)) revert FeeCollectorInvalid();
         if (_feeConfigs[id].collector != address(0)) revert FeeExists(id);
@@ -128,7 +131,8 @@ contract STPV2Factory is Ownable2Step {
      * @notice Destroy a fee schedule
      * @param id the id of the fee to destroy
      */
-    function destroyFee(uint256 id) external onlyOwner {
+    function destroyFee(uint256 id) external {
+        _checkOwner();
         if (_feeConfigs[id].collector == address(0)) revert FeeNotFound(id);
         emit FeeDestroyed(id);
         delete _feeConfigs[id];
@@ -144,11 +148,9 @@ contract STPV2Factory is Ownable2Step {
     }
 
     /////////////////
-
-    function _feeConfig(uint256 feeConfigId) internal view returns (FactoryFeeConfig memory fees) {
-        FactoryFeeConfig memory _fees = _feeConfigs[feeConfigId];
-        if (feeConfigId != 0 && _fees.collector == address(0)) _fees = _feeConfigs[0];
-        return _fees;
+    function _resolveFeeId(uint256 feeConfigId) internal view returns (uint256 id) {
+        if (_feeConfigs[feeConfigId].collector == address(0)) return 0;
+        return feeConfigId;
     }
 
     /**
@@ -157,11 +159,9 @@ contract STPV2Factory is Ownable2Step {
      */
     function _transferDeployFee(FactoryFeeConfig memory fees) internal {
         if (fees.deployFee == 0) return;
-
+        if (fees.collector == address(0)) return;
         if (msg.value < fees.deployFee) revert FeeInsufficient(fees.deployFee);
-
         emit DeployFeeTransfer(fees.collector, msg.value);
-        (bool sent,) = payable(fees.collector).call{value: msg.value}("");
-        if (!sent) revert FeeTransferFailed();
+        _deployFeeCurrency.transfer(fees.collector, msg.value);
     }
 }

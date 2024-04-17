@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.20;
 
-import {Currency} from "../libraries/CurrencyLib.sol";
-
 struct Holder {
     /// @dev The number of shares earned
     uint256 numShares;
@@ -32,26 +30,4 @@ struct RewardParams {
     uint32 slashGracePeriod;
     /// @dev whether the pool is slashable
     bool slashable;
-}
-
-struct IssueParams {
-    /// @dev The address of the pool
-    address holder;
-    /// @dev The number of tokens in the pool
-    uint256 numShares;
-    /// @dev The number of shares to issue
-    uint256 allocation;
-    /// @dev The number of shares to issue
-    uint48 slashingThreshold;
-    /// @dev The number of shares to issue
-    uint8 curveId;
-}
-
-//// Views ////
-
-struct PoolDetailView {
-    uint8 numCurves;
-    address currencyAddress;
-    uint256 totalShares;
-    uint256 balance;
 }
