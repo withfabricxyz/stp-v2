@@ -5,6 +5,7 @@ pragma solidity ^0.8.20;
 // import "forge-std/console.sol";
 import {Gate, GateType} from "../types/Index.sol";
 
+/// @dev External hybrid interface for token gate checks
 interface ExternalGate {
     function balanceOf(address account) external view returns (uint256);
     function balanceOf(address account, uint256 id) external view returns (uint256);

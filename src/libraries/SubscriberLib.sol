@@ -9,18 +9,21 @@ import {Subscription, Tier} from "../types/Index.sol";
 library SubscriberLib {
     using SubscriberLib for Subscription;
 
+    /// @dev Extend the expiration time of a subscription (via purchase)
     function extendPurchase(Subscription storage sub, uint48 numSeconds) internal {
         sub.extend(numSeconds);
         if (sub.purchaseExpires > block.timestamp) sub.purchaseExpires += numSeconds;
         else sub.purchaseExpires = uint48(block.timestamp + numSeconds);
     }
 
+    /// @dev Extend the expiration time of a subscription (via grant)
     function extendGrant(Subscription storage sub, uint48 numSeconds) internal {
         sub.extend(numSeconds);
         if (sub.grantExpires > block.timestamp) sub.grantExpires += numSeconds;
         else sub.grantExpires = uint48(block.timestamp + numSeconds);
     }
 
+    /// @dev Revoke all granted time from a subscription
     function revokeTime(Subscription storage sub) internal returns (uint48) {
         uint48 remaining = sub.grantedTimeRemaining();
         sub.grantExpires = uint48(block.timestamp);
@@ -28,6 +31,7 @@ library SubscriberLib {
         return remaining;
     }
 
+    /// @dev Refund all purchased time from a subscription
     function refundTime(Subscription storage sub) internal returns (uint48) {
         uint48 refundedTime = sub.purchasedTimeRemaining();
         sub.purchaseExpires = uint48(block.timestamp);
@@ -35,6 +39,7 @@ library SubscriberLib {
         return refundedTime;
     }
 
+    /// @dev Reset the expiration time of a subscription (used for tier switching)
     function resetExpires(Subscription storage sub, uint48 expiresAt) internal {
         sub.expiresAt = expiresAt;
         sub.purchaseExpires = expiresAt;
@@ -53,16 +58,19 @@ library SubscriberLib {
         return uint48(sub.grantExpires - block.timestamp);
     }
 
+    /// @dev The amount of time remaining for a given subscription
     function remainingSeconds(Subscription memory sub) internal view returns (uint48) {
         return sub.expiresAt > block.timestamp ? sub.expiresAt - uint48(block.timestamp) : 0;
     }
 
+    /// @dev Extend the expiration time of a subscription and emit an update event
     function extend(Subscription storage sub, uint48 numSeconds) internal {
         if (sub.expiresAt > block.timestamp) sub.expiresAt += numSeconds;
         else sub.expiresAt = uint48(block.timestamp + numSeconds);
         emit IERC4906.MetadataUpdate(sub.tokenId);
     }
 
+    /// @dev Retract the expiration time of a subscription and emit an update event
     function retract(Subscription storage sub, uint48 numSeconds) internal {
         sub.expiresAt -= numSeconds;
         emit IERC4906.MetadataUpdate(sub.tokenId);

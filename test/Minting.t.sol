@@ -40,7 +40,7 @@ contract MintingTest is BaseTest {
         vm.expectRevert(abi.encodeWithSelector(ERC721.TransferToZeroAddress.selector));
         stp.mintFor{value: 0.001 ether}(address(0), 0.001 ether);
         vm.expectEmit(true, true, false, true, address(stp));
-        emit SubscriptionLib.Purchase(bob, 1, 0.001 ether, 30 days, uint48(block.timestamp + 30 days));
+        emit SubscriptionLib.Purchase(1, 0.001 ether, 30 days, uint48(block.timestamp + 30 days));
         stp.mintFor{value: 0.001 ether}(bob, 0.001 ether);
         assertEq(address(stp).balance, 0.001 ether);
         assertEq(stp.balanceOf(bob), 30 days);

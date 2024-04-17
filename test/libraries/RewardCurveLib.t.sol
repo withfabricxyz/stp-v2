@@ -14,10 +14,6 @@ contract RewardCurveTestShim {
         return RewardCurveLib.currentMultiplier(params);
     }
 
-    function flattensAt(CurveParams memory params) external pure returns (uint48) {
-        return RewardCurveLib.flattensAt(params);
-    }
-
     function test() public {}
 }
 
@@ -68,13 +64,6 @@ contract RewardLibTest is BaseTest {
         params.minMultiplier = 0;
         vm.expectRevert(abi.encodeWithSelector(RewardCurveLib.InvalidCurve.selector));
         params = shim.validate(params);
-    }
-
-    function testFlattensAt() public {
-        CurveParams memory params = shim.validate(defaults());
-        assertEq(shim.flattensAt(params), params.startTimestamp + (86_400 * (6 + 1)));
-        vm.warp(params.startTimestamp + shim.flattensAt(params) + 1);
-        assertEq(shim.currentMultiplier(params), params.minMultiplier);
     }
 
     function testSinglePeriod() public {

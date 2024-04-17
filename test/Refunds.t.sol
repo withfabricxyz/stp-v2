@@ -47,7 +47,7 @@ contract RefundsTests is BaseTest {
 
     function testRefundNoPurchase() public prank(creator) {
         stp.topUp{value: 1 ether}(1 ether);
-        vm.expectRevert(abi.encodeWithSelector(SubscriptionLib.InvalidRefund.selector));
+        vm.expectRevert(abi.encodeWithSelector(SubscriptionLib.SubscriptionNotFound.selector));
         stp.refund(bob, 0.001 ether);
     }
 

@@ -32,13 +32,7 @@ library SubscriptionLib {
     /////////////////////
 
     /// @dev Emitted when time is purchased (new nft or renewed)
-    event Purchase(
-        address indexed account,
-        uint64 indexed tokenId,
-        uint256 tokensTransferred,
-        uint48 timePurchased,
-        uint48 expiresAt
-    );
+    event Purchase(uint64 indexed tokenId, uint256 tokensTransferred, uint48 timePurchased, uint48 expiresAt);
 
     /// @dev Emitted when the creator refunds a subscribers remaining time
     event Refund(uint64 indexed tokenId, uint256 tokensTransferred, uint48 timeReclaimed);
@@ -63,7 +57,7 @@ library SubscriptionLib {
     /////////////////////
 
     /// @dev The account does not have a subscription
-    error InvalidRefund();
+    error SubscriptionNotFound();
 
     /// @dev The account cannot be deactivated
     error DeactivationFailure();
@@ -130,22 +124,13 @@ library SubscriptionLib {
         uint48 numSeconds = tierState.checkRenewal(sub, tokensForTime);
         sub.extendPurchase(numSeconds);
 
-        emit Purchase(account, sub.tokenId, numTokens, numSeconds, sub.expiresAt);
+        emit Purchase(sub.tokenId, numTokens, numSeconds, sub.expiresAt);
     }
 
-    function emitSwitchEvents(uint256 tokenId, uint16 fromTierId, uint16 toTierId, bool locked) private {
-        emit SwitchTier(uint64(tokenId), fromTierId, toTierId);
-
-        // Soulbound events
-        if (locked) emit IERC5192.Locked(tokenId);
-        else emit IERC5192.Unlocked(tokenId);
-    }
-
-    /// @dev Refund the remaining time of a subscriber. The creator chooses the amount of tokens to refund, which can be
-    /// 0
+    /// @dev Refund the remaining time of a subscriber. The creator sets the amount of tokens to refund, which can be 0
     function refund(State storage state, address account, uint256 numTokens) internal {
         Subscription storage sub = state.subscriptions[account];
-        if (sub.tokenId == 0) revert InvalidRefund();
+        if (sub.tokenId == 0) revert SubscriptionNotFound();
         uint48 refundedTime = sub.refundTime();
         emit Refund(sub.tokenId, numTokens, refundedTime);
     }
@@ -182,7 +167,17 @@ library SubscriptionLib {
     /// @dev Revoke ONLY granted time from a subscriber
     function revokeTime(State storage state, address account) internal {
         Subscription storage sub = state.subscriptions[account];
+        if (sub.tokenId == 0) revert SubscriptionNotFound();
         uint48 remaining = sub.revokeTime();
         emit GrantRevoke(sub.tokenId, remaining, sub.expiresAt);
+    }
+
+    /// @dev Emit the switch tier events
+    function emitSwitchEvents(uint256 tokenId, uint16 fromTierId, uint16 toTierId, bool locked) private {
+        emit SwitchTier(uint64(tokenId), fromTierId, toTierId);
+
+        // Soulbound events
+        if (locked) emit IERC5192.Locked(tokenId);
+        else emit IERC5192.Unlocked(tokenId);
     }
 }

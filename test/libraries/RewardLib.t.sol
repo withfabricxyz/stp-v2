@@ -28,6 +28,10 @@ contract RewardTestShim {
         );
     }
 
+    function createCurve(CurveParams memory _curve) external {
+        RewardLib.createCurve(_state, _curve);
+    }
+
     function issue(address _holder, uint256 numShares) external {
         RewardLib.issue(_state, _holder, numShares);
     }
@@ -74,7 +78,23 @@ contract RewardTestShim {
 contract RewardLibTest is BaseTest {
     RewardTestShim public shim = new RewardTestShim();
 
+    function testCurve() public {
+        vm.expectEmit(true, true, false, true, address(shim));
+        emit RewardLib.CurveCreated(1);
+        shim.createCurve(
+            CurveParams({
+                numPeriods: 6,
+                periodSeconds: 86_400,
+                startTimestamp: uint48(block.timestamp),
+                minMultiplier: 0,
+                formulaBase: 2
+            })
+        );
+    }
+
     function testIssuance() public {
+        vm.expectEmit(true, true, false, true, address(shim));
+        emit RewardLib.SharesIssued(alice, 100_000);
         shim.issue(alice, 100_000);
         shim.issue(bob, 100_000);
         assertEq(shim.holder(alice).numShares, 100_000);
@@ -85,6 +105,8 @@ contract RewardLibTest is BaseTest {
     function testIssuanceOnCurve() public {
         // state.curves[0] = defaults();
         uint256 multiplier = RewardCurveLib.currentMultiplier(shim.curve(0));
+        vm.expectEmit(true, true, false, true, address(shim));
+        emit RewardLib.SharesIssued(alice, 100_000 * multiplier);
         shim.issueWithCurve(alice, 100_000, 0);
         shim.issueWithCurve(bob, 100_000, 0);
         assertEq(shim.holder(alice).numShares, 100_000 * multiplier);
@@ -97,6 +119,9 @@ contract RewardLibTest is BaseTest {
         shim.allocate(100_000);
 
         shim.issue(alice, 100_000);
+
+        vm.expectEmit(true, true, false, true, address(shim));
+        emit RewardLib.RewardsAllocated(100_000);
         shim.allocate(100_000);
         assertEq(shim.state().totalRewardIngress, 100_000);
         assertEq(shim.rewardBalanceOf(alice), 100_000);
@@ -113,6 +138,9 @@ contract RewardLibTest is BaseTest {
         shim.allocate(100_000);
         assertEq(shim.state().totalRewardIngress, 100_000);
         assertEq(shim.rewardBalanceOf(alice), 100_000);
+
+        vm.expectEmit(true, true, false, true, address(shim));
+        emit RewardLib.RewardsClaimed(alice, 100_000);
         shim.claimRewards(alice);
         assertEq(shim.rewardBalanceOf(alice), 0);
         assertEq(shim.balance(), 0);
@@ -128,6 +156,8 @@ contract RewardLibTest is BaseTest {
 
         assertEq(shim.rewardBalanceOf(bob), 50_000);
 
+        vm.expectEmit(true, true, false, true, address(shim));
+        emit RewardLib.SharesBurned(alice, 100_000);
         shim.burn(alice);
         assertEq(shim.state().totalShares, 100_000);
         assertEq(shim.rewardBalanceOf(alice), 0);

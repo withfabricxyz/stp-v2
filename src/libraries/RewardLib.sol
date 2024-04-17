@@ -11,10 +11,15 @@ library RewardLib {
     using RewardLib for State;
 
     struct State {
+        /// @dev The number of reward curves
         uint8 numCurves;
+        /// @dev The total number of outstanding shares
         uint256 totalShares;
+        /// @dev The total amount of tokens which have been allocated to the pool
         uint256 totalRewardEgress;
+        /// @dev The total amount of tokens which have been claimed from the pool
         uint256 totalRewardIngress;
+        /// @dev The total points per share (used for reward calculations)
         uint256 pointsPerShare;
         mapping(address => Holder) holders;
         mapping(uint8 => CurveParams) curves;

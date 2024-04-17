@@ -26,9 +26,6 @@ library TierLib {
     // ERRORS
     /////////////////////
 
-    /// @dev The tier id must be > 0 and monotonic
-    error TierInvalidId();
-
     /// @dev The tier duration must be > 0
     error TierInvalidDuration();
 
