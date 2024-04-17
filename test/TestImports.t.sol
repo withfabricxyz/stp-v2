@@ -24,7 +24,7 @@ import {GateLib} from "src/libraries/GateLib.sol";
 
 import {ReferralLib} from "src/libraries/ReferralLib.sol";
 import {RewardCurveLib} from "src/libraries/RewardCurveLib.sol";
-import {RewardLib} from "src/libraries/RewardLib.sol";
+import {RewardPoolLib} from "src/libraries/RewardPoolLib.sol";
 import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
 
 import {SubscriberLib} from "src/libraries/SubscriberLib.sol";

@@ -6,9 +6,9 @@ import {RewardCurveLib} from "src/libraries/RewardCurveLib.sol";
 import {CurveParams, Holder} from "src/types/Rewards.sol";
 
 /// @dev Library for reward tracking and distribution
-library RewardLib {
+library RewardPoolLib {
     using RewardCurveLib for CurveParams;
-    using RewardLib for State;
+    using RewardPoolLib for State;
 
     struct State {
         /// @dev The number of reward curves

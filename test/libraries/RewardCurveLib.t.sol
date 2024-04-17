@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "../TestImports.t.sol";
 
-// We need to create a shim contract to call the internal functions of RewardLib in order to get
+// We need to create a shim contract to call the internal functions of RewardPoolLib in order to get
 // foundry to generate the coverage report correctly
 contract RewardCurveTestShim {
     function validate(CurveParams memory params) external view returns (CurveParams memory) {
@@ -17,10 +17,10 @@ contract RewardCurveTestShim {
     function test() public {}
 }
 
-contract RewardLibTest is BaseTest {
+contract RewardCurveLibTest is BaseTest {
     RewardCurveTestShim public shim = new RewardCurveTestShim();
 
-    // Call all methods iva RewardLib.method so the coverage tool can track them
+    // Call all methods iva RewardPoolLib.method so the coverage tool can track them
     function defaults() internal pure returns (CurveParams memory) {
         return CurveParams({numPeriods: 6, periodSeconds: 86_400, startTimestamp: 0, minMultiplier: 0, formulaBase: 2});
     }

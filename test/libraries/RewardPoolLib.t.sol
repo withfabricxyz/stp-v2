@@ -8,12 +8,12 @@ struct PoolStatePartial {
     uint256 totalRewardIngress;
 }
 
-// We need to create a shim contract to call the internal functions of RewardLib in order to get
+// We need to create a shim contract to call the internal functions of RewardPoolLib in order to get
 // foundry to generate the coverage report correctly
 contract RewardTestShim {
-    using RewardLib for RewardLib.State;
+    using RewardPoolLib for RewardPoolLib.State;
 
-    RewardLib.State private _state;
+    RewardPoolLib.State private _state;
 
     constructor() {
         // _state.currency = Currency.wrap(address(0));
@@ -29,23 +29,23 @@ contract RewardTestShim {
     }
 
     function createCurve(CurveParams memory _curve) external {
-        RewardLib.createCurve(_state, _curve);
+        RewardPoolLib.createCurve(_state, _curve);
     }
 
     function issue(address _holder, uint256 numShares) external {
-        RewardLib.issue(_state, _holder, numShares);
+        RewardPoolLib.issue(_state, _holder, numShares);
     }
 
     function issueWithCurve(address _holder, uint256 numShares, uint8 curveId) external {
-        RewardLib.issueWithCurve(_state, _holder, numShares, curveId);
+        RewardPoolLib.issueWithCurve(_state, _holder, numShares, curveId);
     }
 
     function allocate(uint256 amount) external {
-        RewardLib.allocate(_state, amount);
+        RewardPoolLib.allocate(_state, amount);
     }
 
     function claimRewards(address account) external returns (uint256 amount) {
-        return RewardLib.claimRewards(_state, account);
+        return RewardPoolLib.claimRewards(_state, account);
     }
 
     function curve(uint8 id) external view returns (CurveParams memory params) {
@@ -57,15 +57,15 @@ contract RewardTestShim {
     }
 
     function rewardBalanceOf(address account) external view returns (uint256) {
-        return RewardLib.rewardBalanceOf(_state, account);
+        return RewardPoolLib.rewardBalanceOf(_state, account);
     }
 
     function balance() external view returns (uint256) {
-        return RewardLib.balance(_state);
+        return RewardPoolLib.balance(_state);
     }
 
     function burn(address account) external {
-        RewardLib.burn(_state, account);
+        RewardPoolLib.burn(_state, account);
     }
 
     function state() external view returns (PoolStatePartial memory) {
@@ -75,12 +75,12 @@ contract RewardTestShim {
     function test() public {}
 }
 
-contract RewardLibTest is BaseTest {
+contract RewardPoolLibTest is BaseTest {
     RewardTestShim public shim = new RewardTestShim();
 
     function testCurve() public {
         vm.expectEmit(true, true, false, true, address(shim));
-        emit RewardLib.CurveCreated(1);
+        emit RewardPoolLib.CurveCreated(1);
         shim.createCurve(
             CurveParams({
                 numPeriods: 6,
@@ -94,7 +94,7 @@ contract RewardLibTest is BaseTest {
 
     function testIssuance() public {
         vm.expectEmit(true, true, false, true, address(shim));
-        emit RewardLib.SharesIssued(alice, 100_000);
+        emit RewardPoolLib.SharesIssued(alice, 100_000);
         shim.issue(alice, 100_000);
         shim.issue(bob, 100_000);
         assertEq(shim.holder(alice).numShares, 100_000);
@@ -106,7 +106,7 @@ contract RewardLibTest is BaseTest {
         // state.curves[0] = defaults();
         uint256 multiplier = RewardCurveLib.currentMultiplier(shim.curve(0));
         vm.expectEmit(true, true, false, true, address(shim));
-        emit RewardLib.SharesIssued(alice, 100_000 * multiplier);
+        emit RewardPoolLib.SharesIssued(alice, 100_000 * multiplier);
         shim.issueWithCurve(alice, 100_000, 0);
         shim.issueWithCurve(bob, 100_000, 0);
         assertEq(shim.holder(alice).numShares, 100_000 * multiplier);
@@ -115,13 +115,13 @@ contract RewardLibTest is BaseTest {
     }
 
     function testAllocation() public {
-        vm.expectRevert(RewardLib.AllocationWithoutShares.selector);
+        vm.expectRevert(RewardPoolLib.AllocationWithoutShares.selector);
         shim.allocate(100_000);
 
         shim.issue(alice, 100_000);
 
         vm.expectEmit(true, true, false, true, address(shim));
-        emit RewardLib.RewardsAllocated(100_000);
+        emit RewardPoolLib.RewardsAllocated(100_000);
         shim.allocate(100_000);
         assertEq(shim.state().totalRewardIngress, 100_000);
         assertEq(shim.rewardBalanceOf(alice), 100_000);
@@ -131,7 +131,7 @@ contract RewardLibTest is BaseTest {
         assertEq(0, shim.rewardBalanceOf(alice));
         shim.issue(alice, 100_000);
 
-        vm.expectRevert(RewardLib.NoRewardsToClaim.selector);
+        vm.expectRevert(RewardPoolLib.NoRewardsToClaim.selector);
         shim.claimRewards(alice);
         assertEq(0, shim.rewardBalanceOf(alice));
 
@@ -140,14 +140,14 @@ contract RewardLibTest is BaseTest {
         assertEq(shim.rewardBalanceOf(alice), 100_000);
 
         vm.expectEmit(true, true, false, true, address(shim));
-        emit RewardLib.RewardsClaimed(alice, 100_000);
+        emit RewardPoolLib.RewardsClaimed(alice, 100_000);
         shim.claimRewards(alice);
         assertEq(shim.rewardBalanceOf(alice), 0);
         assertEq(shim.balance(), 0);
     }
 
     function testBurn() public {
-        vm.expectRevert(RewardLib.NoSharesToBurn.selector);
+        vm.expectRevert(RewardPoolLib.NoSharesToBurn.selector);
         shim.burn(alice);
 
         shim.issue(alice, 100_000);
@@ -157,7 +157,7 @@ contract RewardLibTest is BaseTest {
         assertEq(shim.rewardBalanceOf(bob), 50_000);
 
         vm.expectEmit(true, true, false, true, address(shim));
-        emit RewardLib.SharesBurned(alice, 100_000);
+        emit RewardPoolLib.SharesBurned(alice, 100_000);
         shim.burn(alice);
         assertEq(shim.state().totalShares, 100_000);
         assertEq(shim.rewardBalanceOf(alice), 0);

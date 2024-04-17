@@ -10,9 +10,7 @@ import {AccessControlled} from "./abstracts/AccessControlled.sol";
 import {ERC721} from "./abstracts/ERC721.sol";
 import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
 import {ReferralLib} from "./libraries/ReferralLib.sol";
-import {RewardCurveLib} from "./libraries/RewardCurveLib.sol";
-
-import {RewardLib} from "./libraries/RewardLib.sol";
+import {RewardPoolLib} from "./libraries/RewardPoolLib.sol";
 import {SubscriberLib} from "./libraries/SubscriberLib.sol";
 import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
 import {TierLib} from "./libraries/TierLib.sol";
@@ -29,13 +27,11 @@ import {ContractView, SubscriberView} from "./types/Views.sol";
  */
 contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
     using LibString for uint256;
-    using TierLib for Tier;
     using SubscriberLib for Subscription;
     using CurrencyLib for Currency;
     using SubscriptionLib for SubscriptionLib.State;
     using ReferralLib for ReferralLib.State;
-    using RewardLib for RewardLib.State;
-    using RewardCurveLib for CurveParams;
+    using RewardPoolLib for RewardPoolLib.State;
 
     //////////////////
     // Errors
@@ -125,7 +121,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
     ReferralLib.State private _referrals;
 
     /// @dev The reward pool state (holders, balances, etc)
-    RewardLib.State private _rewards;
+    RewardPoolLib.State private _rewards;
 
     /// @dev The address of the account which can receive transfers via sponsored calls
     address private _transferRecipient;
