@@ -6,32 +6,30 @@ import {Test} from "@forge/Test.sol";
 import {ERC721} from "src/abstracts/ERC721.sol";
 
 contract TestSubject is ERC721, Test {
-    constructor(address account) {
-
-    }
+    constructor(address account) {}
 
     function mint(address account, uint256 id) external {
-      _mint(account, id);
+        _mint(account, id);
     }
 
-    function tokenURI(uint256) public override pure returns (string memory) {
-      return "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+    function tokenURI(uint256) public pure override returns (string memory) {
+        return "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
     }
 
-    function name() public override pure returns (string memory) {
-      return "TestSubject";
+    function name() public pure override returns (string memory) {
+        return "TestSubject";
     }
 
-    function symbol() public override pure returns (string memory) {
-      return "TS";
+    function symbol() public pure override returns (string memory) {
+        return "TS";
     }
 
-    function balanceOf(address) public override pure returns (uint256) {
-      return 0; // Don't care
+    function balanceOf(address) public pure override returns (uint256) {
+        return 0; // Don't care
     }
 
     function locked(uint256) external pure returns (bool) {
-      return false;
+        return false;
     }
 
     function test() public {}
@@ -41,16 +39,16 @@ contract Receiver is Test {
     error Nope();
 
     bool private _revert;
+    bytes public _data;
 
-    constructor (bool doRevert) {
-      _revert = doRevert;
+    constructor(bool doRevert) {
+        _revert = doRevert;
     }
 
-    function onERC721Received(address, address, uint256, bytes calldata) external view returns (bytes4) {
-      if (_revert) {
-        revert Nope();
-      }
-      return 0x150b7a02;
+    function onERC721Received(address, address, uint256, bytes calldata data) external returns (bytes4) {
+        if (_revert) revert Nope();
+        _data = data;
+        return 0x150b7a02;
     }
 
     function test() public {}
@@ -67,12 +65,12 @@ contract ERC721Test is Test {
     }
 
     function test165() public {
-      assertTrue(subject.supportsInterface(0x01ffc9a7));
-      assertTrue(subject.supportsInterface(0x80ac58cd));
-      assertTrue(subject.supportsInterface(0x5b5e139f));
-      assertTrue(subject.supportsInterface(0x49064906));
-      assertTrue(subject.supportsInterface(0xb45a3c0e));
-      assertFalse(subject.supportsInterface(0xdeadbeef));
+        assertTrue(subject.supportsInterface(0x01ffc9a7));
+        assertTrue(subject.supportsInterface(0x80ac58cd));
+        assertTrue(subject.supportsInterface(0x5b5e139f));
+        assertTrue(subject.supportsInterface(0x49064906));
+        assertTrue(subject.supportsInterface(0xb45a3c0e));
+        assertFalse(subject.supportsInterface(0xdeadbeef));
     }
 
     function testMintApproveTransfer() public {
@@ -114,23 +112,24 @@ contract ERC721Test is Test {
     }
 
     function testSafeTransfer() public {
-      subject.mint(alice, 1);
-      subject.mint(alice, 2);
-      vm.startPrank(alice);
-      subject.safeTransferFrom(alice, bob, 1);
-      subject.safeTransferFrom(alice, bob, 2, "hi");
-      vm.stopPrank();
+        subject.mint(alice, 1);
+        subject.mint(alice, 2);
+        vm.startPrank(alice);
+        subject.safeTransferFrom(alice, bob, 1);
+        subject.safeTransferFrom(alice, bob, 2, "true");
+        vm.stopPrank();
 
-      Receiver receiver1 = new Receiver(true);
-      Receiver receiver2 = new Receiver(false);
+        Receiver receiver1 = new Receiver(true);
+        Receiver receiver2 = new Receiver(false);
 
-      vm.startPrank(bob);
-      vm.expectRevert(0xd1a57ed6);
-      subject.safeTransferFrom(bob, address(this), 1);
+        vm.startPrank(bob);
+        vm.expectRevert(0xd1a57ed6);
+        subject.safeTransferFrom(bob, address(this), 1);
 
-      vm.expectRevert(Receiver.Nope.selector);
-      subject.safeTransferFrom(bob, address(receiver1), 1);
-      subject.safeTransferFrom(bob, address(receiver2), 1);
-      vm.stopPrank();
+        vm.expectRevert(Receiver.Nope.selector);
+        subject.safeTransferFrom(bob, address(receiver1), 1);
+        subject.safeTransferFrom(bob, address(receiver2), 1, "meow");
+        assertEq(receiver2._data(), "meow");
+        vm.stopPrank();
     }
 }
