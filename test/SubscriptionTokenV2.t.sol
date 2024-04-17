@@ -139,7 +139,7 @@ contract STPV2Test is BaseTest {
         mint(bob, 1e18);
         vm.startPrank(alice);
         stp.approve(bob, 1);
-        vm.expectRevert(abi.encodeWithSelector(ISTPV2.InvalidTransfer.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISTPV2.TransferToExistingSubscriber.selector));
         stp.transferFrom(alice, bob, 1);
     }
 

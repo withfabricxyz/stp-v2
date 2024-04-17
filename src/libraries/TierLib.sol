@@ -10,7 +10,12 @@ import {SubscriberLib} from "./SubscriberLib.sol";
 library TierLib {
     using SubscriberLib for Subscription;
     using TierLib for Tier;
+    using TierLib for TierLib.State;
 
+    /// @dev scale factor for precision on tokens per second
+    uint256 private constant SCALE_FACTOR = 1e18;
+
+    /// @dev The state of a tier
     struct State {
         uint32 subCount;
         uint16 id;
@@ -64,6 +69,7 @@ library TierLib {
     // Checks
     /////////////////////
 
+    /// @dev Validate a tier
     function validate(Tier memory tier) internal view {
         if (tier.periodDurationSeconds == 0) revert TierInvalidDuration();
 
@@ -77,6 +83,7 @@ library TierLib {
         GateLib.validate(tier.gate);
     }
 
+    /// @dev Check if an account can join a tier (initial price + token gating)
     function checkJoin(State storage state, address account, uint256 numTokens) internal view {
         if (block.timestamp < state.params.startTimestamp) revert TierNotStarted();
         if (state.params.maxSupply != 0 && state.subCount >= state.params.maxSupply) revert TierHasNoSupply(state.id);
@@ -84,6 +91,7 @@ library TierLib {
         GateLib.checkAccount(state.params.gate, account);
     }
 
+    /// @dev Check the renewal price and commitment time for a subscription
     function checkRenewal(
         State storage state,
         Subscription memory sub,
@@ -94,7 +102,7 @@ library TierLib {
         if (tier.paused) revert TierRenewalsPaused();
         if (numTokens < tier.pricePerPeriod) revert TierInvalidRenewalPrice(tier.pricePerPeriod);
 
-        numSeconds = tokensToSeconds(tier, numTokens);
+        numSeconds = state.tokensToSeconds(numTokens);
         uint48 totalFutureSeconds = sub.remainingSeconds() + numSeconds;
 
         if (tier.maxCommitmentSeconds > 0 && totalFutureSeconds > tier.maxCommitmentSeconds) {
@@ -106,10 +114,26 @@ library TierLib {
         }
     }
 
-    function tokensToSeconds(Tier memory tier, uint256 numTokens) private pure returns (uint48) {
-        // Pay what you want tiers result in the full period duration (regardless of price paid)
-        if (tier.pricePerPeriod == 0) return tier.periodDurationSeconds;
-        // TODO: Precision loss here?
-        return uint48(numTokens / (tier.pricePerPeriod / tier.periodDurationSeconds));
+    /// @dev Convert tokens to seconds based on the current rate (for free tier any tokens = period duration)
+    function tokensToSeconds(State storage state, uint256 numTokens) internal view returns (uint48) {
+        if (state.params.pricePerPeriod == 0) return state.params.periodDurationSeconds;
+        // Try to reduce precision issues by scaling up before division
+        return uint48((numTokens * SCALE_FACTOR) / state.exaTokensPerSecond());
+    }
+
+    /// @dev Determine the number of tokens per second, scaled by the SCALE_FACTOR for low decimal tokens like USDC
+    function exaTokensPerSecond(State storage state) internal view returns (uint256) {
+        return (state.params.pricePerPeriod * SCALE_FACTOR) / state.params.periodDurationSeconds;
+    }
+
+    /// @dev Convert a number of seconds on one tier to a number of seconds on another tier.
+    ///      If the toTier is free, the number of seconds = periodDuration
+    ///      If the fromTier is free, the number of seconds = 0
+    function computeSwitchTimeValue(
+        State storage toTier,
+        State storage fromTier,
+        uint48 numSeconds
+    ) internal view returns (uint48) {
+        return toTier.tokensToSeconds((fromTier.exaTokensPerSecond() * numSeconds) / SCALE_FACTOR);
     }
 }

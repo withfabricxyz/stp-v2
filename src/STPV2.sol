@@ -298,7 +298,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2
      * @param newCollector the new fee collector address
      */
     function updateFeeRecipient(address newCollector) external {
-        if (msg.sender != _feeParams.collector) revert Unauthorized();
+        if (msg.sender != _feeParams.collector) revert NotAuthorized();
 
         // Give tokens back to creator and set fee rate to 0
         if (newCollector == address(0)) _feeParams.bips = 0;
@@ -366,7 +366,6 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2
         // Transfer rewards if tier has rewards
         tokensIn = _issueAndAllocateRewards(account, tokensIn, _state.subscriptions[account].tierId);
 
-        emit MetadataUpdate(tokenId);
         return (tokenId, tokensIn);
     }
 
@@ -541,7 +540,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2
      * @return uri the URI for the token
      */
     function tokenURI(uint256 tokenId) public view override returns (string memory uri) {
-        // _requireOwned(tokenId); // TODO
+        ownerOf(tokenId); // revert if not found
         return string(abi.encodePacked(contractURI, "/", tokenId.toString()));
     }
 
@@ -556,7 +555,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2
 
     /// @dev Prevent burning, handle soulbound tiers, and transfer subscription/reward state
     function _beforeTokenTransfer(address from, address to, uint256) internal override {
-        if (_state.subscriptions[to].tokenId != 0 || to == address(0)) revert InvalidTransfer();
+        if (_state.subscriptions[to].tokenId != 0) revert TransferToExistingSubscriber();
         if (from != address(0)) {
             uint16 tierId = _state.subscriptions[from].tierId;
             if (tierId != 0 && !_state.tiers[tierId].params.transferrable) revert TierLib.TierTransferDisabled();
@@ -590,7 +589,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ISTPV2
      */
     function recoverCurrency(address tokenAddress, address recipientAddress, uint256 tokenAmount) external {
         _checkOwner();
-        if (tokenAddress == Currency.unwrap(_currency)) revert InvalidRecovery();
+        if (tokenAddress == Currency.unwrap(_currency)) revert NotAuthorized();
         Currency.wrap(tokenAddress).transfer(recipientAddress, tokenAmount);
     }
 }

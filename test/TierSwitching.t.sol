@@ -65,8 +65,8 @@ contract TierSwitchingTest is BaseTest {
             MintParams({tierId: 2, recipient: alice, referrer: address(0), referralCode: 0, purchaseValue: 0.002 ether})
         );
 
-        // TODO: Check on timing
         assertEq(stp.subscriptionOf(alice).tierId, 2);
+        assertApproxEqAbs(stp.balanceOf(alice), 45 days, 1);
         assertTrue(stp.locked(1));
     }
 
@@ -77,8 +77,24 @@ contract TierSwitchingTest is BaseTest {
         );
     }
 
-    // TODO: Time adjustment
-    function testDowngrade() public {}
+    function testDowngrade() public prank(alice) {
+        stp.mintAdvanced{value: 0.002 ether}(
+            MintParams({tierId: 2, recipient: alice, referrer: address(0), referralCode: 0, purchaseValue: 0.002 ether})
+        );
+        stp.mintAdvanced{value: 0.001 ether}(
+            MintParams({tierId: 1, recipient: alice, referrer: address(0), referralCode: 0, purchaseValue: 0.001 ether})
+        );
 
-    function testGrantShift() public {}
+        assertEq(stp.subscriptionOf(alice).tierId, 1);
+        assertApproxEqAbs(stp.balanceOf(alice), 90 days, 1);
+        assertFalse(stp.locked(1));
+    }
+
+    // Switching tiers clears the granted time
+    function testGrantShift() public prank(creator) {
+        stp.grantTime(alice, 30 days, 1);
+        assertEq(stp.balanceOf(alice), 30 days);
+        stp.grantTime(alice, 30 days, 2);
+        assertEq(stp.balanceOf(alice), 30 days);
+    }
 }

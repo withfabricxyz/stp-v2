@@ -10,67 +10,33 @@ interface ISTPV2 {
     // ERRORS
     //////////////////
 
-    // TODO: Doc
+    /// @notice Error when the owner is invalid
     error InvalidOwner();
+
+    /// @notice Error when the token params are invalid
     error InvalidTokenParams();
-    error InvalidContractUri();
+
+    /// @notice Error when the fee params are invalid
     error InvalidFeeParams();
-    error InvalidBps();
+
+    /// @notice Error when the reward params are invalid
     error InvalidRewardParams();
-    error InvalidAccount();
-    error InvalidTransfer();
-    error Unauthorized();
-    error InvalidRecovery();
-    error TransferFailed();
+
+    /// @notice Error when a transfer fails due to the recipient having a subscription
+    error TransferToExistingSubscriber();
+
+    /// @notice Error when the balance is insufficient for a transfer
     error InsufficientBalance();
+
+    /// @notice Error when slashing fails due to constraints
     error NotSlashable();
 
     //////////////////
     // EVENTS
     //////////////////
 
-    /// @dev A new tier has been created
-    event TierCreated(uint16 tierId);
-
-    /// @dev The tier is paused
-    event TierPaused(uint16 tierId);
-
-    /// @dev The tier is unpaused
-    event TierUnpaused(uint16 tierId);
-
-    /// @dev The tier price has changed
-    event TierPriceChange(uint16 tierId, uint256 pricePerPeriod);
-
-    /// @dev the supply cap has changed
-    event TierSupplyCapChange(uint16 tierId, uint32 newCap);
-
     /// @dev Emitted when the owner withdraws available funds
     event Withdraw(address indexed account, uint256 tokensTransferred);
-
-    /// @dev Emitted when a subscriber withdraws their rewards
-    event RewardWithdraw(address indexed account, uint256 tokensTransferred);
-
-    /// @dev Emitted when a subscriber slashed the rewards of another subscriber
-    event RewardPointsSlashed(address indexed account, address indexed slasher, uint256 rewardPointsSlashed);
-
-    /// @dev Emitted when tokens are allocated to the reward pool
-    event RewardsAllocated(uint256 tokens);
-
-    /// @dev Emitted when time is purchased (new nft or renewed)
-    event Purchase(
-        address indexed account,
-        uint256 indexed tokenId,
-        uint256 tokensTransferred,
-        uint256 timePurchased,
-        uint256 rewardPoints,
-        uint256 expiresAt
-    );
-
-    /// @dev Emitted when a subscriber is granted time by the creator
-    event Grant(address indexed account, uint256 indexed tokenId, uint256 secondsGranted, uint256 expiresAt);
-
-    /// @dev Emitted when a subscriber is revoked time by the creator
-    event GrantRevoke(address indexed account, uint256 indexed tokenId, uint256 secondsRevoked, uint256 expiresAt);
 
     /// @dev Emitted when the creator tops up the contract balance on refund
     event TopUp(uint256 tokensIn);
@@ -85,12 +51,6 @@ interface ISTPV2 {
     event ReferralPayout(
         uint256 indexed tokenId, address indexed referrer, uint256 indexed referralId, uint256 rewardAmount
     );
-
-    /// @dev Emitted when a new referral code is created
-    event ReferralCreated(uint256 id, uint16 bips);
-
-    /// @dev Emitted when a referral code is deleted
-    event ReferralDestroyed(uint256 id);
 
     /// @dev Emitted when the supply cap is updated
     event GlobalSupplyCapChange(uint256 supplyCap);

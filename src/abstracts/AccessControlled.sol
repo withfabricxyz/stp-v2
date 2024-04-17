@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.20;
 
+/// @title AccessControlled
+/// @dev Opinionated contract module that provides access control mechanisms using role bitmaps
 abstract contract AccessControlled {
     /// @dev Triggered when the owner is changed
     event OwnerChanged(address indexed owner);
@@ -63,8 +65,8 @@ abstract contract AccessControlled {
 
     /**
      * @notice Set the roles for an account
-     * @param account the account to grant the role to
-     * @param roles the role to grant (bitmask)
+     * @param account the account to grant the role(s) to
+     * @param roles the role(s) to grant
      */
     function setRoles(address account, uint16 roles) external {
         _checkOwner();
@@ -78,5 +80,13 @@ abstract contract AccessControlled {
      */
     function owner() external view returns (address account) {
         return _owner;
+    }
+
+    /**
+     * @notice Get the pending owner of the contract
+     * @return account pending owner of the contract
+     */
+    function pendingOwner() external view returns (address account) {
+        return _pendingOwner;
     }
 }

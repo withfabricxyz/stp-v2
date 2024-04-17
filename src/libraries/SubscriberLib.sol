@@ -35,6 +35,12 @@ library SubscriberLib {
         return refundedTime;
     }
 
+    function resetExpires(Subscription storage sub, uint48 expiresAt) internal {
+        sub.expiresAt = expiresAt;
+        sub.purchaseExpires = expiresAt;
+        sub.grantExpires = uint48(block.timestamp);
+    }
+
     /// @dev The amount of purchased time remaining for a given subscription
     function purchasedTimeRemaining(Subscription memory sub) internal view returns (uint48) {
         if (sub.purchaseExpires <= block.timestamp) return 0;

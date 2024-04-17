@@ -101,16 +101,7 @@ contract STPV2Factory is Ownable2Step {
         // Set the owner to the sender if it is not set
         if (params.initParams.owner == address(0)) params.initParams.owner = msg.sender;
 
-        // TODO
-        // FeeParams memory rewardFees = FeeParams({collector: source, bips: bips, controller: address(this)});
         FeeParams memory subFees = FeeParams({collector: fees.collector, bips: fees.basisPoints});
-        // Allow for the factory to control where fees go
-
-        // TODO: Clone and build a thing
-        // RewardParams memory rewardParams = RewardParams({
-        //     rewardPool: params.rewardPool
-        //     rewardBips: params.rewardBips
-        // });
 
         ISTPV2(payable(deployment)).initialize(
             params.initParams, params.tierParams, params.rewardParams, params.curveParams, subFees

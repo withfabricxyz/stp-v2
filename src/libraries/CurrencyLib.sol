@@ -8,7 +8,7 @@ import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 type Currency is address;
 
 /// @title CurrencyLibrary
-/// @dev This library allows for transferring and holding native tokens and ERC20 tokens
+/// @dev This library allows for transferring and holding native tokens and ERC20 tokens (inspired by uniswap v4)
 library CurrencyLib {
     using CurrencyLib for Currency;
     using SafeTransferLib for address;

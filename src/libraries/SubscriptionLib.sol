@@ -96,7 +96,7 @@ library SubscriptionLib {
         if (tierId == 0 || sub.remainingSeconds() > 0) revert DeactivationFailure();
         state.tiers[tierId].subCount -= 1;
         sub.tierId = 0;
-        emit SwitchTier(sub.tokenId, tierId, 0);
+        emitSwitchEvents(sub.tokenId, tierId, 0, false);
     }
 
     /// @dev Mint a new subscription for an account
@@ -133,6 +133,14 @@ library SubscriptionLib {
         emit Purchase(account, sub.tokenId, numTokens, numSeconds, sub.expiresAt);
     }
 
+    function emitSwitchEvents(uint256 tokenId, uint16 fromTierId, uint16 toTierId, bool locked) private {
+        emit SwitchTier(uint64(tokenId), fromTierId, toTierId);
+
+        // Soulbound events
+        if (locked) emit IERC5192.Locked(tokenId);
+        else emit IERC5192.Unlocked(tokenId);
+    }
+
     /// @dev Refund the remaining time of a subscriber. The creator chooses the amount of tokens to refund, which can be
     /// 0
     function refund(State storage state, address account, uint256 numTokens) internal {
@@ -150,14 +158,17 @@ library SubscriptionLib {
         if (subTierId != 0) state.tiers[subTierId].subCount -= 1;
         if (state.tiers[tierId].id == 0) revert TierLib.TierNotFound(tierId);
         state.tiers[tierId].subCount += 1;
-        // TODO: what should we do about time?
-        // sub.adjustPurchase(oldtier, newtier)
         sub.tierId = tierId;
-        emit SwitchTier(sub.tokenId, subTierId, tierId);
 
-        // Soulbound events
-        if (state.tiers[tierId].params.transferrable) emit IERC5192.Locked(sub.tokenId);
-        else emit IERC5192.Unlocked(sub.tokenId);
+        // Adjust the purchased time if necessary, and clear the granted time
+        uint48 proratedTime = 0;
+        if (subTierId != 0) {
+            proratedTime =
+                state.tiers[tierId].computeSwitchTimeValue(state.tiers[subTierId], sub.purchasedTimeRemaining());
+        }
+        sub.resetExpires(uint48(block.timestamp + proratedTime));
+
+        emitSwitchEvents(sub.tokenId, subTierId, tierId, state.tiers[tierId].params.transferrable);
     }
 
     /// @dev Grant time to a subscriber. It can be 0 seconds to switch tiers, etc

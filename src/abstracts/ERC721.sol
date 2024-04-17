@@ -4,8 +4,7 @@ pragma solidity >=0.8.0;
 import "../interfaces/IERC4906.sol";
 import "../interfaces/IERC5192.sol";
 
-/// @notice Modern, minimalist, and gas efficient ERC-721 implementation.
-/// @author Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC721.sol)
+/// @notice Hybrid ERC721 token implementation with ERC4906 and ERC5192 support. Pulled from solady and solmate.
 /// @dev Modified by Fabric
 abstract contract ERC721 is IERC4906, IERC5192 {
     /// @dev Only the token owner or an approved account can manage the token.
@@ -17,7 +16,7 @@ abstract contract ERC721 is IERC4906, IERC5192 {
     /// @dev The token already exists.
     error TokenAlreadyExists();
 
-    // /// @dev Cannot mint or transfer to the zero address.
+    /// @dev Cannot mint or transfer to the zero address.
     error TransferToZeroAddress();
 
     /*//////////////////////////////////////////////////////////////

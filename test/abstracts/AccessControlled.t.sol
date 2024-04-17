@@ -52,6 +52,8 @@ contract AccessControlledTest is Test {
         subject.setPendingOwner(address(0));
         subject.setPendingOwner(alice);
 
+        assertEq(alice, subject.pendingOwner());
+
         vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
         subject.acceptOwnership();
 

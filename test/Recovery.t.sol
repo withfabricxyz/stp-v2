@@ -13,7 +13,7 @@ contract RecoveryTests is BaseTest {
 
     function testRecoverERC20Self() public erc20 prank(creator) {
         address addr = stp.contractDetail().currency;
-        vm.expectRevert(abi.encodeWithSelector(ISTPV2.InvalidRecovery.selector));
+        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
         stp.recoverCurrency(addr, alice, 1e17);
     }
 

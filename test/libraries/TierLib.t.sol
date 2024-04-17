@@ -5,6 +5,7 @@ import "../TestImports.t.sol";
 
 contract TierTestShim {
     TierLib.State state;
+    TierLib.State state2;
 
     function validate(Tier memory tier) external view {
         TierLib.validate(tier);
@@ -19,6 +20,16 @@ contract TierTestShim {
     function checkRenewal(Tier memory tier, Subscription memory sub, uint256 numTokens) external {
         state = TierLib.State({id: 1, subCount: 0, params: tier});
         TierLib.checkRenewal(state, sub, numTokens);
+    }
+
+    function computeSwitchTimeValue(
+        Tier memory toTier,
+        Tier memory fromTier,
+        uint48 numSeconds
+    ) external returns (uint48) {
+        state = TierLib.State({id: 1, subCount: 0, params: toTier});
+        state2 = TierLib.State({id: 2, subCount: 0, params: fromTier});
+        return TierLib.computeSwitchTimeValue(state, state2, numSeconds);
     }
 
     function test() public {}
@@ -120,5 +131,25 @@ contract TierLibTest is Test {
         tier.endTimestamp = uint48(block.timestamp + 2 * tier.periodDurationSeconds);
         vm.expectRevert(abi.encodeWithSelector(TierLib.TierEndExceeded.selector));
         shim.checkRenewal(tier, sub, tier.pricePerPeriod * 3);
+    }
+
+    function testTimeRatios() public {
+        Tier memory toTier = defaults();
+        toTier.periodDurationSeconds = 30 days;
+        toTier.pricePerPeriod = 0.02 ether;
+
+        Tier memory fromTier = defaults();
+        fromTier.pricePerPeriod = 0.01 ether;
+        fromTier.periodDurationSeconds = 30 days;
+
+        uint48 numSeconds = shim.computeSwitchTimeValue(toTier, fromTier, 30 days);
+        assertApproxEqAbs(numSeconds, 15 days, 1);
+        numSeconds = shim.computeSwitchTimeValue(fromTier, toTier, numSeconds);
+        numSeconds = shim.computeSwitchTimeValue(toTier, fromTier, numSeconds);
+        numSeconds = shim.computeSwitchTimeValue(fromTier, toTier, numSeconds);
+        numSeconds = shim.computeSwitchTimeValue(toTier, fromTier, numSeconds);
+        numSeconds = shim.computeSwitchTimeValue(fromTier, toTier, numSeconds);
+        assertApproxEqAbs(numSeconds, 30 days, 10);
+        assertTrue(numSeconds < 30 days);
     }
 }

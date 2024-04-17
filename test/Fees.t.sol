@@ -37,7 +37,7 @@ contract FeesTest is BaseTest {
         vm.expectEmit(true, true, false, true, address(stp));
         emit ISTPV2.FeeCollectorChange(charlie);
         stp.updateFeeRecipient(charlie);
-        vm.expectRevert(abi.encodeWithSelector(ISTPV2.Unauthorized.selector));
+        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
         stp.updateFeeRecipient(charlie);
         vm.stopPrank();
     }
