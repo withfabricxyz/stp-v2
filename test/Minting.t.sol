@@ -121,10 +121,6 @@ contract MintingTest is BaseTest {
         vm.stopPrank();
     }
 
-    function testTierJoinChecks() public {}
-
-    function testNewMintChecks() public {}
-
     function testRenewalChecks() public prank(creator) {
         tierParams.paused = true;
         stp.updateTier(1, tierParams);

@@ -39,3 +39,4 @@ jobs:
         uses: crytic/slither-action@v0.3.2
         with:
           fail-on: high
+          slither-version: 0.10.2
