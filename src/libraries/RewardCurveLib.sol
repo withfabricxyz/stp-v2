@@ -9,7 +9,7 @@ library RewardCurveLib {
     /// @dev Calculate the current multiplier for the curve: base ^ (numPeriods - periods)
     ///      If the curve has no decay, the multiplier will be the minMultiplier
     function currentMultiplier(CurveParams memory curve) internal view returns (uint256 multiplier) {
-        if (curve.numPeriods == 0) return curve.minMultiplier;
+        if (curve.numPeriods == 0) return curve.minMultiplier; // Handle a non-existant or constant curve
 
         uint256 periods = surpassedPeriods(curve);
         if (periods > curve.numPeriods) return curve.minMultiplier;
