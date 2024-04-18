@@ -4,8 +4,8 @@ pragma solidity ^0.8.20;
 import "../TestImports.t.sol";
 
 contract MockCurrencyLib {
-    function capture(Currency currency, address from, uint256 amount) public payable returns (uint256 capturedAmount) {
-        return CurrencyLib.capture(currency, from, amount);
+    function capture(Currency currency, uint256 amount) public payable returns (uint256 capturedAmount) {
+        return CurrencyLib.capture(currency, amount);
     }
 
     function transfer(Currency currency, address to, uint256 amount) public {
@@ -54,9 +54,9 @@ contract CurrencyLibTest is Test {
         assertEq(shim.balance(eth), 0);
 
         vm.startPrank(alice);
-        shim.capture{value: 1e9}(eth, alice, 1e9);
+        shim.capture{value: 1e9}(eth, 1e9);
         vm.expectRevert(abi.encodeWithSelector(CurrencyLib.InvalidCapture.selector));
-        shim.capture{value: 1e7}(eth, alice, 1e9);
+        shim.capture{value: 1e7}(eth, 1e9);
         vm.stopPrank();
 
         vm.expectRevert(abi.encodeWithSelector(CurrencyLib.InvalidAccount.selector));
@@ -73,12 +73,12 @@ contract CurrencyLibTest is Test {
 
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(CurrencyLib.InvalidCapture.selector));
-        shim.capture{value: 1e9}(usdc, alice, 1e9);
+        shim.capture{value: 1e9}(usdc, 1e9);
         vm.expectRevert(abi.encodeWithSelector(SafeTransferLib.TransferFromFailed.selector));
-        shim.capture(usdc, alice, 1e5);
+        shim.capture(usdc, 1e5);
 
         testToken.approve(address(shim), 1e18);
-        shim.capture(usdc, alice, 1e5);
+        shim.capture(usdc, 1e5);
         vm.stopPrank();
 
         assertEq(shim.balance(usdc), 1e5);
@@ -89,7 +89,7 @@ contract CurrencyLibTest is Test {
     function testFeeTaking() public {
         vm.startPrank(alice);
         feeTaking.approve(address(shim), 1e18);
-        uint256 pulled = shim.capture(spendy, alice, 2e9);
+        uint256 pulled = shim.capture(spendy, 2e9);
         vm.stopPrank();
 
         assertEq(pulled, 1e9);

@@ -27,6 +27,9 @@ contract STPV2Factory is AccessControlled {
     // Errors
     /////////////////
 
+    /// @dev Error when the implementation address is invalid
+    error InvalidImplementation();
+
     /// @dev Error when a fee id is not found (for removal)
     error FeeNotFound(uint256 id);
 
@@ -80,6 +83,7 @@ contract STPV2Factory is AccessControlled {
      * @param stpImplementation the STPV2 implementation address
      */
     constructor(address stpImplementation) {
+        if (stpImplementation == address(0)) revert InvalidImplementation();
         _stpImplementation = stpImplementation;
         _setOwner(msg.sender);
     }
@@ -105,10 +109,10 @@ contract STPV2Factory is AccessControlled {
 
         FeeParams memory subFees = FeeParams({collector: fees.collector, bips: fees.basisPoints});
 
+        emit Deployment(deployment, feeConfigId, params.deployKey);
         STPV2(payable(deployment)).initialize(
             params.initParams, params.tierParams, params.rewardParams, params.curveParams, subFees
         );
-        emit Deployment(deployment, feeConfigId, params.deployKey);
 
         return deployment;
     }

@@ -79,6 +79,11 @@ contract TierLibTest is Test {
         vm.warp(block.timestamp + 100);
         vm.expectRevert(abi.encodeWithSelector(TierLib.TierTimingInvalid.selector));
         shim.validate(tier);
+
+        tier = defaults();
+        tier.rewardBasisPoints = 10_001;
+        vm.expectRevert(abi.encodeWithSelector(InvalidBasisPoints.selector));
+        shim.validate(tier);
     }
 
     function testJoinChecks() public {

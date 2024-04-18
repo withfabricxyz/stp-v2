@@ -273,7 +273,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
      * @param numTokens the amount of tokens to transfer
      */
     function topUp(uint256 numTokens) external payable {
-        emit TopUp(_currency.capture(msg.sender, numTokens));
+        emit TopUp(_currency.capture(numTokens));
     }
 
     /**
@@ -383,7 +383,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
         uint256 numTokens
     ) private returns (uint256 tokenId, uint256 change) {
         uint256 tokensIn = 0;
-        if (numTokens > 0) tokensIn = _currency.capture(msg.sender, numTokens);
+        if (numTokens > 0) tokensIn = _currency.capture(numTokens);
 
         // Mint a new token if necessary
         tokenId = _state.subscriptions[account].tokenId;
@@ -448,7 +448,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
      * @param amount the amount of tokens (native or ERC20) to allocate
      */
     function yieldRewards(uint256 amount) external payable {
-        _rewards.allocate(_currency.capture(msg.sender, amount));
+        _rewards.allocate(_currency.capture(amount));
     }
 
     /**

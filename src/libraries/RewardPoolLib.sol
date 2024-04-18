@@ -62,6 +62,7 @@ library RewardPoolLib {
 
     /// @dev Create a new reward curve (starting at id 0)
     function createCurve(State storage state, CurveParams memory curve) internal {
+        if (curve.startTimestamp == 0) curve.startTimestamp = uint48(block.timestamp);
         curve.validate();
         emit CurveCreated(state.numCurves);
         state.curves[state.numCurves++] = curve;

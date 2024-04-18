@@ -25,6 +25,3 @@ forge fmt
 forge doc
 ```
 
-### Signing Commits
-
-All commits and tags for this repository should be signed.

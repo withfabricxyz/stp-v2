@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.20;
 
+import "../types/Constants.sol";
 import {Subscription, Tier} from "../types/Index.sol";
 import {GateLib} from "./GateLib.sol";
 import {SubscriberLib} from "./SubscriberLib.sol";
@@ -69,6 +70,7 @@ library TierLib {
     /// @dev Validate a tier
     function validate(Tier memory tier) internal view {
         if (tier.periodDurationSeconds == 0) revert TierInvalidDuration();
+        if (tier.rewardBasisPoints > MAX_BPS) revert InvalidBasisPoints();
 
         // We don't really care about the start timestamp, but it must be less than the end timestamp
         if (tier.endTimestamp != 0) {

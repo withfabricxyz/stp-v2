@@ -23,7 +23,7 @@ library CurrencyLib {
     error InvalidApproval();
 
     /// @dev capture native or ERC20 tokens
-    function capture(Currency currency, address from, uint256 amount) internal returns (uint256 capturedAmount) {
+    function capture(Currency currency, uint256 amount) internal returns (uint256 capturedAmount) {
         capturedAmount = amount;
         if (currency.isNative()) {
             if (msg.value != amount) revert InvalidCapture();
@@ -31,7 +31,7 @@ library CurrencyLib {
             if (msg.value > 0) revert InvalidCapture();
             // Calculate the captured amount (in case of a token with a fee on transfer, etc.)
             uint256 preBalance = currency.balance();
-            Currency.unwrap(currency).safeTransferFrom(from, address(this), amount);
+            Currency.unwrap(currency).safeTransferFrom(msg.sender, address(this), amount);
             capturedAmount = currency.balance() - preBalance;
         }
     }

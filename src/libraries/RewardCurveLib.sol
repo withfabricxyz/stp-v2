@@ -13,15 +13,11 @@ library RewardCurveLib {
     error InvalidCurve();
 
     /// @dev Validate the curve configuration (and set the startTimestamp if not set)
-    function validate(CurveParams memory curve) internal view returns (CurveParams memory) {
+    function validate(CurveParams memory curve) internal view {
         // Reduce the risk of overflow by limiting the multiplier
         if (uint256(curve.formulaBase) ** curve.numPeriods > MAX_MULTIPLIER) revert InvalidCurve();
         if (curve.numPeriods == 0 && curve.minMultiplier == 0) revert InvalidCurve();
-        if (curve.startTimestamp > block.timestamp) revert InvalidCurve();
-
-        if (curve.startTimestamp == 0) curve.startTimestamp = uint48(block.timestamp);
-
-        return curve;
+        if (curve.startTimestamp > block.timestamp || curve.startTimestamp == 0) revert InvalidCurve();
     }
 
     /// @dev Calculate the current multiplier for the curve: base ^ (numPeriods - periods)
