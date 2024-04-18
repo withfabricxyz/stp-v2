@@ -6,20 +6,6 @@ import {CurveParams} from "src/types/Rewards.sol";
 
 /// @dev Library for reward curve calculations
 library RewardCurveLib {
-    /// @dev The maximum reward factor (limiting this prevents overflow)
-    uint256 private constant MAX_MULTIPLIER = 2 ** 64;
-
-    /// @dev Error when the curve configuration is invalid (e.g. multiplier too high)
-    error InvalidCurve();
-
-    /// @dev Validate the curve configuration (and set the startTimestamp if not set)
-    function validate(CurveParams memory curve) internal view {
-        // Reduce the risk of overflow by limiting the multiplier
-        if (uint256(curve.formulaBase) ** curve.numPeriods > MAX_MULTIPLIER) revert InvalidCurve();
-        if (curve.numPeriods == 0 && curve.minMultiplier == 0) revert InvalidCurve();
-        if (curve.startTimestamp > block.timestamp || curve.startTimestamp == 0) revert InvalidCurve();
-    }
-
     /// @dev Calculate the current multiplier for the curve: base ^ (numPeriods - periods)
     ///      If the curve has no decay, the multiplier will be the minMultiplier
     function currentMultiplier(CurveParams memory curve) internal view returns (uint256 multiplier) {

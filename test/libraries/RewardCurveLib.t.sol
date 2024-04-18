@@ -6,10 +6,6 @@ import "../TestImports.t.sol";
 // We need to create a shim contract to call the internal functions of RewardPoolLib in order to get
 // foundry to generate the coverage report correctly
 contract RewardCurveTestShim {
-    function validate(CurveParams memory params) external view {
-        RewardCurveLib.validate(params);
-    }
-
     function currentMultiplier(CurveParams memory params) external view returns (uint256 multiplier) {
         return RewardCurveLib.currentMultiplier(params);
     }
@@ -27,46 +23,14 @@ contract RewardCurveLibTest is BaseTest {
 
     /// Curve Tests ///
 
-    function testValid() public {
-        vm.warp(1337);
-        CurveParams memory params = defaults();
-        params.startTimestamp = uint48(block.timestamp);
-        shim.validate(params);
-        assertEq(params.startTimestamp, 1337);
-    }
-
-    function testValidNoDecay() public {
+    function testNoDecay() public {
         CurveParams memory params = defaults();
         params.numPeriods = 0;
         params.minMultiplier = 1;
         params.startTimestamp = uint48(1);
-        shim.validate(params);
         assertEq(shim.currentMultiplier(params), 1);
         vm.warp(block.timestamp + 365 days);
         assertEq(shim.currentMultiplier(params), 1);
-    }
-
-    function testInvalidFormula() public {
-        CurveParams memory params = defaults();
-        params.numPeriods = 128;
-        params.formulaBase = 2;
-        vm.expectRevert(abi.encodeWithSelector(RewardCurveLib.InvalidCurve.selector));
-        shim.validate(params);
-    }
-
-    function testFutureStart() public {
-        CurveParams memory params = defaults();
-        params.startTimestamp = uint48(block.timestamp + 1000);
-        vm.expectRevert(abi.encodeWithSelector(RewardCurveLib.InvalidCurve.selector));
-        shim.validate(params);
-    }
-
-    function testInvalidFormulaWithBips() public {
-        CurveParams memory params = defaults();
-        params.numPeriods = 0;
-        params.minMultiplier = 0;
-        vm.expectRevert(abi.encodeWithSelector(RewardCurveLib.InvalidCurve.selector));
-        shim.validate(params);
     }
 
     function testSinglePeriod() public {

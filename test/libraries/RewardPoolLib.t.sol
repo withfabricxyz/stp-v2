@@ -78,18 +78,32 @@ contract RewardTestShim {
 contract RewardPoolLibTest is BaseTest {
     RewardTestShim public shim = new RewardTestShim();
 
+    function defaultCurve() public pure returns (CurveParams memory) {
+        return CurveParams({numPeriods: 6, periodSeconds: 86_400, startTimestamp: 0, minMultiplier: 0, formulaBase: 2});
+    }
+
     function testCurve() public {
+        CurveParams memory curve = defaultCurve();
         vm.expectEmit(true, true, false, true, address(shim));
         emit RewardPoolLib.CurveCreated(1);
-        shim.createCurve(
-            CurveParams({
-                numPeriods: 6,
-                periodSeconds: 86_400,
-                startTimestamp: uint48(block.timestamp),
-                minMultiplier: 0,
-                formulaBase: 2
-            })
-        );
+        shim.createCurve(curve);
+
+        curve = defaultCurve();
+        curve.numPeriods = 128;
+        curve.formulaBase = 2;
+        vm.expectRevert(abi.encodeWithSelector(RewardPoolLib.InvalidCurve.selector));
+        shim.createCurve(curve);
+
+        curve = defaultCurve();
+        curve.numPeriods = 0;
+        curve.minMultiplier = 0;
+        vm.expectRevert(abi.encodeWithSelector(RewardPoolLib.InvalidCurve.selector));
+        shim.createCurve(curve);
+
+        curve = defaultCurve();
+        curve.startTimestamp = uint48(block.timestamp + 1000);
+        vm.expectRevert(abi.encodeWithSelector(RewardPoolLib.InvalidCurve.selector));
+        shim.createCurve(curve);
     }
 
     function testIssuance() public {

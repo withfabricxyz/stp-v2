@@ -28,6 +28,9 @@ library RewardPoolLib {
     /// @dev Reduces precision loss for reward calculations
     uint256 private constant PRECISION_COEFFICIENT = 2 ** 64;
 
+    /// @dev The maximum reward factor (limiting this prevents overflow)
+    uint256 private constant MAX_MULTIPLIER = 2 ** 64;
+
     /////////////////////
     // EVENTS
     /////////////////////
@@ -60,10 +63,17 @@ library RewardPoolLib {
     /// @dev Error when trying to burn shares of a holder with none
     error NoSharesToBurn();
 
+    /// @dev Error when the curve configuration is invalid (e.g. multiplier too high)
+    error InvalidCurve();
+
     /// @dev Create a new reward curve (starting at id 0)
     function createCurve(State storage state, CurveParams memory curve) internal {
         if (curve.startTimestamp == 0) curve.startTimestamp = uint48(block.timestamp);
-        curve.validate();
+        if (curve.numPeriods == 0 && curve.minMultiplier == 0) revert InvalidCurve();
+        if (curve.startTimestamp > block.timestamp) revert InvalidCurve();
+        if (curve.currentMultiplier() > MAX_MULTIPLIER) revert InvalidCurve();
+
+        // curve.validate();
         emit CurveCreated(state.numCurves);
         state.curves[state.numCurves++] = curve;
     }
