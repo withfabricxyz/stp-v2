@@ -9,18 +9,17 @@ import {STPV2Factory} from "src/STPV2Factory.sol";
 contract FactoryTest is BaseTest {
     STPV2 internal impl;
     STPV2Factory internal factory;
-    FactoryFeeConfig internal fee;
 
     function setUp() public {
         impl = new STPV2();
-        factory = new STPV2Factory(address(impl));
-        fee = FactoryFeeConfig({collector: bob, basisPoints: 100, deployFee: 0});
+        factory = new STPV2Factory(address(impl), fees);
         deal(alice, 1e19);
     }
 
     function defaultParams() internal view returns (DeployParams memory) {
         return DeployParams({
-            feeConfigId: 0,
+            clientFeeBps: 400,
+            clientFeeRecipient: fees,
             deployKey: "hello",
             initParams: initParams,
             tierParams: tierParams,
@@ -29,20 +28,33 @@ contract FactoryTest is BaseTest {
         });
     }
 
+    function testInvalidFactory() public {
+        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.InvalidFeeRecipient.selector));
+        new STPV2Factory(address(impl), address(0));
+
+        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.InvalidImplementation.selector));
+        new STPV2Factory(address(0), fees);
+    }
+
     function testDeployment() public {
         vm.startPrank(alice);
 
         DeployParams memory params = defaultParams();
 
         vm.expectEmit(false, false, false, true, address(factory));
-        emit STPV2Factory.Deployment(address(1), 0, "hello");
+        emit STPV2Factory.Deployment(address(1), "hello");
         address deployment = factory.deploySubscription(params);
 
-        STPV2 nft = STPV2(payable(deployment));
-        assertEq(nft.name(), "Meow Sub");
-        assertEq(nft.symbol(), "MEOW");
-        assertEq(nft.contractURI(), "curi");
-        assertEq(nft.contractDetail().currency, address(0));
+        STPV2 stp = STPV2(payable(deployment));
+        assertEq(stp.name(), "Meow Sub");
+        assertEq(stp.symbol(), "MEOW");
+        assertEq(stp.contractURI(), "curi");
+        assertEq(stp.contractDetail().currency, address(0));
+        assertEq(stp.owner(), creator);
+        assertEq(100, stp.feeDetail().protocolBps);
+        assertEq(400, stp.feeDetail().clientBps);
+        assertEq(fees, stp.feeDetail().protocolRecipient);
+        assertEq(fees, stp.feeDetail().clientRecipient);
     }
 
     function testDeployZeroAddr() public {
@@ -53,96 +65,31 @@ contract FactoryTest is BaseTest {
 
         address deployment = factory.deploySubscription(params);
 
-        STPV2 nft = STPV2(payable(deployment));
-        assertEq(nft.owner(), alice);
-    }
-
-    function testDeploymentWithReferral() public {
-        factory.createFee(1, fee);
-        DeployParams memory params = defaultParams();
-        params.feeConfigId = 1;
-
-        vm.startPrank(alice);
-        vm.expectEmit(false, false, false, true, address(factory));
-        emit STPV2Factory.Deployment(address(1), 1, "hello");
-        address deployment = factory.deploySubscription(params);
-        STPV2 nft = STPV2(payable(deployment));
-        assertEq(nft.contractDetail().feeCollector, bob);
-        assertEq(nft.contractDetail().feeBps, 100);
-    }
-
-    function testInvalidReferral() public {
-        factory.createFee(0, fee);
-        DeployParams memory params = defaultParams();
-        params.feeConfigId = 1;
-
-        vm.startPrank(alice);
-        vm.expectEmit(false, false, false, true, address(factory));
-        emit STPV2Factory.Deployment(address(1), 0, "hello"); // ?
-        address deployment = factory.deploySubscription(params);
-        STPV2 nft = STPV2(payable(deployment));
-        assertEq(nft.contractDetail().feeCollector, bob);
-        assertEq(nft.contractDetail().feeBps, 100);
-    }
-
-    function testFeeCreate() public {
-        vm.expectEmit(true, true, true, true, address(factory));
-        emit STPV2Factory.FeeCreated(1, bob, 100, 0);
-        factory.createFee(1, fee);
-
-        FactoryFeeConfig memory result = factory.feeInfo(1);
-        assertEq(bob, result.collector);
-        assertEq(100, result.basisPoints);
-        assertEq(0, result.deployFee);
-    }
-
-    function testFeeCreateInvalid() public {
-        fee.basisPoints = 2000;
-        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.FeeBipsInvalid.selector));
-        factory.createFee(1, fee);
-
-        fee.basisPoints = 0;
-        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.FeeBipsInvalid.selector));
-        factory.createFee(1, fee);
-
-        fee.basisPoints = 100;
-        fee.collector = address(0);
-        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.FeeCollectorInvalid.selector));
-        factory.createFee(1, fee);
-
-        // Valid
-        fee.collector = bob;
-        factory.createFee(1, fee);
-        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.FeeExists.selector, 1));
-        factory.createFee(1, fee);
-    }
-
-    function testFeeDestroy() public {
-        factory.createFee(1, fee);
-        factory.destroyFee(1);
-
-        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.FeeNotFound.selector, 1));
-        factory.destroyFee(1);
+        STPV2 stp = STPV2(payable(deployment));
+        assertEq(stp.owner(), alice);
     }
 
     function testDeployFeeTooLow() public {
-        fee.deployFee = 1e12;
-        factory.createFee(0, fee);
-        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.FeeInsufficient.selector, 1e12));
+        factory.setDeployFee(1e12);
+        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.FeeInvalid.selector));
         factory.deploySubscription(defaultParams());
     }
 
     function testDeployFeeCapture() public {
-        fee.deployFee = 1e12;
-        factory.createFee(0, fee);
+        factory.setDeployFee(1e12);
         factory.deploySubscription{value: 1e12}(defaultParams());
-        assertEq(1e12, bob.balance);
+        assertEq(1e12, fees.balance);
+    }
+
+    function testBadFeeRecipient() public {
+        vm.expectRevert(abi.encodeWithSelector(STPV2Factory.InvalidFeeRecipient.selector));
+        factory.setProtocolFeeRecipient(address(0));
     }
 
     function testDeployFeeTransferBadReceiver() public {
-        fee.deployFee = 1e12;
-        fee.collector = address(this);
-        factory.createFee(0, fee);
+        factory.setDeployFee(1e12);
+        factory.setProtocolFeeRecipient(address(this));
+
         vm.expectRevert(abi.encodeWithSelector(SafeTransferLib.ETHTransferFailed.selector));
         factory.deploySubscription{value: 1e12}(defaultParams());
     }
@@ -153,5 +100,33 @@ contract FactoryTest is BaseTest {
         factory.acceptOwnership();
         vm.stopPrank();
         assertEq(factory.owner(), alice);
+    }
+
+    function testUpdateProtocolFees() public {
+        address payable deployment = payable(factory.deploySubscription(defaultParams()));
+        STPV2 stp = STPV2(deployment);
+
+        bytes[] memory calls = new bytes[](2);
+        calls[0] = abi.encodeWithSelector(factory.updateClientFeeRecipient.selector, deployment, alice);
+        calls[1] = abi.encodeWithSelector(factory.updateProtocolFeeRecipient.selector, deployment, bob);
+
+        vm.startPrank(fees);
+        factory.multicall(calls);
+        vm.stopPrank();
+
+        assertEq(stp.feeDetail().clientRecipient, alice);
+        assertEq(stp.feeDetail().protocolRecipient, bob);
+
+        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
+        factory.updateClientFeeRecipient(deployment, fees);
+
+        vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
+        factory.updateProtocolFeeRecipient(deployment, fees);
+
+        vm.startPrank(alice);
+        factory.updateClientFeeRecipient(deployment, bob);
+        vm.stopPrank();
+
+        assertEq(stp.feeDetail().clientRecipient, bob);
     }
 }

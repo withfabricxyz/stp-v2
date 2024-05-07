@@ -15,8 +15,7 @@ import {SubscriberLib} from "./libraries/SubscriberLib.sol";
 import {SubscriptionLib} from "./libraries/SubscriptionLib.sol";
 import {TierLib} from "./libraries/TierLib.sol";
 import "./types/Constants.sol";
-import {FeeParams, InitParams, Subscription, Tier, Tier} from "./types/Index.sol";
-import {MintParams} from "./types/Params.sol";
+import {FeeParams, InitParams, MintParams, Subscription, Tier} from "./types/Index.sol";
 import {CurveParams, RewardParams} from "./types/Rewards.sol";
 import {ContractView, SubscriberView} from "./types/Views.sol";
 
@@ -72,7 +71,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
     event FeeTransfer(address indexed to, uint256 tokensTransferred);
 
     /// @dev Emitted when the fee collector is updated
-    event FeeCollectorChange(address indexed collector);
+    event FeeRecipientChange();
 
     /// @dev Emitted when a referral fee is paid out
     event ReferralPayout(
@@ -126,6 +125,9 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
     /// @dev The address of the account which can receive transfers via sponsored calls
     address private _transferRecipient;
 
+    /// @dev The address of the factory which created this contract
+    address private _factoryAddress;
+
     ////////////////////////////////////
 
     /// @dev Disable initializers on the logic contract
@@ -138,6 +140,9 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
         mintFor(msg.sender, msg.value);
     }
 
+    /**
+     * @notice Initialize the contract with the core parameters
+     */
     function initialize(
         InitParams memory params,
         Tier memory tier,
@@ -153,7 +158,11 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
         }
 
         // Validate fee params
-        if (fees.bips > MAX_FEE_BPS || (fees.collector != address(0) && fees.bips == 0)) revert InvalidFeeParams();
+        if (
+            fees.clientBps + fees.protocolBps > MAX_FEE_BPS
+                || (fees.clientRecipient != address(0) && fees.clientBps == 0)
+                || (fees.protocolRecipient != address(0) && fees.protocolBps == 0)
+        ) revert InvalidFeeParams();
 
         _contractURI = params.contractUri;
         _name = params.name;
@@ -167,6 +176,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
         _rewards.createCurve(curve);
         _state.createTier(tier);
         _setOwner(params.owner);
+        _factoryAddress = msg.sender;
     }
 
     /////////////////////////
@@ -202,7 +212,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
 
         // Referral Payout (A percentage of the remaining tokens after fees and rewards)
         if (params.referrer != address(0)) {
-            uint256 payout = _referrals.computeReferralReward(params.referralCode, change);
+            uint256 payout = _referrals.computeReferralReward(params.referralCode, change, params.referrer);
             if (payout > 0) {
                 _currency.transfer(params.referrer, payout);
                 emit ReferralPayout(tokenId, params.referrer, params.referralCode, payout);
@@ -337,16 +347,29 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
     /////////////////////////
 
     /**
-     * @notice Update the fee collector address. Can be set to 0x0 to disable fees permanently.
-     * @param newCollector the new fee collector address
+     * @notice Update the protocol fee collector address (must be called from the factory)
+     * @param recipient the new fee recipient address
      */
-    function updateFeeRecipient(address newCollector) external {
-        if (msg.sender != _feeParams.collector) revert NotAuthorized();
+    function updateProtocolFeeRecipient(address recipient) external {
+        if (msg.sender != _factoryAddress) revert NotAuthorized();
 
         // Give tokens back to creator and set fee rate to 0
-        if (newCollector == address(0)) _feeParams.bips = 0;
-        _feeParams.collector = newCollector;
-        emit FeeCollectorChange(newCollector);
+        if (recipient == address(0)) _feeParams.protocolBps = 0;
+        _feeParams.protocolRecipient = recipient;
+        emit FeeRecipientChange();
+    }
+
+    /**
+     * @notice Update the client fee collector address (must be called from the factory)
+     * @param recipient the new fee recipient address
+     */
+    function updateClientFeeRecipient(address recipient) external {
+        if (msg.sender != _factoryAddress) revert NotAuthorized();
+
+        // Give tokens back to creator and set fee rate to 0
+        if (recipient == address(0)) _feeParams.clientBps = 0;
+        _feeParams.clientRecipient = recipient;
+        emit FeeRecipientChange();
     }
 
     /////////////////////////
@@ -357,18 +380,20 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
      * @notice Create or update a referral code for giving rewards to referrers on mint
      * @param code the unique integer code for the referral
      * @param basisPoints the reward basis points
+     * @param permanent whether the referral code is locked (immutable after set)
+     * @param account the specific account to reward (0x0 for any account)
      */
-    function setReferralCode(uint256 code, uint16 basisPoints) external {
+    function setReferralCode(uint256 code, uint16 basisPoints, bool permanent, address account) external {
         _checkOwnerOrRoles(ROLE_MANAGER);
-        _referrals.setReferral(code, basisPoints);
+        _referrals.setReferral(code, ReferralLib.Code(basisPoints, permanent, account));
     }
 
     /**
      * @notice Fetch the reward basis points for a given referral code
      * @param code the unique integer code for the referral
-     * @return bps the reward basis points
+     * @return value the reward basis points and permanence
      */
-    function referralCodeBps(uint256 code) external view returns (uint16 bps) {
+    function referralDetail(uint256 code) external view returns (ReferralLib.Code memory value) {
         return _referrals.codes[code];
     }
 
@@ -383,6 +408,8 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
         uint256 numTokens
     ) private returns (uint256 tokenId, uint256 change) {
         uint256 tokensIn = 0;
+
+        // Allow for free minting for pay what you want tiers
         if (numTokens > 0) tokensIn = _currency.capture(numTokens);
 
         // Mint a new token if necessary
@@ -395,21 +422,27 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
         // Purchase the subscription (switching tiers if necessary)
         _state.purchase(account, tokensIn, tierId);
 
-        // Transfer fees
-        uint16 bips = _feeParams.bips;
-        if (bips > 0) {
-            uint256 fee = (tokensIn * bips) / MAX_BPS;
-            if (fee > 0) {
-                _currency.transfer(_feeParams.collector, fee);
-                emit FeeTransfer(_feeParams.collector, fee);
-                tokensIn -= fee;
-            }
-        }
+        // Take protocol + client fees, then reduce the remaining balance for rewards
+        tokensIn -= (
+            _transferFee(tokensIn, _feeParams.protocolBps, _feeParams.protocolRecipient)
+                + _transferFee(tokensIn, _feeParams.clientBps, _feeParams.clientRecipient)
+        );
 
         // Transfer rewards if tier has rewards
         tokensIn = _issueAndAllocateRewards(account, tokensIn, _state.subscriptions[account].tierId);
 
         return (tokenId, tokensIn);
+    }
+
+    /// @dev Transfer a fee to a recipient, returning the amount transferred
+    function _transferFee(uint256 amount, uint16 bps, address recipient) private returns (uint256 fee) {
+        if (bps > 0) {
+            fee = (amount * bps) / MAX_BPS;
+            if (fee > 0) {
+                _currency.transfer(recipient, fee);
+                emit FeeTransfer(recipient, fee);
+            }
+        }
     }
 
     /// @dev Ensure the contract has a creator balance to cover the transfer, without dipping into rewards
@@ -526,10 +559,16 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
             rewardShares: _rewards.totalShares,
             rewardBalance: _rewards.balance(),
             rewardSlashGracePeriod: _rewardParams.slashGracePeriod,
-            rewardSlashable: _rewardParams.slashable,
-            feeBps: _feeParams.bips,
-            feeCollector: _feeParams.collector
+            rewardSlashable: _rewardParams.slashable
         });
+    }
+
+    /**
+     * @notice Get details about the fee structure
+     * @return fee the fee details
+     */
+    function feeDetail() external view returns (FeeParams memory fee) {
+        return _feeParams;
     }
 
     /**

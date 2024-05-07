@@ -42,8 +42,4 @@ struct ContractView {
     uint32 rewardSlashGracePeriod;
     /// @dev whether the pool is slashable
     bool rewardSlashable;
-    /// @dev The fee basis points
-    uint16 feeBps;
-    /// @dev The fee collector address
-    address feeCollector;
 }

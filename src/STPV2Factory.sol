@@ -2,17 +2,16 @@
 
 pragma solidity ^0.8.20;
 
+import {AccessControlled} from "./abstracts/AccessControlled.sol";
 import {LibClone} from "@solady/utils/LibClone.sol";
+import {Multicallable} from "@solady/utils/Multicallable.sol";
 
 import {STPV2} from "./STPV2.sol";
-
-import {AccessControlled} from "./abstracts/AccessControlled.sol";
-
 import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
 import "./types/Constants.sol";
 import {FeeParams, InitParams, Tier} from "./types/Index.sol";
 import {CurveParams, RewardParams} from "./types/Rewards.sol";
-import {DeployParams, FactoryFeeConfig} from "src/types/Factory.sol";
+import {DeployParams} from "src/types/Factory.sol";
 
 /**
  *
@@ -20,7 +19,7 @@ import {DeployParams, FactoryFeeConfig} from "src/types/Factory.sol";
  * @author Fabric Inc.
  * @dev A factory which leverages Clones to deploy Fabric Subscription Token Contracts
  */
-contract STPV2Factory is AccessControlled {
+contract STPV2Factory is AccessControlled, Multicallable {
     using CurrencyLib for Currency;
 
     /////////////////
@@ -30,61 +29,49 @@ contract STPV2Factory is AccessControlled {
     /// @dev Error when the implementation address is invalid
     error InvalidImplementation();
 
-    /// @dev Error when a fee id is not found (for removal)
-    error FeeNotFound(uint256 id);
-
-    /// @dev Error when a fee id already exists
-    error FeeExists(uint256 id);
-
     /// @dev Error when a fee collector is invalid (0 address)
-    error FeeCollectorInvalid();
-
-    /// @dev Error when a fee bips is invalid (0 or too high)
-    error FeeBipsInvalid();
+    error InvalidFeeRecipient();
 
     /// @dev Error when the fee paid for deployment is insufficient
-    error FeeInsufficient(uint256 amountRequired);
-
-    /// @dev Error when the fee balance is zero (fee transfer)
-    error FeeBalanceZero();
-
-    /// @dev Error when the fee transfer fails
-    error FeeTransferFailed();
+    error FeeInvalid();
 
     /////////////////
     // Events
     /////////////////
 
     /// @dev Emitted upon a successful subscription contract deployment
-    event Deployment(address indexed deployment, uint256 feeId, bytes deployKey);
-
-    /// @dev Emitted when a new fee is created
-    event FeeCreated(uint256 indexed id, address collector, uint16 bips, uint80 deployFee);
-
-    /// @dev Emitted when a fee is destroyed
-    event FeeDestroyed(uint256 indexed id);
+    event Deployment(address indexed deployment, bytes deployKey);
 
     /// @dev Emitted when the deploy fees are collected by the owner
     event DeployFeeTransfer(address indexed recipient, uint256 amount);
 
     /////////////////
 
+    /// @dev The protocol fee basis points
+    uint16 private constant PROTOCOL_FEE_BPS = 100;
+
     /// @dev The deploy fee currency (ETH)
-    Currency private immutable _deployFeeCurrency = Currency.wrap(address(0));
+    Currency private constant FEE_CURRENCY = Currency.wrap(address(0));
 
     /// @dev The STP contract implementation address
-    address immutable _stpImplementation;
+    address private immutable IMPLEMENTATION;
 
-    /// @dev Configured fee ids and their config
-    mapping(uint256 => FactoryFeeConfig) private _feeConfigs;
+    /// @dev The protocol fee recipient
+    address private _protocolFeeRecipient;
+
+    /// @dev The deploy fee (how much to charge for deployment)
+    uint256 private _deployFee;
 
     /**
      * @notice Construct a new Factory contract
      * @param stpImplementation the STPV2 implementation address
      */
-    constructor(address stpImplementation) {
+    constructor(address stpImplementation, address protocolFeeRecipient) {
         if (stpImplementation == address(0)) revert InvalidImplementation();
-        _stpImplementation = stpImplementation;
+        if (protocolFeeRecipient == address(0)) revert InvalidFeeRecipient();
+        IMPLEMENTATION = stpImplementation;
+        _protocolFeeRecipient = protocolFeeRecipient;
+        _deployFee = 0;
         _setOwner(msg.sender);
     }
 
@@ -94,22 +81,23 @@ contract STPV2Factory is AccessControlled {
      * @param params the initialization parameters for the contract (@see DeloyParams)
      */
     function deploySubscription(DeployParams memory params) public payable returns (address) {
-        // If an invalid fee id is provided, use the default fee (0)
-        uint256 feeConfigId = _resolveFeeId(params.feeConfigId);
-        FactoryFeeConfig memory fees = _feeConfigs[feeConfigId];
-
-        // Transfer the deploy fee to the collector
-        _transferDeployFee(fees);
+        // Transfer the deploy fee if required
+        _transferDeployFee();
 
         // Clone the implementation
-        address deployment = LibClone.clone(_stpImplementation);
+        address deployment = LibClone.clone(IMPLEMENTATION);
 
         // Set the owner to the sender if it is not set
         if (params.initParams.owner == address(0)) params.initParams.owner = msg.sender;
 
-        FeeParams memory subFees = FeeParams({collector: fees.collector, bips: fees.basisPoints});
+        FeeParams memory subFees = FeeParams({
+            protocolRecipient: _protocolFeeRecipient,
+            protocolBps: PROTOCOL_FEE_BPS,
+            clientRecipient: params.clientFeeRecipient,
+            clientBps: params.clientFeeBps
+        });
 
-        emit Deployment(deployment, feeConfigId, params.deployKey);
+        emit Deployment(deployment, params.deployKey);
         STPV2(payable(deployment)).initialize(
             params.initParams, params.tierParams, params.rewardParams, params.curveParams, subFees
         );
@@ -118,54 +106,55 @@ contract STPV2Factory is AccessControlled {
     }
 
     /**
-     * @notice Create a fee for future deployments using that fee id
-     * @param id the id of the fee for future deployments
-     * @param config the fee configuration
-     */
-    function createFee(uint256 id, FactoryFeeConfig memory config) external {
-        _checkOwner();
-        if (config.basisPoints == 0 || config.basisPoints > MAX_FEE_BPS) revert FeeBipsInvalid();
-        if (config.collector == address(0)) revert FeeCollectorInvalid();
-        if (_feeConfigs[id].collector != address(0)) revert FeeExists(id);
-        _feeConfigs[id] = config;
-        emit FeeCreated(id, config.collector, config.basisPoints, config.deployFee);
-    }
-
-    /**
-     * @notice Destroy a fee schedule
-     * @param id the id of the fee to destroy
-     */
-    function destroyFee(uint256 id) external {
-        _checkOwner();
-        if (_feeConfigs[id].collector == address(0)) revert FeeNotFound(id);
-        emit FeeDestroyed(id);
-        delete _feeConfigs[id];
-    }
-
-    /**
-     * @notice Fetch the fee schedule for a given fee id
-     * @param feeId the id of the fee to fetch
-     * @return fees the configuration for the fee id
-     */
-    function feeInfo(uint256 feeId) external view returns (FactoryFeeConfig memory fees) {
-        return _feeConfigs[feeId];
-    }
-
-    /////////////////
-    function _resolveFeeId(uint256 feeConfigId) internal view returns (uint256 id) {
-        if (_feeConfigs[feeConfigId].collector == address(0)) return 0;
-        return feeConfigId;
-    }
-
-    /**
      * @dev Transfer the deploy fee to the collector (if configured)
-     * @param fees the fee configuration
      */
-    function _transferDeployFee(FactoryFeeConfig memory fees) internal {
-        if (fees.deployFee == 0) return;
-        if (fees.collector == address(0)) return;
-        if (msg.value < fees.deployFee) revert FeeInsufficient(fees.deployFee);
-        emit DeployFeeTransfer(fees.collector, msg.value);
-        _deployFeeCurrency.transfer(fees.collector, msg.value);
+    function _transferDeployFee() internal {
+        if (msg.value != _deployFee) revert FeeInvalid();
+        if (_deployFee == 0) return;
+        if (_protocolFeeRecipient == address(0)) return;
+
+        emit DeployFeeTransfer(_protocolFeeRecipient, msg.value);
+        FEE_CURRENCY.transfer(_protocolFeeRecipient, msg.value);
+    }
+
+    /**
+     * @notice Set the protocol recipient for deployed contracts
+     * @param recipient the new recipient
+     */
+    function setProtocolFeeRecipient(address recipient) external {
+        _checkOwner();
+        if (recipient == address(0)) revert InvalidFeeRecipient();
+        _protocolFeeRecipient = recipient;
+    }
+
+    /**
+     * @notice Set the deploy fee (wei)
+     * @param deployFeeWei the new deploy fee
+     */
+    function setDeployFee(uint256 deployFeeWei) external {
+        _checkOwner();
+        _deployFee = deployFeeWei;
+    }
+
+    /**
+     * @notice Update the client fee recipient for a list of deployments
+     * @dev requires the sender to be the current recipient
+     * @param deployment the deployment to update
+     * @param recipient the new recipient
+     */
+    function updateClientFeeRecipient(address payable deployment, address recipient) external {
+        if (STPV2(deployment).feeDetail().clientRecipient != msg.sender) revert NotAuthorized();
+        STPV2(deployment).updateClientFeeRecipient(recipient);
+    }
+
+    /**
+     * @notice Update the protocol fee recipient for a list of deployments
+     * @dev requires the sender to be the current recipient
+     * @param deployment the deployment to update
+     * @param recipient the new recipient
+     */
+    function updateProtocolFeeRecipient(address payable deployment, address recipient) external {
+        if (STPV2(deployment).feeDetail().protocolRecipient != msg.sender) revert NotAuthorized();
+        STPV2(deployment).updateProtocolFeeRecipient(recipient);
     }
 }
