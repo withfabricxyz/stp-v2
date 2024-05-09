@@ -2,37 +2,31 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "@forge/Test.sol";
-
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
 import {ERC721} from "solady/tokens/ERC721.sol";
-
 import {Initializable} from "solady/utils/Initializable.sol";
 import {Multicallable} from "solady/utils/Multicallable.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 
 //////////// Project Imports ////////////
 
-import "src/types/Constants.sol";
-
 import {STPV2} from "src/STPV2.sol";
 import {AccessControlled} from "src/abstracts/AccessControlled.sol";
-
 import {Currency, CurrencyLib} from "src/libraries/CurrencyLib.sol";
 import {GateLib} from "src/libraries/GateLib.sol";
-
 import {ReferralLib} from "src/libraries/ReferralLib.sol";
 import {RewardCurveLib} from "src/libraries/RewardCurveLib.sol";
 import {RewardPoolLib} from "src/libraries/RewardPoolLib.sol";
-import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
 
 import {SubscriberLib} from "src/libraries/SubscriberLib.sol";
+import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
-import {DeployParams, FactoryFeeConfig} from "src/types/Factory.sol";
-import {FeeParams, Gate, GateType, InitParams, Subscription, Subscription, Tier} from "src/types/Index.sol";
-
-import {MintParams} from "src/types/Params.sol";
+import "src/types/Constants.sol";
+import {DeployParams} from "src/types/Factory.sol";
+import {
+    FeeParams, Gate, GateType, InitParams, MintParams, Subscription, Subscription, Tier
+} from "src/types/Index.sol";
 import {CurveParams, Holder, RewardParams} from "src/types/Rewards.sol";
 import {SubscriberView} from "src/types/Views.sol";
 
@@ -125,7 +119,8 @@ abstract contract BaseTest is Test {
         gate: Gate({gateType: GateType.NONE, contractAddress: address(0), componentId: 0, balanceMin: 0})
     });
 
-    FeeParams internal feeParams = FeeParams({collector: address(0), bips: 0});
+    FeeParams internal feeParams =
+        FeeParams({protocolRecipient: address(0), protocolBps: 0, clientRecipient: address(0), clientBps: 0});
 
     RewardParams internal rewardParams = RewardParams({slashGracePeriod: 7 days, slashable: true});
 
@@ -198,8 +193,8 @@ abstract contract BaseTest is Test {
         tierParams.periodDurationSeconds = uint32(minPurchase);
         tierParams.pricePerPeriod = minPurchase * 2;
         tierParams.rewardBasisPoints = bips;
-        feeParams.bips = feeBps;
-        feeParams.collector = feeBps > 0 ? fees : address(0);
+        feeParams.protocolBps = feeBps;
+        feeParams.protocolRecipient = feeBps > 0 ? fees : address(0);
         return reinitStp();
     }
 

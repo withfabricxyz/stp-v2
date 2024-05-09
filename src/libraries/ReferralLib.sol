@@ -8,31 +8,50 @@ import "../types/Constants.sol";
 
 /// @dev Library for storing referral codes and their associated percentages
 library ReferralLib {
+    error ReferralLocked();
+
     /// @dev A referral code was created or updated
-    event ReferralSet(uint256 indexed code, uint16 basisPoints);
+    event ReferralSet(uint256 indexed code);
 
     /// @dev A referral code was destroyed (set to 0)
     event ReferralDestroyed(uint256 indexed code);
 
+    /// @dev Struct for holding details of a referral code
+    struct Code {
+        /// @dev The percentage of the transfer to give to the referrer
+        uint16 basisPoints;
+        /// @dev Whether this code can be updated once set (mutable or not)
+        bool permanent;
+        /// @dev A specific address (0x0 for any address)
+        address referrer;
+    }
+
     struct State {
-        mapping(uint256 => uint16) codes;
+        mapping(uint256 => Code) codes;
     }
 
     /// @dev Basic validation and storage for a referral code. A single call was used to reduce size
-    function setReferral(State storage state, uint256 code, uint16 basisPoints) internal {
-        if (basisPoints == 0) {
+    function setReferral(State storage state, uint256 code, Code memory settings) internal {
+        if (state.codes[code].permanent) revert ReferralLocked();
+        if (settings.basisPoints == 0) {
             delete state.codes[code];
             emit ReferralDestroyed(code);
             return;
         }
-        if (basisPoints > MAX_BPS) revert InvalidBasisPoints();
+        if (settings.basisPoints > MAX_BPS) revert InvalidBasisPoints();
 
-        state.codes[code] = basisPoints;
-        emit ReferralSet(code, basisPoints);
+        state.codes[code] = settings;
+        emit ReferralSet(code);
     }
 
     /// @dev Compute the reward for a referral code (or 0 if not found)
-    function computeReferralReward(State storage state, uint256 code, uint256 amount) internal view returns (uint256) {
-        return (amount * state.codes[code]) / MAX_BPS;
+    function computeReferralReward(
+        State storage state,
+        uint256 code,
+        uint256 amount,
+        address referrer
+    ) internal view returns (uint256) {
+        if (state.codes[code].referrer != address(0) && state.codes[code].referrer != referrer) return 0;
+        return (amount * state.codes[code].basisPoints) / MAX_BPS;
     }
 }

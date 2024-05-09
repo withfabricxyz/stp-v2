@@ -18,8 +18,11 @@ library TierLib {
 
     /// @dev The state of a tier
     struct State {
+        /// @dev The number of subscriptions in this tier
         uint32 subCount;
+        /// @dev The id of the tier
         uint16 id;
+        /// @dev The parameters for the tier
         Tier params;
     }
 

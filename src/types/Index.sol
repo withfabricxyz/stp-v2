@@ -11,8 +11,8 @@ enum GateType {
 }
 
 /// @notice A struct to represent a gate for a tier. A gate is metadata that is used to check if a subscriber
-///         is eligible to join a tier. The gate can be a contract that implements the IERC721/20 or IERC1155 interface,
-/// or
+///         is eligible to join a tier.
+///         The gate can be a contract that implements the IERC721/20 or IERC1155 interface, or
 ///         it can be the subscription token tier.
 struct Gate {
     /// @dev The type of gate to use
@@ -54,11 +54,16 @@ struct Tier {
     Gate gate;
 }
 
+/// @dev The fee configuration for a subscription contract (split between client and protocol)
 struct FeeParams {
-    /// @dev the address which receives fees
-    address collector;
-    /// @dev the fee in basis points
-    uint16 bips;
+    /// @dev the protocol fee recipient
+    address protocolRecipient;
+    /// @dev the protocol fee in basis points
+    uint16 protocolBps;
+    /// @dev the client fee recipient
+    address clientRecipient;
+    /// @dev the client fee in basis points
+    uint16 clientBps;
 }
 
 /// @dev The initialization parameters for a subscription token
@@ -91,15 +96,16 @@ struct Subscription {
     uint64 tokenId;
 }
 
+/// @dev The advanced parameters for minting a subscription
 struct MintParams {
-    /// @dev The tokenId to mint
-    address account;
-    /// @dev The tier id to mint
+    /// @dev The tier id of the subscription
     uint16 tierId;
-    /// @dev The referrer address to provide send a referral reward to
+    /// @dev The address of the recipient (token holder)
+    address recipient;
+    /// @dev The address of the referrer (reward recipient)
     address referrer;
-    /// @dev The referral code to use
+    /// @dev The referral code
     uint256 referralCode;
-    /// @dev The number of tokens to mint
-    uint256 numTokens;
+    /// @dev The number of tokens being transferred
+    uint256 purchaseValue;
 }
