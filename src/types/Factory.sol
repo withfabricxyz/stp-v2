@@ -8,6 +8,8 @@ import {CurveParams, RewardParams} from "./Rewards.sol";
 struct DeployParams {
     /// @dev the client fee basis points
     uint16 clientFeeBps;
+    /// @dev the client referral share basis points
+    uint16 clientReferralShareBps;
     /// @dev the client fee recipient
     address clientFeeRecipient;
     /// @dev An identifer to help track deployments via Deploy event

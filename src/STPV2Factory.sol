@@ -94,7 +94,8 @@ contract STPV2Factory is AccessControlled, Multicallable {
             protocolRecipient: _protocolFeeRecipient,
             protocolBps: PROTOCOL_FEE_BPS,
             clientRecipient: params.clientFeeRecipient,
-            clientBps: params.clientFeeBps
+            clientBps: params.clientFeeBps,
+            clientReferralBps: params.clientReferralShareBps
         });
 
         emit Deployment(deployment, params.deployKey);
