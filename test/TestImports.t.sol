@@ -119,8 +119,13 @@ abstract contract BaseTest is Test {
         gate: Gate({gateType: GateType.NONE, contractAddress: address(0), componentId: 0, balanceMin: 0})
     });
 
-    FeeParams internal feeParams =
-        FeeParams({protocolRecipient: address(0), protocolBps: 0, clientRecipient: address(0), clientBps: 0});
+    FeeParams internal feeParams = FeeParams({
+        protocolRecipient: address(0),
+        protocolBps: 0,
+        clientRecipient: address(0),
+        clientBps: 0,
+        clientReferralBps: 0
+    });
 
     RewardParams internal rewardParams = RewardParams({slashGracePeriod: 7 days, slashable: true});
 

@@ -19,6 +19,7 @@ contract FactoryTest is BaseTest {
     function defaultParams() internal view returns (DeployParams memory) {
         return DeployParams({
             clientFeeBps: 400,
+            clientReferralShareBps: 0,
             clientFeeRecipient: fees,
             deployKey: "hello",
             initParams: initParams,

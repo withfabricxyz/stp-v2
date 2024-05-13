@@ -162,6 +162,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
             fees.clientBps + fees.protocolBps > MAX_FEE_BPS
                 || (fees.clientRecipient != address(0) && fees.clientBps == 0)
                 || (fees.protocolRecipient != address(0) && fees.protocolBps == 0)
+                || (fees.clientReferralBps > fees.clientBps)
         ) revert InvalidFeeParams();
 
         _contractURI = params.contractUri;
@@ -199,7 +200,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
      * @param numTokens the amount of ERC20 tokens or native tokens to transfer
      */
     function mintFor(address account, uint256 numTokens) public payable {
-        _purchase(account, 0, numTokens);
+        _purchase(account, 0, numTokens, 0, address(0));
     }
 
     /**
@@ -208,16 +209,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
      * @param params the minting parameters
      */
     function mintAdvanced(MintParams calldata params) external payable {
-        (uint256 tokenId, uint256 change) = _purchase(params.recipient, params.tierId, params.purchaseValue);
-
-        // Referral Payout (A percentage of the remaining tokens after fees and rewards)
-        if (params.referrer != address(0)) {
-            uint256 payout = _referrals.computeReferralReward(params.referralCode, change, params.referrer);
-            if (payout > 0) {
-                _currency.transfer(params.referrer, payout);
-                emit ReferralPayout(tokenId, params.referrer, params.referralCode, payout);
-            }
-        }
+        _purchase(params.recipient, params.tierId, params.purchaseValue, params.referralCode, params.referrer);
     }
 
     /////////////////////////
@@ -402,18 +394,14 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
     ////////////////////////
 
     /// @dev Purchase a subscription, minting a token if necessary, switching tiers if necessary
-    function _purchase(
-        address account,
-        uint16 tierId,
-        uint256 numTokens
-    ) private returns (uint256 tokenId, uint256 change) {
+    function _purchase(address account, uint16 tierId, uint256 numTokens, uint256 code, address referrer) private {
         uint256 tokensIn = 0;
 
         // Allow for free minting for pay what you want tiers
         if (numTokens > 0) tokensIn = _currency.capture(numTokens);
 
         // Mint a new token if necessary
-        tokenId = _state.subscriptions[account].tokenId;
+        uint256 tokenId = _state.subscriptions[account].tokenId;
         if (tokenId == 0) {
             tokenId = _state.mint(account);
             _safeMint(account, tokenId);
@@ -422,16 +410,37 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
         // Purchase the subscription (switching tiers if necessary)
         _state.purchase(account, tokensIn, tierId);
 
-        // Take protocol + client fees, then reduce the remaining balance for rewards
+        // Calculate client / referrer split if referral code isn't applicable
+        uint16 clientBps = _feeParams.clientBps;
+        uint16 referrerBps = 0;
+
+        if (referrer != address(0)) {
+            referrerBps = _referrals.getBps(code, referrer);
+            // Fallback to client split if referrer code nets 0 bps
+            if (referrerBps == 0) {
+                referrerBps = _feeParams.clientReferralBps;
+                clientBps -= referrerBps;
+            }
+        }
+
+        // Transfer protocol + client fees
         tokensIn -= (
             _transferFee(tokensIn, _feeParams.protocolBps, _feeParams.protocolRecipient)
-                + _transferFee(tokensIn, _feeParams.clientBps, _feeParams.clientRecipient)
+                + _transferFee(tokensIn, clientBps, _feeParams.clientRecipient)
         );
 
-        // Transfer rewards if tier has rewards
-        tokensIn = _issueAndAllocateRewards(account, tokensIn, _state.subscriptions[account].tierId);
+        // Transfer referral rewards if applicable
+        if (referrerBps > 0) {
+            uint256 payout = (tokensIn * referrerBps) / MAX_BPS;
+            if (payout > 0) {
+                tokensIn -= payout;
+                _currency.transfer(referrer, payout);
+                emit ReferralPayout(tokenId, referrer, code, payout);
+            }
+        }
 
-        return (tokenId, tokensIn);
+        // Issue shares and allocate funds to reward pool
+        _issueAndAllocateRewards(account, tokensIn, _state.subscriptions[account].tierId);
     }
 
     /// @dev Transfer a fee to a recipient, returning the amount transferred

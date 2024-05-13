@@ -11,16 +11,6 @@ install_foundry() {
   fi
 }
 
-install_brew() {
-  echo "Checking brew packages for updates"
-  if ! command -v brew &> /dev/null
-  then
-    curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh
-  fi
-  brew bundle check || brew bundle
-}
-
-install_brew
 install_foundry
 
 echo

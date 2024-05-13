@@ -44,14 +44,9 @@ library ReferralLib {
         emit ReferralSet(code);
     }
 
-    /// @dev Compute the reward for a referral code (or 0 if not found)
-    function computeReferralReward(
-        State storage state,
-        uint256 code,
-        uint256 amount,
-        address referrer
-    ) internal view returns (uint256) {
+    /// @dev Get bps for a referral code
+    function getBps(State storage state, uint256 code, address referrer) internal view returns (uint16) {
         if (state.codes[code].referrer != address(0) && state.codes[code].referrer != referrer) return 0;
-        return (amount * state.codes[code].basisPoints) / MAX_BPS;
+        return state.codes[code].basisPoints;
     }
 }
