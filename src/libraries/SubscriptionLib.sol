@@ -104,8 +104,9 @@ library SubscriptionLib {
     function purchase(State storage state, address account, uint256 numTokens, uint16 tierId) internal {
         Subscription storage sub = state.subscriptions[account];
 
-        // Determine which tier to use. If input is 0, default to current tier.
-        // If default tier is 0, default to tier 1. Fallback to tier 1 (default)
+        // Determine which tier to use. If tierId input is 0, the following logic will determine the tier
+        // 1. If the subscription exists, it will use the current tier of the subscription
+        // 2. If the subscription does not exist, it will default to tier 1
         uint16 subTierId = sub.tierId;
         uint16 resolvedTier = tierId == 0 ? subTierId : tierId;
         if (resolvedTier == 0) resolvedTier = 1;
