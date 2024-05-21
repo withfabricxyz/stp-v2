@@ -82,6 +82,7 @@ contract AccessControlledTest is Test {
         vm.stopPrank();
 
         subject.setRoles(alice, 3);
+        assertEq(subject.rolesOf(alice), 3);
         vm.startPrank(alice);
         subject.checkManager();
         vm.stopPrank();

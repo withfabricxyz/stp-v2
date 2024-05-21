@@ -4,6 +4,11 @@ pragma solidity ^0.8.20;
 
 /// @title AccessControlled
 /// @dev Opinionated contract module that provides access control mechanisms using role bitmaps
+///      When extending this, ensure your roles are unique powers of 2 and do not overlap, eg: 1, 2, 4, 8, 16, 32, etc
+///      The owner can do anything, and roles can be granted to other accounts
+///      The owner can propose a new owner, and the new owner must accept the proposal
+///      The owner can grant roles to other accounts.
+///      The owner can also revoke roles from other accounts (by setting the role to 0, or updating to bitmap)
 abstract contract AccessControlled {
     /// @dev Triggered when the owner is changed
     event OwnerChanged(address indexed owner);
@@ -17,9 +22,13 @@ abstract contract AccessControlled {
     /// @dev Not authorized error
     error NotAuthorized();
 
+    /// @dev The current owner, which should be initialized in the constructor or initializer
     address private _owner;
+
+    /// @dev The pending owner, which is set when the owner proposes a new owner
     address private _pendingOwner;
 
+    /// @dev The roles for each account
     mapping(address => uint16) private _roles;
 
     /// @dev Check if the caller is the owner
@@ -32,6 +41,7 @@ abstract contract AccessControlled {
         if (_roles[msg.sender] & roles == 0) revert NotAuthorized();
     }
 
+    /// @dev Check if the caller is the owner or has the required role (owner can do anything)
     function _checkOwnerOrRoles(uint16 roles) internal view {
         if (msg.sender != _owner && _roles[msg.sender] & roles == 0) revert NotAuthorized();
     }
@@ -72,6 +82,15 @@ abstract contract AccessControlled {
         _checkOwner();
         _roles[account] = roles;
         emit RoleChanged(account, roles);
+    }
+
+    /**
+     * @notice Get the role bitmap for an account
+     * @param account the account to check
+     * @return roles the role(s) granted, or 0 if none
+     */
+    function rolesOf(address account) external view returns (uint16 roles) {
+        return _roles[account];
     }
 
     /**
