@@ -345,7 +345,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
     function updateProtocolFeeRecipient(address recipient) external {
         if (msg.sender != _factoryAddress) revert NotAuthorized();
 
-        // Give tokens back to creator and set fee rate to 0
+        // Set fee rate to 0
         if (recipient == address(0)) _feeParams.protocolBps = 0;
         _feeParams.protocolRecipient = recipient;
         emit FeeRecipientChange();
@@ -358,7 +358,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
     function updateClientFeeRecipient(address recipient) external {
         if (msg.sender != _factoryAddress) revert NotAuthorized();
 
-        // Give tokens back to creator and set fee rate to 0
+        // Set fee rate to 0
         if (recipient == address(0)) _feeParams.clientBps = 0;
         _feeParams.clientRecipient = recipient;
         emit FeeRecipientChange();
