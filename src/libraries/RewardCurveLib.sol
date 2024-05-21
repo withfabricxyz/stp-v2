@@ -14,7 +14,9 @@ library RewardCurveLib {
         uint256 periods = surpassedPeriods(curve);
         if (periods > curve.numPeriods) return curve.minMultiplier;
 
-        return uint256(curve.formulaBase) ** (curve.numPeriods - periods);
+        // Ensure the multiplier never goes below the minMultiplier
+        multiplier = uint256(curve.formulaBase) ** (curve.numPeriods - periods);
+        if (multiplier < curve.minMultiplier) multiplier = curve.minMultiplier;
     }
 
     /// @dev How many periods have passed, so we can compute the current multiplier

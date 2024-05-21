@@ -54,6 +54,17 @@ contract RewardCurveLibTest is BaseTest {
         assertEq(shim.currentMultiplier(params), 1);
     }
 
+    function testMinMultiplierIsMin() public {
+        CurveParams memory params = defaults();
+        params.minMultiplier = 16;
+        vm.warp(block.timestamp + 2 days);
+        assertEq(shim.currentMultiplier(params), 16);
+        vm.warp(block.timestamp + 1 days);
+        assertEq(shim.currentMultiplier(params), 16);
+        vm.warp(block.timestamp + 365 days);
+        assertEq(shim.currentMultiplier(params), 16);
+    }
+
     function testZeroPeriods() public {
         CurveParams memory params = defaults();
         params.numPeriods = 0;
