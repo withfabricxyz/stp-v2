@@ -11,7 +11,7 @@ import {Currency, CurrencyLib} from "./libraries/CurrencyLib.sol";
 import "./types/Constants.sol";
 import {FeeParams, InitParams, Tier} from "./types/Index.sol";
 import {CurveParams, RewardParams} from "./types/Rewards.sol";
-import {DeployParams} from "src/types/Factory.sol";
+import {DeployParams, FeeScheduleView} from "src/types/Factory.sol";
 
 /**
  *
@@ -44,6 +44,12 @@ contract STPV2Factory is AccessControlled, Multicallable {
 
     /// @dev Emitted when the deploy fees are collected by the owner
     event DeployFeeTransfer(address indexed recipient, uint256 amount);
+
+    /// @dev Emitted when a deploy fee is set
+    event DeployFeeChange(uint256 amount);
+
+    /// @dev Emitted when the protocol fee recipient is set
+    event ProtocolFeeRecipientChange(address account);
 
     /////////////////
 
@@ -126,6 +132,7 @@ contract STPV2Factory is AccessControlled, Multicallable {
         _checkOwner();
         if (recipient == address(0)) revert InvalidFeeRecipient();
         _protocolFeeRecipient = recipient;
+        emit ProtocolFeeRecipientChange(recipient);
     }
 
     /**
@@ -135,6 +142,16 @@ contract STPV2Factory is AccessControlled, Multicallable {
     function setDeployFee(uint256 deployFeeWei) external {
         _checkOwner();
         _deployFee = deployFeeWei;
+        emit DeployFeeChange(deployFeeWei);
+    }
+
+    /**
+     * @notice Get the current fee schedule
+     * @return schedule the fee schedule
+     */
+    function feeSchedule() external view returns (FeeScheduleView memory schedule) {
+        return
+            FeeScheduleView({deployFee: _deployFee, protocolFeeBps: PROTOCOL_FEE_BPS, recipient: _protocolFeeRecipient});
     }
 
     /**

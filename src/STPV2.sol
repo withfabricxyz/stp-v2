@@ -70,8 +70,11 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
     /// @dev Emitted when the fees are transferred to the collector
     event FeeTransfer(address indexed to, uint256 tokensTransferred);
 
-    /// @dev Emitted when the fee collector is updated
-    event FeeRecipientChange();
+    /// @dev Emitted when the protocol fee recipient is updated
+    event ProtocolFeeRecipientChange(address indexed account);
+
+    /// @dev Emitted when the client fee recipient is updated
+    event ClientFeeRecipientChange(address indexed account);
 
     /// @dev Emitted when a referral fee is paid out
     event ReferralPayout(
@@ -352,7 +355,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
         // Set fee rate to 0
         if (recipient == address(0)) _feeParams.protocolBps = 0;
         _feeParams.protocolRecipient = recipient;
-        emit FeeRecipientChange();
+        emit ProtocolFeeRecipientChange(recipient);
     }
 
     /**
@@ -365,7 +368,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
         // Set fee rate to 0
         if (recipient == address(0)) _feeParams.clientBps = 0;
         _feeParams.clientRecipient = recipient;
-        emit FeeRecipientChange();
+        emit ClientFeeRecipientChange(recipient);
     }
 
     /////////////////////////

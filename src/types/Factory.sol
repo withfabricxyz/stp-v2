@@ -24,3 +24,13 @@ struct DeployParams {
     /// @dev Initial reward curve params (curve 0)
     CurveParams curveParams;
 }
+
+/// @dev A view of the fee schedule for the factory
+struct FeeScheduleView {
+    /// @dev the fee for deploying a new subscription contract
+    uint256 deployFee;
+    /// @dev the protocol fee basis points set on deployed contracts
+    uint256 protocolFeeBps;
+    /// @dev the protocol fee recipient
+    address recipient;
+}

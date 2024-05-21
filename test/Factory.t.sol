@@ -77,9 +77,20 @@ contract FactoryTest is BaseTest {
     }
 
     function testDeployFeeCapture() public {
+        vm.expectEmit(true, true, false, true, address(factory));
+        emit STPV2Factory.DeployFeeChange(1e12);
         factory.setDeployFee(1e12);
+
+        vm.expectEmit(true, true, false, true, address(factory));
+        emit STPV2Factory.ProtocolFeeRecipientChange(bob);
+        factory.setProtocolFeeRecipient(bob);
+
+        assertEq(factory.feeSchedule().deployFee, 1e12);
+        assertEq(factory.feeSchedule().protocolFeeBps, 100);
+        assertEq(factory.feeSchedule().recipient, bob);
+
         factory.deploySubscription{value: 1e12}(defaultParams());
-        assertEq(1e12, fees.balance);
+        assertEq(1e12, bob.balance);
     }
 
     function testBadFeeRecipient() public {
