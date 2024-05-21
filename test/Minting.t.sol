@@ -41,6 +41,9 @@ contract MintingTest is BaseTest {
         stp.mintFor{value: 0.001 ether}(address(0), 0.001 ether);
         vm.expectEmit(true, true, false, true, address(stp));
         emit SubscriptionLib.Purchase(1, 0.001 ether, 30 days, uint48(block.timestamp + 30 days));
+
+        vm.expectEmit(true, true, false, true, address(stp));
+        emit IERC4906.MetadataUpdate(1);
         stp.mintFor{value: 0.001 ether}(bob, 0.001 ether);
         assertEq(address(stp).balance, 0.001 ether);
         assertEq(stp.balanceOf(bob), 30 days);

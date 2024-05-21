@@ -13,6 +13,7 @@ import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 
 import {STPV2} from "src/STPV2.sol";
 import {AccessControlled} from "src/abstracts/AccessControlled.sol";
+import {IERC4906} from "src/interfaces/IERC4906.sol";
 import {Currency, CurrencyLib} from "src/libraries/CurrencyLib.sol";
 import {GateLib} from "src/libraries/GateLib.sol";
 import {ReferralLib} from "src/libraries/ReferralLib.sol";

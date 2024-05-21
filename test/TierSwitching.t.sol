@@ -47,7 +47,6 @@ contract TierSwitchingTest is BaseTest {
         stp.deactivateSubscription(alice);
         assertEq(stp.subscriptionOf(alice).tierId, 0);
         assertEq(stp.tierDetail(1).subCount, 0);
-        assertFalse(stp.locked(1));
 
         vm.startPrank(alice);
         vm.expectEmit(true, true, false, true, address(stp));
@@ -67,7 +66,6 @@ contract TierSwitchingTest is BaseTest {
 
         assertEq(stp.subscriptionOf(alice).tierId, 2);
         assertApproxEqAbs(stp.balanceOf(alice), 45 days, 1);
-        assertTrue(stp.locked(1));
     }
 
     function testInvalidTier() public prank(alice) {
@@ -87,7 +85,6 @@ contract TierSwitchingTest is BaseTest {
 
         assertEq(stp.subscriptionOf(alice).tierId, 1);
         assertApproxEqAbs(stp.balanceOf(alice), 90 days, 1);
-        assertFalse(stp.locked(1));
     }
 
     // Switching tiers clears the granted time

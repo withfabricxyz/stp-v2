@@ -676,17 +676,6 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
         }
     }
 
-    /**
-     * @notice Check if a token is locked
-     * @param tokenId the token id to check
-     * @return locked true if the token is locked
-     */
-    function locked(uint256 tokenId) public view override returns (bool) {
-        uint16 tierId = _state.subscriptions[ownerOf(tokenId)].tierId;
-        if (tierId == 0) return false;
-        return !_state.tiers[tierId].params.transferrable;
-    }
-
     //////////////////////
     // Recovery Functions
     //////////////////////
