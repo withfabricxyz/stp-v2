@@ -99,6 +99,10 @@ contract TierLibTest is Test {
         vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidMintPrice.selector, 0.01 ether));
         shim.checkJoin(tier, 1, alice, 0.009 ether);
 
+        // No cap
+        tier.maxSupply = 0;
+        shim.checkJoin(tier, 1000, alice, 1e18);
+
         // Ensure gating is wired up
         TestERC20Token token = new TestERC20Token("FIAT", "FIAT", 18);
         tier.gate = Gate({gateType: GateType.ERC20, contractAddress: address(token), componentId: 0, balanceMin: 1});

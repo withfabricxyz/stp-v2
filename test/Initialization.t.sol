@@ -34,15 +34,28 @@ contract InitializationTest is BaseTest {
         stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
     }
 
-    function testFeeBps() public {
+    function testProtocolFeeBps() public {
         feeParams.protocolBps = 1500;
         vm.expectRevert(abi.encodeWithSelector(STPV2.InvalidFeeParams.selector));
         stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
     }
 
-    function testFeeRequirement() public {
-        feeParams.clientRecipient = fees;
+    function testProtocolFeeNoRecipient() public {
+        feeParams.protocolRecipient = address(0);
+        feeParams.protocolBps = 100;
+        vm.expectRevert(abi.encodeWithSelector(STPV2.InvalidFeeParams.selector));
+        stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
+    }
 
+    function testClientFeeRequirement() public {
+        feeParams.clientRecipient = fees;
+        vm.expectRevert(abi.encodeWithSelector(STPV2.InvalidFeeParams.selector));
+        stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
+    }
+
+    function testClientFeeBpsNoRecipient() public {
+        feeParams.clientRecipient = address(0);
+        feeParams.clientBps = 100;
         vm.expectRevert(abi.encodeWithSelector(STPV2.InvalidFeeParams.selector));
         stp.initialize(initParams, tierParams, rewardParams, curveParams, feeParams);
     }

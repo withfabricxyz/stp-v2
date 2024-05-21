@@ -26,6 +26,9 @@ contract ReferralTests is BaseTest {
     function testCreateInvalid() public prank(creator) {
         vm.expectRevert(abi.encodeWithSelector(InvalidBasisPoints.selector));
         stp.setReferralCode(1, 11_000, false, address(0));
+
+        vm.expectRevert(abi.encodeWithSelector(InvalidBasisPoints.selector));
+        stp.setReferralCode(1, 5001, false, address(0));
     }
 
     function testInvalidReferralCode() public {

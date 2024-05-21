@@ -38,7 +38,7 @@ library ReferralLib {
             emit ReferralDestroyed(code);
             return;
         }
-        if (settings.basisPoints > MAX_BPS) revert InvalidBasisPoints();
+        if (settings.basisPoints > MAX_REFERRAL_BPS) revert InvalidBasisPoints();
 
         state.codes[code] = settings;
         emit ReferralSet(code);
