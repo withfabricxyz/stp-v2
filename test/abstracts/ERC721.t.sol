@@ -69,7 +69,6 @@ contract ERC721Test is Test {
         assertTrue(subject.supportsInterface(0x80ac58cd));
         assertTrue(subject.supportsInterface(0x5b5e139f));
         assertTrue(subject.supportsInterface(0x49064906));
-        assertTrue(subject.supportsInterface(0xb45a3c0e));
         assertFalse(subject.supportsInterface(0xdeadbeef));
     }
 

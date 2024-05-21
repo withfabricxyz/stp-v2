@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import {IERC5192} from "src/interfaces/IERC5192.sol";
+import {IERC4906} from "src/interfaces/IERC4906.sol";
 import {SubscriberLib} from "src/libraries/SubscriberLib.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
 import {Subscription, Tier} from "src/types/Index.sol";
@@ -90,7 +90,8 @@ library SubscriptionLib {
         if (tierId == 0 || sub.remainingSeconds() > 0) revert DeactivationFailure();
         state.tiers[tierId].subCount -= 1;
         sub.tierId = 0;
-        emitSwitchEvents(sub.tokenId, tierId, 0, false);
+        emit SwitchTier(sub.tokenId, tierId, 0);
+        _updateMetadata(sub.tokenId);
     }
 
     /// @dev Mint a new subscription for an account
@@ -126,6 +127,7 @@ library SubscriptionLib {
         sub.extendPurchase(numSeconds);
 
         emit Purchase(sub.tokenId, numTokens, numSeconds, sub.expiresAt);
+        _updateMetadata(sub.tokenId);
     }
 
     /// @dev Refund the remaining time of a subscriber. The creator sets the amount of tokens to refund, which can be 0
@@ -134,6 +136,7 @@ library SubscriptionLib {
         if (sub.tokenId == 0) revert SubscriptionNotFound();
         uint48 refundedTime = sub.refundTime();
         emit Refund(sub.tokenId, numTokens, refundedTime);
+        _updateMetadata(sub.tokenId);
     }
 
     /// @dev Switch the tier of a subscriber
@@ -154,7 +157,7 @@ library SubscriptionLib {
         }
         sub.resetExpires(uint48(block.timestamp + proratedTime));
 
-        emitSwitchEvents(sub.tokenId, subTierId, tierId, state.tiers[tierId].params.transferrable);
+        emit SwitchTier(sub.tokenId, subTierId, tierId);
     }
 
     /// @dev Grant time to a subscriber. It can be 0 seconds to switch tiers, etc
@@ -163,6 +166,7 @@ library SubscriptionLib {
         state.switchTier(account, tierId);
         sub.extendGrant(numSeconds);
         emit Grant(sub.tokenId, numSeconds, sub.expiresAt);
+        _updateMetadata(sub.tokenId);
     }
 
     /// @dev Revoke ONLY granted time from a subscriber
@@ -171,14 +175,12 @@ library SubscriptionLib {
         if (sub.tokenId == 0) revert SubscriptionNotFound();
         uint48 remaining = sub.revokeTime();
         emit GrantRevoke(sub.tokenId, remaining, sub.expiresAt);
+        _updateMetadata(sub.tokenId);
     }
 
-    /// @dev Emit the switch tier events
-    function emitSwitchEvents(uint256 tokenId, uint16 fromTierId, uint16 toTierId, bool locked) private {
-        emit SwitchTier(uint64(tokenId), fromTierId, toTierId);
-
-        // Soulbound events
-        if (locked) emit IERC5192.Locked(tokenId);
-        else emit IERC5192.Unlocked(tokenId);
+    /// @dev Emit a metadata update event when a subscription is modified in some way. This occurs when time is
+    /// purchased, granted, refunded, or revoked. This will result in unrecommended (per spec) events such as new mints
+    function _updateMetadata(uint64 tokenId) private {
+        emit IERC4906.MetadataUpdate(tokenId);
     }
 }

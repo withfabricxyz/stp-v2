@@ -3,11 +3,10 @@
 pragma solidity ^0.8.20;
 
 import "../interfaces/IERC4906.sol";
-import "../interfaces/IERC5192.sol";
 
-/// @notice Hybrid ERC721 token implementation with ERC4906 and ERC5192 support. Pulled from solady and solmate.
+/// @notice Hybrid ERC721 token implementation with partial ERC4906 support. Pulled from solady and solmate.
 /// @dev Modified by Fabric
-abstract contract ERC721 is IERC4906, IERC5192 {
+abstract contract ERC721 is IERC4906 {
     /// @dev Only the token owner or an approved account can manage the token.
     error TokenNotAuthorized();
 
@@ -115,8 +114,7 @@ abstract contract ERC721 is IERC4906, IERC5192 {
         return interfaceId == 0x01ffc9a7 // ERC165 Interface ID for ERC165
             || interfaceId == 0x80ac58cd // ERC165 Interface ID for ERC721
             || interfaceId == 0x5b5e139f // ERC165 Interface ID for ERC721Metadata
-            || interfaceId == 0x49064906 // ERC165 Interface ID for ERC4906
-            || interfaceId == 0xb45a3c0e; // ERC165 Interface ID for ERC5192
+            || interfaceId == 0x49064906; // ERC165 Interface ID for ERC4906
     }
 
     /*//////////////////////////////////////////////////////////////

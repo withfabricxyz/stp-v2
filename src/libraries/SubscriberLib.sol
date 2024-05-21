@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.20;
 
-import {IERC4906} from "../interfaces/IERC4906.sol";
 import {Subscription, Tier} from "../types/Index.sol";
 
 /// @dev Library for managing subscription state
@@ -67,12 +66,10 @@ library SubscriberLib {
     function extend(Subscription storage sub, uint48 numSeconds) internal {
         if (sub.expiresAt > block.timestamp) sub.expiresAt += numSeconds;
         else sub.expiresAt = uint48(block.timestamp + numSeconds);
-        emit IERC4906.MetadataUpdate(sub.tokenId);
     }
 
     /// @dev Retract the expiration time of a subscription and emit an update event
     function retract(Subscription storage sub, uint48 numSeconds) internal {
         sub.expiresAt -= numSeconds;
-        emit IERC4906.MetadataUpdate(sub.tokenId);
     }
 }
