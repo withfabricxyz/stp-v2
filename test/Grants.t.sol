@@ -12,7 +12,6 @@ contract GrantsTest is BaseTest {
         deal(charlie, 1e19);
         deal(creator, 1e19);
         deal(fees, 1e19);
-        tierParams.periodDurationSeconds = 1;
         reinitStp();
     }
 
@@ -41,8 +40,8 @@ contract GrantsTest is BaseTest {
         vm.startPrank(creator);
         stp.grantTime(alice, 90 days, 1);
         vm.stopPrank();
-        mint(alice, 1e5);
-        assertEq(stp.balanceOf(alice), 90 days + 1e5 / 4);
+        mint(alice, 0.001 ether);
+        assertEq(stp.balanceOf(alice), 90 days + 30 days);
     }
 
     function testGrantRevoke() public {
@@ -68,12 +67,12 @@ contract GrantsTest is BaseTest {
     }
 
     function testGrantRevokeWithPayment() public {
-        mint(alice, 1e5);
+        mint(alice, 0.001 ether);
         vm.startPrank(creator);
         stp.grantTime(alice, 90 days, 1);
         stp.revokeTime(alice);
         vm.stopPrank();
-        assertEq(stp.balanceOf(alice), 1e5 / 4);
+        assertEq(stp.balanceOf(alice), 30 days);
     }
 
     function multicall() public prank(creator) {

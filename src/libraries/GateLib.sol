@@ -2,7 +2,8 @@
 
 pragma solidity ^0.8.20;
 
-// import "forge-std/console.sol";
+import {SafeCastLib} from "@solady/utils/SafeCastLib.sol";
+
 import {Gate, GateType} from "../types/Index.sol";
 
 /// @dev External hybrid interface for token gate checks
@@ -15,6 +16,7 @@ interface ExternalGate {
 /// @notice Library for token gating tiers
 library GateLib {
     using GateLib for Gate;
+    using SafeCastLib for uint256;
 
     /////////////////////
     // ERRORS
@@ -54,7 +56,7 @@ library GateLib {
         ExternalGate eg = ExternalGate(gate.contractAddress);
         if (gate.gateType == GateType.ERC721 || gate.gateType == GateType.ERC20) balance = eg.balanceOf(account);
         else if (gate.gateType == GateType.ERC1155) balance = eg.balanceOf(account, gate.componentId);
-        else if (gate.gateType == GateType.STPV2) balance = eg.tierBalanceOf(uint16(gate.componentId), account);
+        else if (gate.gateType == GateType.STPV2) balance = eg.tierBalanceOf(gate.componentId.toUint16(), account);
         else balance = 0;
     }
 }

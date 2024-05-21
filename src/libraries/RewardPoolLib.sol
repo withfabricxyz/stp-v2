@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.20;
 
+import {SafeCastLib} from "@solady/utils/SafeCastLib.sol";
+
 import {RewardCurveLib} from "src/libraries/RewardCurveLib.sol";
 import {CurveParams, Holder} from "src/types/Rewards.sol";
 
@@ -9,6 +11,7 @@ import {CurveParams, Holder} from "src/types/Rewards.sol";
 library RewardPoolLib {
     using RewardCurveLib for CurveParams;
     using RewardPoolLib for State;
+    using SafeCastLib for uint256;
 
     struct State {
         /// @dev The number of reward curves
@@ -26,9 +29,9 @@ library RewardPoolLib {
     }
 
     /// @dev Reduces precision loss for reward calculations
-    uint256 private constant PRECISION_COEFFICIENT = 2 ** 64;
+    uint256 private constant PRECISION_SHIFT = 64;
 
-    /// @dev The maximum reward factor (limiting this prevents overflow)
+    /// @dev The maximum reward factor (this limits overflow probability)
     uint256 private constant MAX_MULTIPLIER = 2 ** 64;
 
     /////////////////////
@@ -87,7 +90,7 @@ library RewardPoolLib {
         if (holder == address(0)) revert InvalidHolder();
         state.totalShares += numShares;
         state.holders[holder].numShares += numShares;
-        state.holders[holder].pointsCorrection -= int256(state.pointsPerShare * numShares);
+        state.holders[holder].pointsCorrection -= (state.pointsPerShare * numShares).toInt256();
         emit SharesIssued(holder, numShares);
     }
 
@@ -99,7 +102,7 @@ library RewardPoolLib {
     /// @dev Allocate rewards to the pool for holders to claim (capture should be done separately)
     function allocate(State storage state, uint256 amount) internal {
         if (state.totalShares == 0) revert AllocationWithoutShares();
-        state.pointsPerShare += (amount * PRECISION_COEFFICIENT) / state.totalShares;
+        state.pointsPerShare += (amount << PRECISION_SHIFT) / state.totalShares;
         state.totalRewardIngress += amount;
         emit RewardsAllocated(amount);
     }
@@ -118,7 +121,7 @@ library RewardPoolLib {
         if (state.totalShares == 0) return 0;
         Holder memory holder = state.holders[account];
         uint256 exposure =
-            uint256(int256(state.pointsPerShare * holder.numShares) + holder.pointsCorrection) / PRECISION_COEFFICIENT;
+            uint256((state.pointsPerShare * holder.numShares).toInt256() + holder.pointsCorrection) >> PRECISION_SHIFT;
         return exposure - holder.rewardsWithdrawn;
     }
 
@@ -128,7 +131,7 @@ library RewardPoolLib {
         if (numShares == 0) revert NoSharesToBurn();
         state.totalShares -= numShares;
         if (state.totalShares > 0) {
-            state.pointsPerShare = (state.totalRewardIngress * PRECISION_COEFFICIENT) / state.totalShares;
+            state.pointsPerShare = (state.totalRewardIngress << PRECISION_SHIFT) / state.totalShares;
         }
         delete state.holders[account];
         emit SharesBurned(account, numShares);

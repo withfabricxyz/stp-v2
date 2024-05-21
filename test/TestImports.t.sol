@@ -106,7 +106,8 @@ abstract contract BaseTest is Test {
     address internal doug = 0xB4c79dAb8f259c7aee6e5b2aa729821864227E7b;
 
     Tier internal tierParams = Tier({
-        periodDurationSeconds: 2,
+        // periodDurationSeconds: 2,
+        periodDurationSeconds: 30 days,
         maxSupply: 1000,
         maxCommitmentSeconds: 0,
         rewardCurveId: 0,
@@ -114,7 +115,8 @@ abstract contract BaseTest is Test {
         paused: false,
         transferrable: true,
         initialMintPrice: 0,
-        pricePerPeriod: 4,
+        // pricePerPeriod: 4,
+        pricePerPeriod: 0.001 ether,
         startTimestamp: 0,
         endTimestamp: 0,
         gate: Gate({gateType: GateType.NONE, contractAddress: address(0), componentId: 0, balanceMin: 0})

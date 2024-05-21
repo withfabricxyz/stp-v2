@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.20;
 
+import {SafeCastLib} from "@solady/utils/SafeCastLib.sol";
+
 import "../types/Constants.sol";
 import {Subscription, Tier} from "../types/Index.sol";
 import {GateLib} from "./GateLib.sol";
@@ -12,9 +14,10 @@ library TierLib {
     using SubscriberLib for Subscription;
     using TierLib for Tier;
     using TierLib for TierLib.State;
+    using SafeCastLib for uint256;
 
     /// @dev scale factor for precision on tokens per second
-    uint256 private constant SCALE_FACTOR = 1e18;
+    uint256 private constant SCALE_POWER = 80;
 
     /// @dev The state of a tier
     struct State {
@@ -122,13 +125,13 @@ library TierLib {
     /// @dev Convert tokens to seconds based on the current rate (for free tier any tokens = period duration)
     function tokensToSeconds(State storage state, uint256 numTokens) internal view returns (uint48) {
         if (state.params.pricePerPeriod == 0) return state.params.periodDurationSeconds;
-        // Try to reduce precision issues by scaling up before division
-        return uint48((numTokens * SCALE_FACTOR) / state.exaTokensPerSecond());
+        // Reduce precision issues by scaling up before division
+        return ((numTokens << SCALE_POWER) / state.scaledTokensPerSecond()).toUint48();
     }
 
-    /// @dev Determine the number of tokens per second, scaled by the SCALE_FACTOR for low decimal tokens like USDC
-    function exaTokensPerSecond(State storage state) internal view returns (uint256) {
-        return (state.params.pricePerPeriod * SCALE_FACTOR) / state.params.periodDurationSeconds;
+    /// @dev Determine the number of tokens per second, scaled with scale power for low decimal tokens like USDC
+    function scaledTokensPerSecond(State storage state) internal view returns (uint256) {
+        return (state.params.pricePerPeriod << SCALE_POWER) / state.params.periodDurationSeconds;
     }
 
     /// @dev Convert a number of seconds on one tier to a number of seconds on another tier.
@@ -139,6 +142,6 @@ library TierLib {
         State storage fromTier,
         uint48 numSeconds
     ) internal view returns (uint48) {
-        return toTier.tokensToSeconds((fromTier.exaTokensPerSecond() * numSeconds) / SCALE_FACTOR);
+        return toTier.tokensToSeconds((fromTier.scaledTokensPerSecond() * numSeconds) >> SCALE_POWER);
     }
 }

@@ -2,24 +2,29 @@
 
 pragma solidity ^0.8.20;
 
+import {SafeCastLib} from "@solady/utils/SafeCastLib.sol";
+
 import {Subscription, Tier} from "../types/Index.sol";
 
 /// @dev Library for managing subscription state
 library SubscriberLib {
     using SubscriberLib for Subscription;
 
+    /// @dev We assume block.timestamp is less than 2^48, but check additions with inputs
+    using SafeCastLib for uint256;
+
     /// @dev Extend the expiration time of a subscription (via purchase)
     function extendPurchase(Subscription storage sub, uint48 numSeconds) internal {
         sub.extend(numSeconds);
         if (sub.purchaseExpires > block.timestamp) sub.purchaseExpires += numSeconds;
-        else sub.purchaseExpires = uint48(block.timestamp + numSeconds);
+        else sub.purchaseExpires = (block.timestamp + numSeconds).toUint48();
     }
 
     /// @dev Extend the expiration time of a subscription (via grant)
     function extendGrant(Subscription storage sub, uint48 numSeconds) internal {
         sub.extend(numSeconds);
         if (sub.grantExpires > block.timestamp) sub.grantExpires += numSeconds;
-        else sub.grantExpires = uint48(block.timestamp + numSeconds);
+        else sub.grantExpires = (block.timestamp + numSeconds).toUint48();
     }
 
     /// @dev Revoke all granted time from a subscription
@@ -65,7 +70,7 @@ library SubscriberLib {
     /// @dev Extend the expiration time of a subscription and emit an update event
     function extend(Subscription storage sub, uint48 numSeconds) internal {
         if (sub.expiresAt > block.timestamp) sub.expiresAt += numSeconds;
-        else sub.expiresAt = uint48(block.timestamp + numSeconds);
+        else sub.expiresAt = (block.timestamp + numSeconds).toUint48();
     }
 
     /// @dev Retract the expiration time of a subscription and emit an update event
