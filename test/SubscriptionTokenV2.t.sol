@@ -5,8 +5,8 @@ import "./TestImports.t.sol";
 
 contract STPV2Test is BaseTest {
     function setUp() public {
-        tierParams.periodDurationSeconds = 4;
-        tierParams.pricePerPeriod = 8;
+        tierParams.periodDurationSeconds = 30 days;
+        tierParams.pricePerPeriod = 0.001 ether;
         stp = reinitStp();
 
         deal(alice, 1e19);
@@ -33,9 +33,9 @@ contract STPV2Test is BaseTest {
 
     function testMintForErc20() public erc20 prank(alice) {
         token().approve(address(stp), 1e18);
-        stp.mintFor(bob, 1e5);
-        assertEq(token().balanceOf(address(stp)), 1e5);
-        assertEq(stp.balanceOf(bob), 1e5 / 2);
+        stp.mintFor(bob, 0.001 ether);
+        assertEq(token().balanceOf(address(stp)), 0.001 ether);
+        assertEq(stp.balanceOf(bob), 30 days);
         assertEq(stp.balanceOf(alice), 0);
         assertEq(stp.ownerOf(1), bob);
     }
@@ -92,9 +92,9 @@ contract STPV2Test is BaseTest {
         assert(stp.contractDetail().currency != address(0));
         assertEq(token().balanceOf(alice), 1e20);
         token().approve(address(stp), 1e18);
-        stp.mint(1e5);
-        assertEq(token().balanceOf(address(stp)), 1e5);
-        assertEq(stp.balanceOf(alice), 1e5 / 2);
+        stp.mint(0.001 ether);
+        assertEq(token().balanceOf(address(stp)), 0.001 ether);
+        assertEq(stp.balanceOf(alice), 30 days);
     }
 
     function testMintInvalidERC20() public erc20 prank(alice) {

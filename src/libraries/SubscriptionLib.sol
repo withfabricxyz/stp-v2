@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.20;
 
+import {SafeCastLib} from "@solady/utils/SafeCastLib.sol";
 import {IERC4906} from "src/interfaces/IERC4906.sol";
 import {SubscriberLib} from "src/libraries/SubscriberLib.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
@@ -13,6 +14,7 @@ library SubscriptionLib {
     using SubscriberLib for Subscription;
     using TierLib for Tier;
     using TierLib for TierLib.State;
+    using SafeCastLib for uint256;
 
     struct State {
         /// @dev The maximum number of subscriptions that can be minted (updateable) (0 = unlimited/max uint64)
@@ -155,7 +157,7 @@ library SubscriptionLib {
             proratedTime =
                 state.tiers[tierId].computeSwitchTimeValue(state.tiers[subTierId], sub.purchasedTimeRemaining());
         }
-        sub.resetExpires(uint48(block.timestamp + proratedTime));
+        sub.resetExpires((block.timestamp + proratedTime).toUint48());
 
         emit SwitchTier(sub.tokenId, subTierId, tierId);
     }
