@@ -88,7 +88,9 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
     event TransferRecipientChange(address indexed recipient);
 
     //////////////////
-    // State
+    // Roles
+    // The roles are bitmapped, so they can be combined. Role definitions must be powers of 2 and
+    // unique, eg: 1, 2, 4, 8, 16, 32, etc.
     //////////////////
 
     /// @dev The manager role can do most things, except calls that involve money (except tier management with
@@ -97,6 +99,13 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
 
     /// @dev The agent can only grant and revoke time
     uint16 private constant ROLE_AGENT = 2;
+
+    /// @dev The issuer role can issue shares
+    uint16 private constant ROLE_ISSUER = 4;
+
+    //////////////////
+    // State
+    //////////////////
 
     /// @dev The metadata URI for the contract (tokenUri is derived from this)
     string private _contractURI;
@@ -494,7 +503,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
      * @notice Mint tokens to an account without payment (used for migrations, tips, etc)
      */
     function issueRewardShares(address account, uint256 numShares) external {
-        _checkOwner();
+        _checkOwnerOrRoles(ROLE_ISSUER);
         _rewards.issue(account, numShares);
     }
 
