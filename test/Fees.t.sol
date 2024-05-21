@@ -38,8 +38,9 @@ contract FeesTest is BaseTest {
     }
 
     function testProtocolFeeUpdate() public {
+        // this contract is the factory, so it can update the protocol fee
         vm.expectEmit(true, true, false, true, address(stp));
-        emit STPV2.FeeRecipientChange();
+        emit STPV2.ProtocolFeeRecipientChange(charlie);
         stp.updateProtocolFeeRecipient(charlie);
 
         vm.startPrank(charlie);
@@ -55,7 +56,7 @@ contract FeesTest is BaseTest {
 
     function testClientFeeUpdate() public {
         vm.expectEmit(true, true, false, true, address(stp));
-        emit STPV2.FeeRecipientChange();
+        emit STPV2.ClientFeeRecipientChange(charlie);
         stp.updateClientFeeRecipient(charlie);
 
         vm.startPrank(charlie);

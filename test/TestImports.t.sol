@@ -24,7 +24,7 @@ import {SubscriberLib} from "src/libraries/SubscriberLib.sol";
 import {SubscriptionLib} from "src/libraries/SubscriptionLib.sol";
 import {TierLib} from "src/libraries/TierLib.sol";
 import "src/types/Constants.sol";
-import {DeployParams} from "src/types/Factory.sol";
+import {DeployParams, FeeScheduleView} from "src/types/Factory.sol";
 import {
     FeeParams, Gate, GateType, InitParams, MintParams, Subscription, Subscription, Tier
 } from "src/types/Index.sol";
