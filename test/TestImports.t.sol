@@ -106,7 +106,7 @@ abstract contract BaseTest is Test {
 
     Tier internal tierParams = Tier({
         periodDurationSeconds: 2,
-        maxSupply: 0,
+        maxSupply: 1000,
         maxCommitmentSeconds: 0,
         rewardCurveId: 0,
         rewardBasisPoints: 0,
@@ -138,7 +138,7 @@ abstract contract BaseTest is Test {
         contractUri: "curi",
         owner: creator,
         erc20TokenAddr: address(0),
-        globalSupplyCap: 0
+        globalSupplyCap: 1000
     });
 
     STPV2 internal stp;

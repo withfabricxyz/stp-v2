@@ -15,7 +15,7 @@ library SubscriptionLib {
     using TierLib for TierLib.State;
 
     struct State {
-        /// @dev The maximum number of subscriptions that can be minted (updateable)
+        /// @dev The maximum number of subscriptions that can be minted (updateable) (0 = unlimited/max uint64)
         uint64 supplyCap;
         /// @dev The total number of subscriptions that have been minted
         uint64 subCount;
@@ -95,7 +95,7 @@ library SubscriptionLib {
 
     /// @dev Mint a new subscription for an account
     function mint(State storage state, address account) internal returns (uint64 tokenId) {
-        if (state.supplyCap != 0 && state.subCount >= state.supplyCap) revert GlobalSupplyLimitExceeded();
+        if (state.subCount >= state.supplyCap) revert GlobalSupplyLimitExceeded();
         tokenId = ++state.subCount;
         state.subscriptions[account].tokenId = tokenId;
     }

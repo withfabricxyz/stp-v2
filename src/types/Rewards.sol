@@ -25,9 +25,11 @@ struct CurveParams {
     uint8 minMultiplier;
 }
 
+/// @dev The slashing parameters for the reward pool. Slashing is a mechanism to to burn shares for a
+///      holder who's subscription has lapsed by the amount of time specified in the grace period.
 struct RewardParams {
-    /// @dev slashGracePeriod
+    /// @dev The amount of seconds after which reward shares become slashable (0 = immediately after lapse)
     uint32 slashGracePeriod;
-    /// @dev whether the pool is slashable
+    /// @dev A flag indicating whether the rewards are slashable after expiration + grace period
     bool slashable;
 }

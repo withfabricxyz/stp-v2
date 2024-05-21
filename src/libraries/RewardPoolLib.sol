@@ -66,6 +66,9 @@ library RewardPoolLib {
     /// @dev Error when the curve configuration is invalid (e.g. multiplier too high)
     error InvalidCurve();
 
+    /// @dev Error when the account is invalid (0 address)
+    error InvalidHolder();
+
     /// @dev Create a new reward curve (starting at id 0)
     function createCurve(State storage state, CurveParams memory curve) internal {
         if (curve.startTimestamp == 0) curve.startTimestamp = uint48(block.timestamp);
@@ -81,6 +84,7 @@ library RewardPoolLib {
     /// @dev Issue shares to a holder
     function issue(State storage state, address holder, uint256 numShares) internal {
         if (numShares == 0) return;
+        if (holder == address(0)) revert InvalidHolder();
         state.totalShares += numShares;
         state.holders[holder].numShares += numShares;
         state.holders[holder].pointsCorrection -= int256(state.pointsPerShare * numShares);

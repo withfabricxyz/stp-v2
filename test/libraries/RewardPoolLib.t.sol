@@ -134,6 +134,9 @@ contract RewardPoolLibTest is BaseTest {
 
         shim.issue(alice, 100_000);
 
+        vm.expectRevert(RewardPoolLib.InvalidHolder.selector);
+        shim.issue(address(0), 100_000);
+
         vm.expectEmit(true, true, false, true, address(shim));
         emit RewardPoolLib.RewardsAllocated(100_000);
         shim.allocate(100_000);

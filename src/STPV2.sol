@@ -160,6 +160,8 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
         // Validate fee params
         if (
             fees.clientBps + fees.protocolBps > MAX_FEE_BPS
+                || (fees.clientRecipient == address(0) && fees.clientBps > 0)
+                || (fees.protocolRecipient == address(0) && fees.protocolBps > 0)
                 || (fees.clientRecipient != address(0) && fees.clientBps == 0)
                 || (fees.protocolRecipient != address(0) && fees.protocolBps == 0)
                 || (fees.clientReferralBps > fees.clientBps)
@@ -320,6 +322,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
      */
     function createTier(Tier memory params) external {
         _checkOwnerOrRoles(ROLE_MANAGER);
+        if (params.rewardCurveId > _rewards.numCurves - 1) revert RewardPoolLib.InvalidCurve();
         _state.createTier(params);
     }
 
@@ -331,6 +334,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
      */
     function updateTier(uint16 tierId, Tier memory params) external {
         _checkOwnerOrRoles(ROLE_MANAGER);
+        if (params.rewardCurveId > _rewards.numCurves - 1) revert RewardPoolLib.InvalidCurve();
         _state.updateTier(tierId, params);
     }
 
@@ -371,7 +375,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
     /**
      * @notice Create or update a referral code for giving rewards to referrers on mint
      * @param code the unique integer code for the referral
-     * @param basisPoints the reward basis points
+     * @param basisPoints the reward basis points (max = 50% = 5000 bps)
      * @param permanent whether the referral code is locked (immutable after set)
      * @param account the specific account to reward (0x0 for any account)
      */
