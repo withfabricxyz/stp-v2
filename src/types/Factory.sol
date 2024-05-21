@@ -12,7 +12,8 @@ struct DeployParams {
     uint16 clientReferralShareBps;
     /// @dev the client fee recipient
     address clientFeeRecipient;
-    /// @dev An identifer to help track deployments via Deploy event
+    /// @dev An identifer to help track deployments via Deploy event. This should only be used in
+    ///      conjunction with the expected owner account to prevent impersonation via front or back running.
     bytes deployKey;
     /// @dev the init parameters for the collection
     InitParams initParams;
