@@ -30,6 +30,9 @@ library TierLib {
     // ERRORS
     /////////////////////
 
+    /// @dev A sponsored purchase attempts to switch tiers (not allowed)
+    error TierInvalidSwitch();
+
     /// @dev The tier duration must be > 0
     error TierInvalidDuration();
 

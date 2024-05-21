@@ -409,6 +409,12 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
         if (tokenId == 0) {
             tokenId = _state.mint(account);
             _safeMint(account, tokenId);
+        } else if (msg.sender != account) {
+            // Prevent tier migration from another caller
+            if (
+                _state.subscriptions[account].tierId != 0 && tierId != 0
+                    && _state.subscriptions[account].tierId != tierId
+            ) revert TierLib.TierInvalidSwitch();
         }
 
         // Purchase the subscription (switching tiers if necessary)

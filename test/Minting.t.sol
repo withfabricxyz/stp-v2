@@ -130,4 +130,48 @@ contract MintingTest is BaseTest {
         vm.expectRevert(abi.encodeWithSelector(TierLib.TierRenewalsPaused.selector));
         stp.mintFor{value: 0.001 ether}(alice, 0.001 ether);
     }
+
+    function testMintForTierRules() public {
+        vm.startPrank(creator);
+        stp.createTier(tierParams); // tier 2
+        vm.stopPrank();
+
+        // Mint a new token for bob
+        stp.mintAdvanced{value: 0.001 ether}(
+            MintParams({tierId: 2, recipient: bob, referrer: address(0), referralCode: 0, purchaseValue: 0.001 ether})
+        );
+
+        // Disallow explicit switching unless the sender is the recipient
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierInvalidSwitch.selector));
+        stp.mintAdvanced{value: 0.001 ether}(
+            MintParams({tierId: 1, recipient: bob, referrer: address(0), referralCode: 0, purchaseValue: 0.001 ether})
+        );
+
+        // Ok
+        stp.mintAdvanced{value: 0.001 ether}(
+            MintParams({tierId: 2, recipient: bob, referrer: address(0), referralCode: 0, purchaseValue: 0.001 ether})
+        );
+        stp.mintAdvanced{value: 0.001 ether}(
+            MintParams({tierId: 0, recipient: bob, referrer: address(0), referralCode: 0, purchaseValue: 0.001 ether})
+        );
+        stp.mintFor{value: 0.001 ether}(bob, 0.001 ether);
+
+        // Switch allowed
+        vm.startPrank(bob);
+        uint256 time = stp.tierBalanceOf(2, bob);
+        stp.mintAdvanced{value: 0.001 ether}(
+            MintParams({tierId: 1, recipient: bob, referrer: address(0), referralCode: 0, purchaseValue: 0.001 ether})
+        );
+        assertApproxEqAbs(stp.tierBalanceOf(1, bob), time + 30 days, 1);
+        vm.stopPrank();
+
+        // Deactivate and migrate via sponsored call
+        vm.warp(stp.balanceOf(bob) + 1);
+        stp.deactivateSubscription(bob);
+
+        // Place on tier 2
+        stp.mintAdvanced{value: 0.001 ether}(
+            MintParams({tierId: 2, recipient: bob, referrer: address(0), referralCode: 0, purchaseValue: 0.001 ether})
+        );
+    }
 }
