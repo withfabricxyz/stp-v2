@@ -41,7 +41,6 @@ library GateLib {
         if (gate.gateType == GateType.STPV2 && (gate.componentId >= 2 ** 16 || gate.componentId == 0)) {
             revert GateInvalid();
         }
-        if (gate.gateType == GateType.ERC1155 && gate.componentId == 0) revert GateInvalid();
     }
 
     /// @dev Check if the account meets the gate requirements and revert if not

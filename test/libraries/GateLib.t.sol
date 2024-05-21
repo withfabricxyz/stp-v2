@@ -39,12 +39,11 @@ contract GateLibTest is BaseTest {
         vm.expectRevert(abi.encodeWithSelector(GateLib.GateInvalid.selector));
         shim.validate(gate);
 
-        gate.balanceMin = 1;
         gate.gateType = GateType.ERC1155;
         vm.expectRevert(abi.encodeWithSelector(GateLib.GateInvalid.selector));
         shim.validate(gate);
 
-        gate.componentId = 2 ** 17;
+        gate.balanceMin = 1;
         shim.validate(gate);
 
         gate.gateType = GateType.STPV2;
