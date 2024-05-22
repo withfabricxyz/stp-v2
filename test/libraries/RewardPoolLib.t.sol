@@ -72,7 +72,7 @@ contract RewardTestShim {
         return PoolStatePartial({totalShares: _state.totalShares, totalRewardIngress: _state.totalRewardIngress});
     }
 
-    function test() public {}
+    function testIgnore() public {}
 }
 
 contract RewardPoolLibTest is BaseTest {
@@ -89,7 +89,7 @@ contract RewardPoolLibTest is BaseTest {
         shim.createCurve(curve);
 
         curve = defaultCurve();
-        curve.numPeriods = 128;
+        curve.numPeriods = 37;
         curve.formulaBase = 2;
         vm.expectRevert(abi.encodeWithSelector(RewardPoolLib.InvalidCurve.selector));
         shim.createCurve(curve);
@@ -178,9 +178,57 @@ contract RewardPoolLibTest is BaseTest {
         shim.burn(alice);
         assertEq(shim.state().totalShares, 100_000);
         assertEq(shim.rewardBalanceOf(alice), 0);
-        assertEq(shim.rewardBalanceOf(bob), 100_000);
+        assertEq(shim.rewardBalanceOf(bob), 50_000);
+        assertEq(shim.balance(), 50_000);
 
         shim.burn(bob);
         assertEq(shim.state().totalShares, 0);
+    }
+
+    function testLargeValues() public {
+        uint256 maxWeiDelta = 10;
+        uint256 allocation = 2 ** 72;
+        for (uint256 i = 0; i < 512; i++) {
+            shim.issueWithCurve(alice, allocation, 0);
+            shim.issueWithCurve(bob, allocation, 0);
+            shim.issueWithCurve(charlie, allocation, 0);
+            shim.allocate(allocation);
+        }
+
+        assertEq(shim.state().totalShares, allocation * 512 * 3 * 64);
+        assertApproxEqAbs(
+            shim.balance(),
+            shim.rewardBalanceOf(alice) + shim.rewardBalanceOf(bob) + shim.rewardBalanceOf(charlie),
+            maxWeiDelta
+        );
+
+        assertApproxEqAbs(shim.rewardBalanceOf(alice), shim.rewardBalanceOf(charlie), maxWeiDelta);
+        assertApproxEqAbs(shim.rewardBalanceOf(alice), shim.rewardBalanceOf(bob), maxWeiDelta);
+
+        shim.burn(alice);
+        shim.burn(bob);
+        shim.burn(charlie);
+        assertApproxEqAbs(shim.balance(), 0, maxWeiDelta);
+    }
+
+    function testFuzzAllocate(uint48 allocation) public {
+        vm.assume(allocation > 0);
+        uint256 maxWeiDelta = 10;
+        shim.issueWithCurve(alice, allocation, 0);
+        shim.issueWithCurve(bob, allocation, 0);
+        shim.issueWithCurve(charlie, allocation, 0);
+        shim.allocate(allocation);
+
+        assertApproxEqAbs(shim.rewardBalanceOf(alice), allocation / 3, maxWeiDelta);
+        assertApproxEqAbs(
+            shim.balance(),
+            shim.rewardBalanceOf(alice) + shim.rewardBalanceOf(bob) + shim.rewardBalanceOf(charlie),
+            maxWeiDelta
+        );
+        shim.burn(alice);
+        shim.burn(bob);
+        shim.burn(charlie);
+
+        assertApproxEqAbs(shim.balance(), 0, maxWeiDelta);
     }
 }

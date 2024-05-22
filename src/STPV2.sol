@@ -538,7 +538,10 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
             !_rewardParams.slashable
                 || _state.subscriptions[account].expiresAt + _rewardParams.slashGracePeriod > block.timestamp
         ) revert NotSlashable();
-        _rewards.burn(account);
+
+        // Burn shares (remove holder) and transfer any unclaimed rewards
+        uint256 rewards = _rewards.burn(account);
+        if (rewards > 0) _currency.transfer(account, rewards);
     }
 
     ////////////////////////
