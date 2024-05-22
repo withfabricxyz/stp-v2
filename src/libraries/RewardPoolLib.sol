@@ -8,6 +8,37 @@ import {RewardCurveLib} from "src/libraries/RewardCurveLib.sol";
 import {CurveParams, Holder} from "src/types/Rewards.sol";
 
 /// @dev Library for reward tracking and distribution
+///
+///      This library is designed to issues shares to holders based on a multiplier calculated
+///      via a reward curve multiplied by allocated currency. Each holder effectively has a percentage
+///      of the total reward pool which allows them to claim rewards (currency) based on their
+///      share of the pool and time of issuance.
+///
+///      The reward curve is defined by a set of parameters which determine the multiplier at any given time.
+///
+///      Because the reward curves can be flat or decaying, earlier holders may have a higher multiplier
+///      than later holders. This is useful for incentivizing early participation in a protocol.
+///
+///      Additionally, there are slashing (burning) mechanisms which can be used to reduce the total
+///      number of shares. With STP, holders are slashable if the creator allows it at deployment AND
+///      the holder is no longer an active subscriber. Holders are paid out their rewards before losing shares.
+///
+///      Note: Due to the nature of curves and allocation, the order of issuance matters. Example:
+///      - Contract deployed
+///      - Alice allocates 100 tokens and now owns 100% of the shares
+///        - Alice has 100 claimable tokens
+///      - Bob allocates 100 tokens and now owns 1/2 of the shares, alice 1/2
+///        - Alice has 150 claimable tokens
+///        - Bob has 50 claimable tokens
+///      - Charlie allocates 100 tokens and now owns 1/3 of the shares, alice 1/3, bob 1/3
+///        - Alice has ~183.33 claimable tokens
+///        - Bob has ~83.33 claimable tokens
+///        - Charlie has ~33.33 claimable tokens
+///      - Creator issues 100 shares to doug, all parties now own 1/4 of the shares
+///        - Alice has ~183.33 claimable tokens
+///        - Bob has ~83.33 claimable tokens
+///        - Charlie has ~33.33 claimable tokens
+///        - Doug has ~0 claimable tokens
 library RewardPoolLib {
     using RewardCurveLib for CurveParams;
     using RewardPoolLib for State;
@@ -24,15 +55,17 @@ library RewardPoolLib {
         uint256 totalRewardEgress;
         /// @dev The total points per share (used for reward calculations)
         uint256 pointsPerShare;
+        /// @dev The holders of the pool by account
         mapping(address => Holder) holders;
+        /// @dev The reward curves by id
         mapping(uint8 => CurveParams) curves;
     }
 
     /// @dev Reduces precision loss for reward calculations
-    uint256 private constant PRECISION_SHIFT = 64;
+    uint256 private constant PRECISION_SHIFT = 96;
 
     /// @dev The maximum reward factor (this limits overflow probability)
-    uint256 private constant MAX_MULTIPLIER = 2 ** 64;
+    uint256 private constant MAX_MULTIPLIER = 2 ** 36;
 
     /////////////////////
     // EVENTS
@@ -125,14 +158,16 @@ library RewardPoolLib {
         return exposure - holder.rewardsWithdrawn;
     }
 
-    /// @dev Burn shares of a holder and adjust the points per share
-    function burn(State storage state, address account) internal {
+    /// @dev Claim rewards and burn shares of a holder.
+    ///      Note: Ensure the caller transfers the reward amount to the holder
+    function burn(State storage state, address account) internal returns (uint256 transferAmount) {
         uint256 numShares = state.holders[account].numShares;
         if (numShares == 0) revert NoSharesToBurn();
-        state.totalShares -= numShares;
-        if (state.totalShares > 0) {
-            state.pointsPerShare = (state.totalRewardIngress << PRECISION_SHIFT) / state.totalShares;
+        if (state.rewardBalanceOf(account) > 0) {
+            // The amount of tokens to transfer to the holder after calling burn
+            transferAmount = state.claimRewards(account);
         }
+        state.totalShares -= numShares;
         delete state.holders[account];
         emit SharesBurned(account, numShares);
     }
