@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.25;
 
 import {AccessControlled} from "./abstracts/AccessControlled.sol";
 import {LibClone} from "@solady/utils/LibClone.sol";
@@ -52,12 +52,6 @@ contract STPV2Factory is AccessControlled, Multicallable {
     event ProtocolFeeRecipientChange(address account);
 
     /////////////////
-
-    /// @dev The protocol fee basis points
-    uint16 private constant PROTOCOL_FEE_BPS = 100;
-
-    /// @dev The deploy fee currency (ETH)
-    Currency private constant FEE_CURRENCY = Currency.wrap(address(0));
 
     /// @dev The STP contract implementation address
     address private immutable IMPLEMENTATION;
@@ -121,7 +115,7 @@ contract STPV2Factory is AccessControlled, Multicallable {
         if (_protocolFeeRecipient == address(0)) return;
 
         emit DeployFeeTransfer(_protocolFeeRecipient, msg.value);
-        FEE_CURRENCY.transfer(_protocolFeeRecipient, msg.value);
+        DEPLOY_FEE_CURRENCY.transfer(_protocolFeeRecipient, msg.value);
     }
 
     /**

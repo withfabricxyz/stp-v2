@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.25;
 
 /*
  * Views are read-only interfaces that can be used to access the state of a contract.

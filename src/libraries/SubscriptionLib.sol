@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.25;
 
 import {SafeCastLib} from "@solady/utils/SafeCastLib.sol";
 import {IERC4906} from "src/interfaces/IERC4906.sol";
