@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: CC0-1.0
-pragma solidity ^0.8.0;
+pragma solidity 0.8.25;
 
 interface IERC4906 {
     /// @dev This event emits when the metadata of a token is changed.

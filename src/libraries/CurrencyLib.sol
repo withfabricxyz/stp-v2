@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.25;
 
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 
@@ -18,9 +18,6 @@ library CurrencyLib {
 
     /// @notice Thrown when an account is invalid
     error InvalidAccount();
-
-    /// @notice Thrown when approval is invalid
-    error InvalidApproval();
 
     /// @dev capture native or ERC20 tokens
     function capture(Currency currency, uint256 amount) internal returns (uint256 capturedAmount) {

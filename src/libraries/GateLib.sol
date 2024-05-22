@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.25;
 
 import {SafeCastLib} from "@solady/utils/SafeCastLib.sol";
 

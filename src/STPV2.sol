@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.25;
 
 import {Initializable} from "@solady/utils/Initializable.sol";
 import {LibString} from "@solady/utils/LibString.sol";
@@ -44,9 +44,6 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
 
     /// @notice Error when the fee params are invalid
     error InvalidFeeParams();
-
-    /// @notice Error when the reward params are invalid
-    error InvalidRewardParams();
 
     /// @notice Error when a transfer fails due to the recipient having a subscription
     error TransferToExistingSubscriber();
@@ -482,17 +479,15 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
     }
 
     /// @dev Issue rewards to an account and allocate funds to the pool (if configured)
-    function _issueAndAllocateRewards(address account, uint256 amount, uint16 tierId) private returns (uint256) {
+    function _issueAndAllocateRewards(address account, uint256 amount, uint16 tierId) private {
         uint16 bps = _state.tiers[tierId].params.rewardBasisPoints;
         uint8 curve = _state.tiers[tierId].params.rewardCurveId;
         uint256 rewards = (amount * bps) / MAX_BPS;
-        if (rewards == 0) return amount;
+        if (rewards == 0) return;
 
         // It's possible for 0 shares to be issued if the curve is not set, or the multipler is 0
         _rewards.issueWithCurve(account, rewards, curve);
         _rewards.allocate(rewards);
-
-        return amount - rewards;
     }
 
     ////////////////////////
