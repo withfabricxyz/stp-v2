@@ -17,7 +17,7 @@ library TierLib {
     using SafeCastLib for uint256;
 
     /// @dev scale factor for precision on tokens per second
-    uint256 private constant SCALE_POWER = 80;
+    uint256 private constant SCALE_FACTOR = 2 ** 80;
 
     /// @dev The state of a tier
     struct State {
@@ -126,12 +126,12 @@ library TierLib {
     function tokensToSeconds(State storage state, uint256 numTokens) internal view returns (uint48) {
         if (state.params.pricePerPeriod == 0) return state.params.periodDurationSeconds;
         // Reduce precision issues by scaling up before division
-        return ((numTokens << SCALE_POWER) / state.scaledTokensPerSecond()).toUint48();
+        return ((numTokens * SCALE_FACTOR) / state.scaledTokensPerSecond()).toUint48();
     }
 
     /// @dev Determine the number of tokens per second, scaled with scale power for low decimal tokens like USDC
     function scaledTokensPerSecond(State storage state) internal view returns (uint256) {
-        return (state.params.pricePerPeriod << SCALE_POWER) / state.params.periodDurationSeconds;
+        return (state.params.pricePerPeriod * SCALE_FACTOR) / state.params.periodDurationSeconds;
     }
 
     /// @dev Convert a number of seconds on one tier to a number of seconds on another tier.
@@ -142,6 +142,6 @@ library TierLib {
         State storage fromTier,
         uint48 numSeconds
     ) internal view returns (uint48) {
-        return toTier.tokensToSeconds((fromTier.scaledTokensPerSecond() * numSeconds) >> SCALE_POWER);
+        return toTier.tokensToSeconds((fromTier.scaledTokensPerSecond() * numSeconds) / SCALE_FACTOR);
     }
 }

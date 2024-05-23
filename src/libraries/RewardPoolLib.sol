@@ -62,7 +62,7 @@ library RewardPoolLib {
     }
 
     /// @dev Reduces precision loss for reward calculations
-    uint256 private constant PRECISION_SHIFT = 96;
+    uint256 private constant PRECISION_FACTOR = 2 ** 96;
 
     /// @dev The maximum reward factor (this limits overflow probability)
     uint256 private constant MAX_MULTIPLIER = 2 ** 36;
@@ -135,7 +135,7 @@ library RewardPoolLib {
     /// @dev Allocate rewards to the pool for holders to claim (capture should be done separately)
     function allocate(State storage state, uint256 amount) internal {
         if (state.totalShares == 0) revert AllocationWithoutShares();
-        state.pointsPerShare += (amount << PRECISION_SHIFT) / state.totalShares;
+        state.pointsPerShare += (amount * PRECISION_FACTOR) / state.totalShares;
         state.totalRewardIngress += amount;
         emit RewardsAllocated(amount);
     }
@@ -154,7 +154,7 @@ library RewardPoolLib {
         if (state.totalShares == 0) return 0;
         Holder memory holder = state.holders[account];
         uint256 exposure =
-            uint256((state.pointsPerShare * holder.numShares).toInt256() + holder.pointsCorrection) >> PRECISION_SHIFT;
+            uint256((state.pointsPerShare * holder.numShares).toInt256() + holder.pointsCorrection) / PRECISION_FACTOR;
         return exposure - holder.rewardsWithdrawn;
     }
 
