@@ -5,6 +5,7 @@ pragma solidity 0.8.25;
 import {Initializable} from "@solady/utils/Initializable.sol";
 import {LibString} from "@solady/utils/LibString.sol";
 import {Multicallable} from "@solady/utils/Multicallable.sol";
+import {ReentrancyGuard} from "@solady/utils/ReentrancyGuard.sol";
 
 import {AccessControlled} from "./abstracts/AccessControlled.sol";
 import {ERC721} from "./abstracts/ERC721.sol";
@@ -24,7 +25,7 @@ import {ContractView, SubscriberView} from "./types/Views.sol";
  * @author Fabric Inc.
  * @notice An NFT contract which allows users to mint time and access token gated content while time remains.
  */
-contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
+contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, ReentrancyGuard {
     using LibString for uint256;
     using SubscriberLib for Subscription;
     using CurrencyLib for Currency;
@@ -246,7 +247,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
      * @param numSeconds the number of seconds to grant
      * @param tierId the tier id to grant time to (0 to match current tier, or default for new)
      */
-    function grantTime(address account, uint48 numSeconds, uint16 tierId) external {
+    function grantTime(address account, uint48 numSeconds, uint16 tierId) external nonReentrant {
         _checkOwnerOrRoles(ROLE_MANAGER | ROLE_AGENT);
         if (_state.subscriptions[account].tokenId == 0) _safeMint(account, _state.mint(account));
         _state.grant(account, numSeconds, tierId);
@@ -407,7 +408,13 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
     ////////////////////////
 
     /// @dev Purchase a subscription, minting a token if necessary, switching tiers if necessary
-    function _purchase(address account, uint16 tierId, uint256 numTokens, uint256 code, address referrer) private {
+    function _purchase(
+        address account,
+        uint16 tierId,
+        uint256 numTokens,
+        uint256 code,
+        address referrer
+    ) private nonReentrant {
         uint256 tokensIn = 0;
 
         // Allow for free minting for pay what you want tiers
@@ -506,7 +513,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable {
      * @notice Allocate rewards to the pool in the denominated currency
      * @param amount the amount of tokens (native or ERC20) to allocate
      */
-    function yieldRewards(uint256 amount) external payable {
+    function yieldRewards(uint256 amount) external payable nonReentrant {
         _rewards.allocate(_currency.capture(amount));
     }
 
