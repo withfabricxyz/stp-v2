@@ -16,7 +16,8 @@ remappings = [
 ]
 
 # Much slower compile times when true, but helps with code size when true
-via_ir = false
+[profile.deploy]
+via_ir = true
 
 [invariant]
 runs = 256
