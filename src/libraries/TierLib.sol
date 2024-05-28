@@ -94,7 +94,7 @@ library TierLib {
     /// @dev Check if an account can join a tier (initial price + token gating)
     function checkJoin(State storage state, address account, uint256 numTokens) internal view {
         if (block.timestamp < state.params.startTimestamp) revert TierNotStarted();
-        if (state.params.maxSupply != 0 && state.subCount >= state.params.maxSupply) revert TierHasNoSupply(state.id);
+        if (state.subCount >= state.params.maxSupply) revert TierHasNoSupply(state.id);
         if (numTokens < state.params.initialMintPrice) revert TierInvalidMintPrice(state.params.initialMintPrice);
         GateLib.checkAccount(state.params.gate, account);
     }

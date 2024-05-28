@@ -119,6 +119,7 @@ library SubscriptionLib {
         // Join the tier, if necessary, and deduct the initial mint price
         uint256 tokensForTime = numTokens;
         if (subTierId != resolvedTier) {
+            if (tierState.id == 0) revert TierLib.TierNotFound(resolvedTier);
             tierState.checkJoin(account, numTokens);
             state.switchTier(account, resolvedTier);
             tokensForTime -= tierState.params.initialMintPrice;
@@ -146,8 +147,9 @@ library SubscriptionLib {
         Subscription storage sub = state.subscriptions[account];
         uint16 subTierId = sub.tierId;
         if (subTierId == tierId) return;
-        if (subTierId != 0) state.tiers[subTierId].subCount -= 1;
         if (state.tiers[tierId].id == 0) revert TierLib.TierNotFound(tierId);
+        if (subTierId != 0) state.tiers[subTierId].subCount -= 1;
+
         state.tiers[tierId].subCount += 1;
         sub.tierId = tierId;
 
