@@ -13,7 +13,7 @@ contract TierSwitchingTest is BaseTest {
         stp.createTier(
             Tier({
                 periodDurationSeconds: 30 days,
-                maxSupply: 0,
+                maxSupply: 500,
                 maxCommitmentSeconds: 0,
                 rewardCurveId: 0,
                 rewardBasisPoints: 0,
