@@ -17,7 +17,7 @@ library SubscriptionLib {
     using SafeCastLib for uint256;
 
     struct State {
-        /// @dev The maximum number of subscriptions that can be minted (updateable) (0 = unlimited/max uint64)
+        /// @dev The maximum number of subscriptions that can be minted (updateable)
         uint64 supplyCap;
         /// @dev The total number of subscriptions that have been minted
         uint64 subCount;

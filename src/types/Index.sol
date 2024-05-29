@@ -30,7 +30,7 @@ struct Gate {
 struct Tier {
     /// @dev The minimimum subscription time for the tier
     uint32 periodDurationSeconds;
-    /// @dev The maximum number of subscribers the tier can have (0 = unlimited)
+    /// @dev The maximum number of subscribers the tier can have
     uint32 maxSupply;
     /// @dev The maximum number of future seconds a subscriber can hold (0 = unlimited)
     uint48 maxCommitmentSeconds;
