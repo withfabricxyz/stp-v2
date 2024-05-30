@@ -65,6 +65,8 @@ contract TestFeeToken is ERC20 {
 
 contract TestERC20Token is ERC20 {
     uint8 private immutable _decimals;
+    bool private revertOnTransfer = false;
+    bool private falseReturn = false;
 
     constructor(string memory name, string memory symbol, uint8 numDecimals) ERC20(name, symbol) {
         _decimals = numDecimals;
@@ -73,6 +75,20 @@ contract TestERC20Token is ERC20 {
 
     function decimals() public view override returns (uint8) {
         return _decimals;
+    }
+
+    function transfer(address to, uint256 amount) public virtual override returns (bool) {
+        if (revertOnTransfer) revert("TestERC20Token: transfer failed");
+        if (falseReturn) return false;
+        return super.transfer(to, amount);
+    }
+
+    function setRevertOnTransfer(bool value) external {
+        revertOnTransfer = value;
+    }
+
+    function setFalseReturn(bool value) external {
+        falseReturn = value;
     }
 
     function testIgnore() internal {}
@@ -141,7 +157,7 @@ abstract contract BaseTest is Test {
         symbol: "MEOW",
         contractUri: "curi",
         owner: creator,
-        erc20TokenAddr: address(0),
+        currencyAddress: address(0),
         globalSupplyCap: 1000
     });
 
@@ -194,7 +210,7 @@ abstract contract BaseTest is Test {
         _token.transfer(bob, 1e20);
         _token.transfer(charlie, 1e20);
         _token.transfer(creator, 1e20);
-        initParams.erc20TokenAddr = address(_token);
+        initParams.currencyAddress = address(_token);
         return reinitStp();
     }
 

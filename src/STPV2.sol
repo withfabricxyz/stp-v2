@@ -85,6 +85,9 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, Reentr
     /// @dev Emitted when the transfer recipient is updated
     event TransferRecipientChange(address indexed recipient);
 
+    /// @dev Emitted when slashing and the reward transfer fails. The balance is reallocated to the creator
+    event SlashTransferFallback(address indexed account, uint256 amount);
+
     //////////////////
     // Roles
     // The roles are bitmapped, so they can be combined. Role definitions must be powers of 2 and
@@ -180,7 +183,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, Reentr
         _contractURI = params.contractUri;
         _name = params.name;
         _symbol = params.symbol;
-        _currency = Currency.wrap(params.erc20TokenAddr);
+        _currency = Currency.wrap(params.currencyAddress);
         _state.supplyCap = params.globalSupplyCap;
 
         _feeParams = fees;
@@ -548,7 +551,11 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, Reentr
 
         // Burn shares (remove holder) and transfer any unclaimed rewards
         uint256 rewards = _rewards.burn(account);
-        if (rewards > 0) _currency.transfer(account, rewards);
+        if (rewards == 0) return;
+
+        // Attempt transfer of rewards to the slashed account. Transfer failure reallocates funds to the owner.
+        // This is a last resort to ensure the funds are not lost and gives the owner discretion.
+        if (!_currency.tryTransfer(account, rewards)) emit SlashTransferFallback(account, rewards);
     }
 
     ////////////////////////
