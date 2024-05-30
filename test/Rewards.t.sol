@@ -78,6 +78,26 @@ contract RewardsTest is BaseTest {
         assertEq(stp.contractDetail().rewardShares, 0);
     }
 
+    // Holder is slashed, but the transfer fails, so the creator is credited
+    function testSlashingBadContract() public {
+        rewardParams.slashable = true;
+        rewardParams.slashGracePeriod = 0;
+        stp = reinitStp();
+
+        vm.startPrank(creator);
+        stp.issueRewardShares(address(this), 100_000);
+        stp.yieldRewards{value: 1 ether}(1 ether);
+        assertEq(0, stp.contractDetail().creatorBalance);
+        assertEq(1 ether, stp.contractDetail().rewardBalance);
+
+        vm.expectEmit(true, true, false, true, address(stp));
+        emit STPV2.SlashTransferFallback(address(this), 1 ether);
+        stp.slash(address(this));
+        assertEq(1 ether, stp.contractDetail().creatorBalance);
+        assertEq(0, stp.contractDetail().rewardBalance);
+        vm.stopPrank();
+    }
+
     function rbalance(address account) internal view returns (uint256) {
         return stp.subscriptionOf(account).rewardBalance;
     }

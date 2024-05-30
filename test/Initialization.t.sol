@@ -23,7 +23,7 @@ contract InitializationTest is BaseTest {
         assertEq(initParams.contractUri, stp.contractURI());
 
         // More
-        assertEq(initParams.erc20TokenAddr, stp.contractDetail().currency);
+        assertEq(initParams.currencyAddress, stp.contractDetail().currency);
         assertEq(initParams.globalSupplyCap, stp.contractDetail().supplyCap);
     }
 

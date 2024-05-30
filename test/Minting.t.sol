@@ -75,7 +75,7 @@ contract MintingTest is BaseTest {
     function testMintERC20FeeTaking() public {
         TestFeeToken _token = new TestFeeToken("FIAT", "FIAT", 1e21);
         _token.transfer(alice, 1e20);
-        initParams.erc20TokenAddr = address(_token);
+        initParams.currencyAddress = address(_token);
         reinitStp();
         vm.startPrank(alice);
         _token.approve(address(stp), 1e18);

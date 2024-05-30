@@ -78,8 +78,8 @@ struct InitParams {
     string contractUri;
     /// @dev the address of the owner of the contract (default admin)
     address owner;
-    /// @dev the address of the ERC20 token used for purchases, or the 0x0 for native
-    address erc20TokenAddr;
+    /// @dev the address of the token used for purchases (0x0 for native, otherwise erc20)
+    address currencyAddress;
     /// @dev The initial global supply cap
     uint64 globalSupplyCap;
 }

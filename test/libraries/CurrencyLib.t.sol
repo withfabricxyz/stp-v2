@@ -12,6 +12,10 @@ contract MockCurrencyLib {
         CurrencyLib.transfer(currency, to, amount);
     }
 
+    function tryTransfer(Currency currency, address to, uint256 amount) public returns (bool success) {
+        return CurrencyLib.tryTransfer(currency, to, amount);
+    }
+
     /// @dev show the balance of the contract
     function balance(Currency currency) public view returns (uint256) {
         return CurrencyLib.balance(currency);
@@ -94,5 +98,35 @@ contract CurrencyLibTest is Test {
 
         assertEq(pulled, 1e9);
         assertEq(shim.balance(spendy), 1e9);
+    }
+
+    function testTryTransfer() public {
+        deal(address(shim), 1e9);
+        vm.expectRevert(abi.encodeWithSelector(CurrencyLib.InvalidAccount.selector));
+        shim.tryTransfer(eth, address(0), 1e9);
+        assertTrue(shim.tryTransfer(eth, alice, 1e5));
+        assertEq(1e5 + 1e18, alice.balance);
+        assertFalse(shim.tryTransfer(eth, address(this), 1e5));
+        assertFalse(shim.tryTransfer(eth, alice, 1e18));
+        assertEq(1e5 + 1e18, alice.balance);
+    }
+
+    function testTryTransferERC20() public {
+        assertEq(0, testToken.balanceOf(address(shim)));
+        assertFalse(shim.tryTransfer(usdc, alice, 1e5));
+        assertEq(1e9, testToken.balanceOf(alice));
+
+        testToken.transfer(address(shim), 1e9);
+        assertTrue(shim.tryTransfer(usdc, alice, 1e5));
+        assertEq(1e9 + 1e5, testToken.balanceOf(alice));
+
+        testToken.setRevertOnTransfer(true);
+        assertFalse(shim.tryTransfer(usdc, alice, 1e5));
+
+        testToken.setRevertOnTransfer(false);
+        testToken.setFalseReturn(true);
+        assertFalse(shim.tryTransfer(usdc, alice, 1e5));
+
+        assertEq(1e9 + 1e5, testToken.balanceOf(alice));
     }
 }

@@ -61,6 +61,12 @@ contract GrantsTest is BaseTest {
         assertEq(stp.balanceOf(alice), 0);
     }
 
+    function testGrantInvalidTier() public {
+        vm.startPrank(creator);
+        vm.expectRevert(abi.encodeWithSelector(TierLib.TierNotFound.selector, 20));
+        stp.grantTime(alice, 10 days, 20);
+    }
+
     function testInvalidRevoke() public prank(creator) {
         vm.expectRevert(abi.encodeWithSelector(SubscriptionLib.SubscriptionNotFound.selector));
         stp.revokeTime(alice);
