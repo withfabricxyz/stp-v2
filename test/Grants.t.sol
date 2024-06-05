@@ -18,8 +18,22 @@ contract GrantsTest is BaseTest {
     function testGrant() public {
         vm.startPrank(creator);
         vm.expectEmit(true, true, false, true, address(stp));
+        emit SubscriptionLib.SwitchTier(1, 0, 1);
+        vm.expectEmit(true, true, false, true, address(stp));
         emit SubscriptionLib.Grant(1, 90 days, uint48(block.timestamp + 90 days));
         stp.grantTime(alice, 90 days, 1);
+        vm.stopPrank();
+        assertEq(stp.balanceOf(alice), 90 days);
+        assertEq(stp.subscriptionOf(alice).tierId, 1);
+    }
+
+    function testGrantZeroTier() public {
+        vm.startPrank(creator);
+        vm.expectEmit(true, true, false, true, address(stp));
+        emit SubscriptionLib.SwitchTier(1, 0, 1);
+        vm.expectEmit(true, true, false, true, address(stp));
+        emit SubscriptionLib.Grant(1, 90 days, uint48(block.timestamp + 90 days));
+        stp.grantTime(alice, 90 days, 0);
         vm.stopPrank();
         assertEq(stp.balanceOf(alice), 90 days);
         assertEq(stp.subscriptionOf(alice).tierId, 1);

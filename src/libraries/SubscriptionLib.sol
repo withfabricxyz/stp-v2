@@ -167,7 +167,9 @@ library SubscriptionLib {
     /// @dev Grant time to a subscriber. It can be 0 seconds to switch tiers, etc
     function grant(State storage state, address account, uint48 numSeconds, uint16 tierId) internal {
         Subscription storage sub = state.subscriptions[account];
-        state.switchTier(account, tierId);
+        uint16 resolvedTier = tierId == 0 ? sub.tierId : tierId;
+        if (resolvedTier == 0) resolvedTier = 1;
+        state.switchTier(account, resolvedTier);
         sub.extendGrant(numSeconds);
         emit Grant(sub.tokenId, numSeconds, sub.expiresAt);
         _updateMetadata(sub.tokenId);
