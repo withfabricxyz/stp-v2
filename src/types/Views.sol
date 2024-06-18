@@ -13,6 +13,8 @@ struct SubscriberView {
     uint64 tokenId;
     /// @dev The expiration timestamp of the subscription
     uint48 expiresAt;
+    /// @dev The expiration timestamp of the subscription (excluding granted time)
+    uint48 purchaseExpiresAt;
     /// @dev The number of reward shares held
     uint256 rewardShares;
     /// @dev The claimable reward balance

@@ -24,6 +24,7 @@ contract MintingTest is BaseTest {
         assertEq(stp.subscriptionOf(alice).tokenId, 1);
         assertEq(stp.subscriptionOf(alice).tierId, 1);
         assertEq(stp.subscriptionOf(alice).expiresAt, block.timestamp + 30 days);
+        assertEq(stp.subscriptionOf(alice).purchaseExpiresAt, block.timestamp + 30 days);
         assertEq(stp.ownerOf(1), alice);
     }
 
