@@ -581,6 +581,7 @@ contract STPV2 is ERC721, AccessControlled, Multicallable, Initializable, Reentr
             tierId: _state.subscriptions[account].tierId,
             tokenId: _state.subscriptions[account].tokenId,
             expiresAt: _state.subscriptions[account].expiresAt,
+            purchaseExpiresAt: _state.subscriptions[account].purchaseExpires,
             rewardShares: _rewards.holders[account].numShares,
             rewardBalance: _rewards.rewardBalanceOf(account)
         });

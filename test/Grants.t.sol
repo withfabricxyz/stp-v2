@@ -56,6 +56,7 @@ contract GrantsTest is BaseTest {
         vm.stopPrank();
         mint(alice, 0.001 ether);
         assertEq(stp.balanceOf(alice), 90 days + 30 days);
+        assertEq(stp.subscriptionOf(alice).purchaseExpiresAt, block.timestamp + 30 days);
     }
 
     function testGrantRevoke() public {
