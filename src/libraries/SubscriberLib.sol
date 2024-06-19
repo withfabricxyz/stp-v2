@@ -15,23 +15,23 @@ library SubscriberLib {
 
     /// @dev Extend the expiration time of a subscription (via purchase)
     function extendPurchase(Subscription storage sub, uint48 numSeconds) internal {
-        sub.extend(numSeconds);
         if (sub.purchaseExpires > block.timestamp) sub.purchaseExpires += numSeconds;
         else sub.purchaseExpires = (block.timestamp + numSeconds).toUint48();
+        sub.recalcExpiry();
     }
 
     /// @dev Extend the expiration time of a subscription (via grant)
     function extendGrant(Subscription storage sub, uint48 numSeconds) internal {
-        sub.extend(numSeconds);
         if (sub.grantExpires > block.timestamp) sub.grantExpires += numSeconds;
         else sub.grantExpires = (block.timestamp + numSeconds).toUint48();
+        sub.recalcExpiry();
     }
 
     /// @dev Revoke all granted time from a subscription
     function revokeTime(Subscription storage sub) internal returns (uint48) {
         uint48 remaining = sub.grantedTimeRemaining();
         sub.grantExpires = uint48(block.timestamp);
-        sub.retract(remaining);
+        sub.recalcExpiry();
         return remaining;
     }
 
@@ -39,7 +39,7 @@ library SubscriberLib {
     function refundTime(Subscription storage sub) internal returns (uint48) {
         uint48 refundedTime = sub.purchasedTimeRemaining();
         sub.purchaseExpires = uint48(block.timestamp);
-        sub.retract(refundedTime);
+        sub.recalcExpiry();
         return refundedTime;
     }
 
@@ -67,14 +67,8 @@ library SubscriberLib {
         return sub.expiresAt > block.timestamp ? sub.expiresAt - uint48(block.timestamp) : 0;
     }
 
-    /// @dev Extend the expiration time of a subscription and emit an update event
-    function extend(Subscription storage sub, uint48 numSeconds) internal {
-        if (sub.expiresAt > block.timestamp) sub.expiresAt += numSeconds;
-        else sub.expiresAt = (block.timestamp + numSeconds).toUint48();
-    }
-
-    /// @dev Retract the expiration time of a subscription and emit an update event
-    function retract(Subscription storage sub, uint48 numSeconds) internal {
-        sub.expiresAt -= numSeconds;
+    /// @dev Recalculate the expiration time of a subscription based on sum of grant and purchase time
+    function recalcExpiry(Subscription storage sub) internal {
+        sub.expiresAt = uint48(block.timestamp) + sub.purchasedTimeRemaining() + sub.grantedTimeRemaining();
     }
 }

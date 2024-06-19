@@ -169,4 +169,23 @@ contract STPV2Test is BaseTest {
         vm.expectRevert(abi.encodeWithSelector(AccessControlled.NotAuthorized.selector));
         stp.updateMetadata("x");
     }
+
+    function testTimedKick() public {
+        mint(alice, 0.001 ether);
+
+        vm.startPrank(creator);
+        stp.grantTime(alice, 30 days, 1);
+        assertEq(stp.balanceOf(alice), 60 days);
+        vm.warp(block.timestamp + 5 days);
+        assertEq(stp.balanceOf(alice), 60 days - 5 days);
+        stp.refund(alice, 0);
+        stp.revokeTime(alice);
+        stp.deactivateSubscription(alice);
+        vm.stopPrank();
+
+        assertEq(stp.subscriptionOf(alice).tierId, 0);
+        assertEq(stp.subscriptionOf(alice).purchaseExpiresAt, block.timestamp);
+        assertEq(stp.subscriptionOf(alice).expiresAt, block.timestamp);
+        assertEq(stp.balanceOf(alice), 0);
+    }
 }
